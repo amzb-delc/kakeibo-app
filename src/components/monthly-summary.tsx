@@ -87,11 +87,9 @@ function CategoryRow({ category, year, month, maxTotal, isOpen, onToggle }: Cate
 
 type Props = {
   summary: MonthlySummary;
-  onPrevMonth: () => void;
-  onNextMonth: () => void;
 };
 
-export function MonthlySummaryView({ summary, onPrevMonth, onNextMonth }: Props) {
+export function MonthlySummaryView({ summary }: Props) {
   const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
 
   const handleToggle = (categoryId: string) => {
@@ -100,9 +98,6 @@ export function MonthlySummaryView({ summary, onPrevMonth, onNextMonth }: Props)
 
   const totalLevel = getTrendLevel(summary.total, summary.prevTotal);
   const totalPercent = formatPercent(summary.total, summary.prevTotal);
-  const now = new Date();
-  const isCurrentMonth =
-    summary.year === now.getFullYear() && summary.month === now.getMonth() + 1;
 
   const maxCategoryTotal = Math.max(...summary.categories.map((c) => c.total), 0);
 
@@ -112,32 +107,7 @@ export function MonthlySummaryView({ summary, onPrevMonth, onNextMonth }: Props)
     : 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* ヘッダー */}
-      <header className="sticky top-0 z-10 bg-background border-b">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            type="button"
-            onClick={onPrevMonth}
-            className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            ◀
-          </button>
-          <h1 className="text-base font-semibold">
-            {summary.year}年{summary.month}月
-          </h1>
-          <button
-            type="button"
-            onClick={onNextMonth}
-            disabled={isCurrentMonth}
-            className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
-          >
-            ▶
-          </button>
-        </div>
-      </header>
-
-      <main className="px-4 py-6 space-y-6">
+    <main className="px-4 py-6 space-y-6">
         {/* 合計カード */}
         <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50">
           <div className="flex items-baseline justify-between mb-1">
@@ -192,7 +162,6 @@ export function MonthlySummaryView({ summary, onPrevMonth, onNextMonth }: Props)
             )}
           </div>
         </div>
-      </main>
-    </div>
+    </main>
   );
 }

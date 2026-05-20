@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExpenseForm } from "@/components/expense-form";
 import { prisma } from "@/lib/prisma";
 import { DEMO_HOUSEHOLD_ID } from "@/lib/auth";
 import { formatJstDate } from "@/lib/date";
+import { PageHeader } from "@/components/page-header";
 import type { Expense } from "@/types";
 
 type Params = Promise<{ id: string }>;
@@ -61,22 +61,11 @@ export default async function EditExpensePage({
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 bg-background border-b">
-        <div className="flex items-center px-4 py-3">
-          <Link
-            href={backHref}
-            className="text-muted-foreground hover:text-foreground min-w-[44px] min-h-[44px] flex items-center text-sm"
-          >
-            ← 戻る
-          </Link>
-          <div className="flex-1 text-center pr-[44px]">
-            <h1 className="text-base font-semibold">支出を編集</h1>
-            <p className="text-xs text-muted-foreground">
-              {spentAtJst} ・ {formatYen(expense.amount)}
-            </p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="支出を編集"
+        subtitle={`${spentAtJst} ・ ${formatYen(expense.amount)}`}
+        backHref={backHref}
+      />
       <main>
         <ExpenseForm
           categories={categories}

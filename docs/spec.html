@@ -291,6 +291,7 @@ hr {
     <li><a href="#overview">概要</a></li>
     <li><a href="#stack">技術スタック</a></li>
     <li><a href="#data-model">データモデル</a></li>
+    <li><a href="#layout">共通レイアウト</a></li>
     <li><a href="#screens">画面構成</a></li>
     <li><a href="#api">API仕様</a></li>
     <li><a href="#business-rules">ビジネスルール</a></li>
@@ -322,7 +323,7 @@ hr {
 
 <header class="title">
   <h1>家計簿アプリ — MVP仕様書</h1>
-  <div class="meta">最終更新: 2026-05-20 / 対象コミット: <code>b6cc1e1</code></div>
+  <div class="meta">最終更新: 2026-05-20（共通レイアウト + UI改修反映）</div>
 </header>
 
 <section id="overview">
@@ -365,11 +366,14 @@ hr {
 │       ├── expenses/[id]/route.ts
 │       └── monthly-summary/route.ts
 ├── components/
+│   ├── page-header.tsx       # 共通ヘッダ（全ページに sticky）
+│   ├── footer-nav.tsx        # 共通フッタ（3タブ + 中央 ＋FAB）
 │   ├── expense-form.tsx      # 登録 + 編集共用
 │   ├── monthly-summary.tsx
 │   └── ui/                   # shadcn コンポーネント
 ├── lib/
 │   ├── auth.ts               # DEMO_HOUSEHOLD_ID / getDemoUserId
+│   ├── app-meta.ts           # HOUSEHOLD_NAME / APP_VERSION / APP_LABEL
 │   ├── date.ts               # JSTヘルパ
 │   ├── expenses.ts           # listExpenses + validateExpenseInput
 │   ├── prisma.ts             # PrismaClient シングルトン
@@ -431,6 +435,64 @@ hr {
 
 <h3>Household / User / HouseholdMember</h3>
 <p>Householdは <code>notificationDay</code> / <code>notificationTime</code> を持つが、通知機能は未実装。HouseholdMember の <code>role</code> は <code>"owner"</code> | <code>"member"</code> を想定。MVPでは認証なしで使われる。</p>
+</section>
+
+<section id="layout">
+<h2>共通レイアウト</h2>
+<p>全ページが共通の <strong>ヘッダ</strong>（上部 sticky）と <strong>フッタ</strong>（下部 fixed）で囲まれる。各ページは中央のコンテンツのみを描画する。</p>
+
+<div class="ascii-art">┌───────────────────────────┐
+│ 我が家の家計簿 v0.1.0     │  ← アプリラベル（aria-hidden、装飾）
+│ [←] ページタイトル        │  ← ChevronLeft + h1 / subtitle
+├───────────────────────────┤
+│                           │
+│      (ページコンテンツ)   │
+│                           │
+├───────────────────────────┤
+│        ┏━━━━━━━━┓         │
+│        ┃   ＋   ┃         │  ← FAB（青グラデ + 白リング）
+│  [⌂]   ┗━━━━━━━━┛   [📊]  │
+└───────────────────────────┘
+       ↑ ホーム      ↑ サマリー</div>
+
+<h3>PageHeader（src/components/page-header.tsx）</h3>
+<table>
+<tr><th>項目</th><th>仕様</th></tr>
+<tr><td>位置</td><td><code>sticky top-0 z-10</code>、<code>safe-area-inset-top</code> 対応</td></tr>
+<tr><td>上段</td><td>「{HOUSEHOLD_NAME}の家計簿 v{APP_VERSION}」を <code>tracking-[0.18em]</code> で表示。<code>aria-hidden="true"</code>（SR で重複読み回避）</td></tr>
+<tr><td>下段</td><td>左: 戻る（ChevronLeft、44×44）、中央: ページタイトル（文字列なら <code>&lt;h1&gt;</code>、JSX も可）、右: アクション枠</td></tr>
+<tr><td>Props</td><td><code>title: ReactNode</code>, <code>subtitle?</code>, <code>backHref?</code>, <code>right?</code></td></tr>
+<tr><td>戻る</td><td><code>backHref</code> の文字列リンク（<code>router.back()</code> は使わない）。サニタイズは呼び出し元責任（<code>safeBackHref</code> を各ページで実装）</td></tr>
+<tr><td>注意</td><td><code>title</code> が JSX のときは <code>&lt;h1&gt;</code> 不在になるため、利用元で <code>&lt;h1 className="sr-only"&gt;</code> を別途置く（/summary がこれ）</td></tr>
+</table>
+
+<h3>FooterNav（src/components/footer-nav.tsx）</h3>
+<table>
+<tr><th>項目</th><th>仕様</th></tr>
+<tr><td>位置</td><td><code>fixed bottom-0 z-30</code>、<code>safe-area-inset-bottom</code> 対応、フッタ高 <code>h-24</code>（96px）</td></tr>
+<tr><td>3タブ</td><td>左: ホーム（Home アイコン）、中央: ＋FAB、右: サマリー（BarChart3 アイコン）。アクティブタブは <code>text-primary</code> + <code>aria-current="page"</code></td></tr>
+<tr><td>＋FAB</td><td>88×88、青グラデ <code>from-blue-500 to-blue-700</code>、白リング 8px、青系の接地シャドウ2層、<code>active:scale-90 translate-y-0.5</code> の押下感</td></tr>
+<tr><td>FAB の動線</td><td>現在パス＋クエリを <code>?back=</code> に渡して <code>/expenses/new</code> へ。保存後・キャンセル時に元の絞り込みへ戻れる</td></tr>
+<tr><td>アクティブ判定</td><td>ホーム: <code>pathname === "/"</code> / サマリー: <code>/summary</code> 配下 + <code>/expenses</code> 配下（ただし <code>/expenses/new</code> は除外）</td></tr>
+</table>
+
+<h3>余白計算</h3>
+<p><code>layout.tsx</code> の body 内コンテンツに <code>pb-[calc(env(safe-area-inset-bottom)+9rem)]</code> を当てる。内訳:</p>
+<ul>
+  <li>フッタ高 96px（<code>h-24</code>）</li>
+  <li>＋FAB の上方はみ出し 44px（<code>-top-11</code>）</li>
+  <li>余裕 4px 程度</li>
+  <li>= 計 144px（<code>9rem</code>）</li>
+</ul>
+
+<h3>app-meta（src/lib/app-meta.ts）</h3>
+<p>クライアントバンドルにも乗るため <code>prisma</code> を import しない。<code>package.json</code> の直 import は依存パッケージ一覧漏洩リスクのため避け、<code>APP_VERSION</code> は手書き定数で <code>package.json</code> と揃える。</p>
+<table>
+<tr><th>定数</th><th>用途</th></tr>
+<tr><td><code>HOUSEHOLD_NAME</code></td><td>世帯名（seed 固定値 "我が家"。TODO: DB から取得）</td></tr>
+<tr><td><code>APP_VERSION</code></td><td>"0.1.0"</td></tr>
+<tr><td><code>APP_LABEL</code></td><td>"我が家の家計簿 v0.1.0"（ヘッダ・<code>&lt;title&gt;</code> メタで共用）</td></tr>
+</table>
 </section>
 
 <section id="screens">
@@ -698,7 +760,44 @@ hr {
 <section id="changelog">
 <h2>改修履歴</h2>
 
-<h3>2026-05-20 — 支出 CRUD + コードレビュー対応</h3>
+<h3>2026-05-20 (PM) — 共通レイアウト + UI改修</h3>
+<p><span class="badge badge-major">major</span> ヘッダ・フッタの共通化、＋FAB の演出強化、レビュー反映を同梱。</p>
+
+<h4>新規</h4>
+<ul>
+  <li><code>src/components/footer-nav.tsx</code> — 3タブ + 中央 ＋FAB のフッタ。<code>aria-current</code>、青グラデ + 白リング + 接地シャドウ + active 演出</li>
+  <li><code>src/components/page-header.tsx</code> — 全ページ共通の sticky ヘッダ。アプリラベル（<code>aria-hidden</code>）+ 戻る + ページタイトル + アクション枠</li>
+  <li><code>src/lib/app-meta.ts</code> — <code>HOUSEHOLD_NAME</code> / <code>APP_VERSION</code> / <code>APP_LABEL</code> を集約（prisma 非依存、<code>package.json</code> も直 import しない）</li>
+</ul>
+
+<h4>既存ページ統一</h4>
+<ul>
+  <li>ホーム / 登録 / サマリー / 一覧 / 編集 の個別ヘッダを <code>PageHeader</code> に統合。MonthlySummaryView 内の旧 <code>&lt;header&gt;</code> を撤去</li>
+  <li>ホームの「支出を登録」「月次サマリー」ボタンを削除（フッタに集約）</li>
+  <li>＋FAB の <code>href</code> に現在パス＋クエリを <code>?back=</code> で渡し、保存後・キャンセル時に元の絞り込みへ復帰</li>
+  <li>編集だけでなく新規登録時も <code>backHref</code> で戻り先を制御</li>
+</ul>
+
+<h4>レビュー対応</h4>
+<ul>
+  <li><span class="badge badge-major">major</span> body 下部余白を <code>6.5rem → 9rem</code>（フッタ + FAB はみ出し + 余裕を明示）</li>
+  <li><span class="badge badge-major">major</span> <code>viewport.maximumScale: 1</code> を撤去（WCAG 1.4.4）</li>
+  <li><span class="badge badge-major">major</span> 月切替えボタン <code>w-9 h-9 → w-11 h-11</code>（44×44 順守）、<code>disabled={loading}</code>、aria-label 改善</li>
+  <li><span class="badge badge-major">major</span> アプリラベルを <code>aria-hidden</code>、<code>/summary</code> に <code>&lt;h1 className="sr-only"&gt;</code> 追加</li>
+  <li><span class="badge badge-major">major</span> FooterNav タブに <code>aria-current="page"</code>、<code>isSummary</code> 判定を <code>/expenses</code> 配下にも拡張（<code>/expenses/new</code> 除外）</li>
+  <li><span class="badge badge-minor">minor</span> 削除確認ダイアログを <code>z-30 → z-50</code>、<code>backdrop-blur-sm</code> 撤去、<code>LucideIcon</code> 型化</li>
+  <li><span class="badge badge-minor">minor</span> <code>editHref</code> を <code>URLSearchParams</code> で組み立て</li>
+  <li><span class="badge badge-minor">minor</span> <code>metadata.title</code> を「我が家の家計簿」に統一</li>
+</ul>
+
+<h4>その他</h4>
+<ul>
+  <li>フォント: <code>--font-sans</code> 自己参照のバグ修正 + Hiragino Sans / Noto Sans JP のフォールバック追加</li>
+</ul>
+
+<hr>
+
+<h3>2026-05-20 (AM) — 支出 CRUD + コードレビュー対応</h3>
 <p><span class="badge badge-major">major</span> 新機能と品質向上を同梱。コミット <code>b6cc1e1</code>。</p>
 
 <h4>新機能</h4>

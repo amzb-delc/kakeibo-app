@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import Link from "next/link";
 import { MonthlySummaryView } from "@/components/monthly-summary";
+import { PageHeader } from "@/components/page-header";
 import type { MonthlySummary } from "@/types";
 
 export default function SummaryPage() {
@@ -25,7 +25,6 @@ export default function SummaryPage() {
     } finally {
       setLoading(false);
       isInitial.current = false;
-      // Fade in after data arrives
       requestAnimationFrame(() => setFade(false));
     }
   }, [year, month]);
@@ -52,37 +51,52 @@ export default function SummaryPage() {
     }
   };
 
-  if (!summary && loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-sm text-muted-foreground">
-        読み込み中…
-      </div>
-    );
-  }
+  const isCurrentMonth =
+    year === now.getFullYear() && month === now.getMonth() + 1;
 
-  if (!summary) return null;
+  const monthSwitcher = (
+    <div className="flex items-center justify-center gap-2">
+      <button
+        type="button"
+        onClick={handlePrevMonth}
+        disabled={loading}
+        aria-label="前月"
+        className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+      >
+        ◀
+      </button>
+      <span className="text-base font-semibold tabular-nums">
+        {year}年{month}月
+      </span>
+      <button
+        type="button"
+        onClick={handleNextMonth}
+        disabled={isCurrentMonth || loading}
+        aria-label={isCurrentMonth ? "翌月（未来は表示できません）" : "翌月"}
+        className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+      >
+        ▶
+      </button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
-      {/* 戻るリンク */}
-      <div className="sticky top-0 z-20 bg-background px-4 pt-3">
-        <Link
-          href="/"
-          className="text-muted-foreground hover:text-foreground text-sm min-h-[44px] inline-flex items-center"
+      {/* PageHeader の title が JSX のため h1 が失われる。ランドマーク確保用に sr-only で補う。 */}
+      <h1 className="sr-only">月次サマリー</h1>
+      <PageHeader title={monthSwitcher} />
+      {!summary && loading ? (
+        <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+          読み込み中…
+        </div>
+      ) : summary ? (
+        <div
+          className="transition-opacity duration-150"
+          style={{ opacity: fade ? 0 : 1 }}
         >
-          ← 戻る
-        </Link>
-      </div>
-      <div
-        className="transition-opacity duration-150"
-        style={{ opacity: fade ? 0 : 1 }}
-      >
-        <MonthlySummaryView
-          summary={summary}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
-        />
-      </div>
+          <MonthlySummaryView summary={summary} />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { DEMO_HOUSEHOLD_ID } from "@/lib/auth";
 import { formatJstDateLabel } from "@/lib/date";
 import { listExpenses } from "@/lib/expenses";
+import { PageHeader } from "@/components/page-header";
 
 type SearchParams = Promise<{
   year?: string;
@@ -35,24 +36,18 @@ export default async function ExpensesPage({
   ]);
 
   const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+  const listParams = new URLSearchParams({ year: String(year), month: String(month) });
+  if (categoryId) listParams.set("categoryId", categoryId);
+  const listSelfHref = `/expenses?${listParams.toString()}`;
   const backHref = `/summary?year=${year}&month=${month}`;
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 bg-background border-b">
-        <div className="flex items-center px-4 py-3">
-          <Link
-            href={backHref}
-            className="text-muted-foreground hover:text-foreground min-w-[44px] min-h-[44px] flex items-center text-sm"
-          >
-            ← 戻る
-          </Link>
-          <h1 className="flex-1 text-center text-base font-semibold pr-[44px]">
-            {year}年{month}月
-            {category ? ` ・ ${category.name}` : ""}
-          </h1>
-        </div>
-      </header>
+      <PageHeader
+        title={`${year}年${month}月${category ? ` ・ ${category.name}` : ""}`}
+        backHref={backHref}
+      />
 
       <main className="px-4 py-6 space-y-6">
         <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50">
@@ -71,9 +66,7 @@ export default async function ExpensesPage({
             </p>
           ) : (
             expenses.map((exp) => {
-              const editHref = `/expenses/${exp.id}/edit?back=${encodeURIComponent(
-                `/expenses?year=${year}&month=${month}${categoryId ? `&categoryId=${categoryId}` : ""}`
-              )}`;
+              const editHref = `/expenses/${exp.id}/edit?back=${encodeURIComponent(listSelfHref)}`;
               return (
                 <Link
                   key={exp.id}

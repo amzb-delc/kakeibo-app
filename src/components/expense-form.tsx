@@ -94,7 +94,7 @@ export function ExpenseForm({ categories, expense, backHref }: Props) {
         throw new Error(data.error ?? "保存に失敗しました");
       }
 
-      const redirect = expense ? (backHref ?? "/") : "/";
+      const redirect = backHref ?? "/";
       finishWithToast(expense ? "更新しました" : "保存しました", redirect);
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
@@ -229,7 +229,7 @@ export function ExpenseForm({ categories, expense, backHref }: Props) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-title"
-          className="fixed inset-0 z-30 flex items-end sm:items-center justify-center bg-black/40"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40"
           onClick={() => setConfirmingDelete(false)}
         >
           <div

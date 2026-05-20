@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { FooterNav } from "@/components/footer-nav";
+import { HOUSEHOLD_NAME } from "@/lib/app-meta";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -12,20 +14,23 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// maximumScale は WCAG 2.1 SC 1.4.4 違反になるため設定しない。
+// iOS Safari のフォーム自動ズーム回避は入力フィールド側を 16px 以上にすることで対応。
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
 };
 
+const APP_TITLE = `${HOUSEHOLD_NAME}の家計簿`;
+
 export const metadata: Metadata = {
-  title: "家計簿",
+  title: APP_TITLE,
   description: "夫婦のための家計簿アプリ",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "家計簿",
+    title: APP_TITLE,
   },
   icons: {
     icon: "/icon.svg",
@@ -44,8 +49,15 @@ export default function RootLayout({
       lang="ja"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col pb-[env(safe-area-inset-bottom)]">
-        {children}
+      <body className="min-h-full flex flex-col">
+        {/*
+          フッタ高 96px + FAB の上方はみ出し 44px + 余白 ≒ 144px(9rem) を確保。
+          末尾のコンテンツが FAB に隠れないようにするため。
+        */}
+        <div className="flex-1 pb-[calc(env(safe-area-inset-bottom)+9rem)]">
+          {children}
+        </div>
+        <FooterNav />
       </body>
     </html>
   );
