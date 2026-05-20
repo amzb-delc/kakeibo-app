@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿アプリ — MVP仕様書</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --pre-bg: #1f2937;
+  --pre-fg: #e5e7eb;
+  --kbd-bg: #f3f4f6;
+  --badge-critical-bg: #fee2e2;
+  --badge-critical-fg: #991b1b;
+  --badge-major-bg: #fef3c7;
+  --badge-major-fg: #92400e;
+  --badge-minor-bg: #dbeafe;
+  --badge-minor-fg: #1e40af;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --pre-bg: #0d1117;
+    --pre-fg: #c9d1d9;
+    --kbd-bg: #21262d;
+    --badge-critical-bg: #450a0a;
+    --badge-critical-fg: #fca5a5;
+    --badge-major-bg: #451a03;
+    --badge-major-fg: #fcd34d;
+    --badge-minor-bg: #172554;
+    --badge-minor-fg: #93c5fd;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 0;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+nav.toc {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 24px 16px;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 13px;
+}
+nav.toc h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 16px 0 8px;
+}
+nav.toc h2:first-child { margin-top: 0; }
+nav.toc ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+nav.toc li { margin: 4px 0; }
+nav.toc a {
+  color: var(--fg);
+  text-decoration: none;
+  padding: 4px 8px;
+  display: block;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+nav.toc a:hover { background: var(--code-bg); color: var(--primary); }
+main {
+  padding: 32px 40px 80px;
+  min-width: 0;
+}
+header.title {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+}
+header.title h1 {
+  font-size: 28px;
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+header.title .meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+h2 {
+  margin: 48px 0 16px;
+  font-size: 22px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  scroll-margin-top: 16px;
+}
+h3 {
+  margin: 32px 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  scroll-margin-top: 16px;
+}
+h4 {
+  margin: 20px 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+p { margin: 8px 0 12px; }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 24px;
+  font-size: 14px;
+}
+th, td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: var(--code-bg);
+  font-weight: 600;
+  font-size: 13px;
+}
+code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+pre {
+  background: var(--pre-bg);
+  color: var(--pre-fg);
+  padding: 14px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.method {
+  display: inline-block;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.method-get { background: #dbeafe; color: #1e40af; }
+.method-post { background: #d1fae5; color: #065f46; }
+.method-patch { background: #fef3c7; color: #92400e; }
+.method-delete { background: #fee2e2; color: #991b1b; }
+@media (prefers-color-scheme: dark) {
+  .method-get { background: #172554; color: #93c5fd; }
+  .method-post { background: #064e3b; color: #6ee7b7; }
+  .method-patch { background: #451a03; color: #fcd34d; }
+  .method-delete { background: #450a0a; color: #fca5a5; }
+}
+.endpoint {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  background: var(--card);
+}
+.endpoint > h4 {
+  margin-top: 0;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14px;
+}
+.note {
+  background: var(--primary-bg);
+  border-left: 3px solid var(--primary);
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.warn {
+  background: var(--badge-major-bg);
+  border-left: 3px solid var(--warning);
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.ascii-art {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  background: var(--code-bg);
+  padding: 14px 16px;
+  border-radius: 8px;
+  white-space: pre;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.badge-critical { background: var(--badge-critical-bg); color: var(--badge-critical-fg); }
+.badge-major { background: var(--badge-major-bg); color: var(--badge-major-fg); }
+.badge-minor { background: var(--badge-minor-bg); color: var(--badge-minor-fg); }
+
+.color-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  vertical-align: middle;
+  margin-right: 6px;
+}
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 32px 0;
+}
+@media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  main { padding: 24px 16px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="toc">
+  <h2>目次</h2>
+  <ul>
+    <li><a href="#overview">概要</a></li>
+    <li><a href="#stack">技術スタック</a></li>
+    <li><a href="#data-model">データモデル</a></li>
+    <li><a href="#screens">画面構成</a></li>
+    <li><a href="#api">API仕様</a></li>
+    <li><a href="#business-rules">ビジネスルール</a></li>
+    <li><a href="#design">UIガイド</a></li>
+    <li><a href="#out-of-scope">MVPスコープ外</a></li>
+    <li><a href="#changelog">改修履歴</a></li>
+  </ul>
+  <h2>画面</h2>
+  <ul>
+    <li><a href="#screen-home">/ ホーム</a></li>
+    <li><a href="#screen-new">/expenses/new</a></li>
+    <li><a href="#screen-summary">/summary</a></li>
+    <li><a href="#screen-list">/expenses</a></li>
+    <li><a href="#screen-edit">/expenses/[id]/edit</a></li>
+  </ul>
+  <h2>API</h2>
+  <ul>
+    <li><a href="#api-categories">GET /api/categories</a></li>
+    <li><a href="#api-expenses-list">GET /api/expenses</a></li>
+    <li><a href="#api-expenses-create">POST /api/expenses</a></li>
+    <li><a href="#api-expenses-get">GET /api/expenses/[id]</a></li>
+    <li><a href="#api-expenses-patch">PATCH /api/expenses/[id]</a></li>
+    <li><a href="#api-expenses-delete">DELETE /api/expenses/[id]</a></li>
+    <li><a href="#api-monthly-summary">GET /api/monthly-summary</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<header class="title">
+  <h1>家計簿アプリ — MVP仕様書</h1>
+  <div class="meta">最終更新: 2026-05-20 / 対象コミット: <code>b6cc1e1</code></div>
+</header>
+
+<section id="overview">
+<h2>概要</h2>
+<p>夫婦2人で日々の支出を素早く記録し、月単位で振り返るための家計簿アプリ。iPhone Safari をメインデバイスとして PWA 対応する。</p>
+<table>
+<tr><th>項目</th><th>内容</th></tr>
+<tr><td>利用者</td><td>夫婦2人（1世帯）</td></tr>
+<tr><td>主要デバイス</td><td>iPhone（Safari、PWAインストール想定）</td></tr>
+<tr><td>目的</td><td>支出の即時記録 + 月次の使い方の可視化</td></tr>
+<tr><td>認証</td><td>MVPでは未実装。固定の <code>demo-household</code> にスコープ</td></tr>
+<tr><td>タイムゾーン</td><td>JST（Asia/Tokyo）固定</td></tr>
+</table>
+</section>
+
+<section id="stack">
+<h2>技術スタック</h2>
+<table>
+<tr><th>レイヤー</th><th>技術</th></tr>
+<tr><td>フレームワーク</td><td>Next.js 16（App Router、Turbopack dev）</td></tr>
+<tr><td>言語</td><td>TypeScript</td></tr>
+<tr><td>UI</td><td>shadcn-ui + Tailwind CSS</td></tr>
+<tr><td>DB</td><td>PostgreSQL</td></tr>
+<tr><td>ORM</td><td>Prisma 5（<code>src/lib/prisma.ts</code> でシングルトン）</td></tr>
+<tr><td>PWA</td><td><code>public/manifest.json</code>、アイコン PNG/SVG</td></tr>
+</table>
+
+<h3>主なディレクトリ</h3>
+<pre><code>src/
+├── app/
+│   ├── page.tsx              # / ホーム
+│   ├── summary/page.tsx      # /summary 月次サマリー
+│   ├── expenses/
+│   │   ├── new/page.tsx      # /expenses/new 支出登録
+│   │   ├── page.tsx          # /expenses 一覧
+│   │   └── [id]/edit/page.tsx# /expenses/[id]/edit 編集
+│   └── api/
+│       ├── categories/route.ts
+│       ├── expenses/route.ts
+│       ├── expenses/[id]/route.ts
+│       └── monthly-summary/route.ts
+├── components/
+│   ├── expense-form.tsx      # 登録 + 編集共用
+│   ├── monthly-summary.tsx
+│   └── ui/                   # shadcn コンポーネント
+├── lib/
+│   ├── auth.ts               # DEMO_HOUSEHOLD_ID / getDemoUserId
+│   ├── date.ts               # JSTヘルパ
+│   ├── expenses.ts           # listExpenses + validateExpenseInput
+│   ├── prisma.ts             # PrismaClient シングルトン
+│   └── trend.ts              # トレンドレベル判定
+├── types/index.ts            # Expense / Category / MonthlySummary
+└── ...
+</code></pre>
+
+<h3>開発コマンド</h3>
+<table>
+<tr><th>コマンド</th><th>用途</th></tr>
+<tr><td><code>npm run dev</code></td><td>開発サーバ（localhost:3000）</td></tr>
+<tr><td><code>npm run build</code></td><td>プロダクションビルド</td></tr>
+<tr><td><code>npm run lint</code></td><td>ESLint</td></tr>
+<tr><td><code>npx prisma migrate dev</code></td><td>マイグレーション</td></tr>
+<tr><td><code>npx prisma db seed</code></td><td>シードデータ投入</td></tr>
+<tr><td><code>npx prisma studio</code></td><td>DB GUI</td></tr>
+</table>
+</section>
+
+<section id="data-model">
+<h2>データモデル</h2>
+<p>すべてのテーブルは世帯（<code>Household</code>）にスコープされる。MVP では <code>demo-household</code> 1件のみが seed で投入される。</p>
+
+<h3>ER概要</h3>
+<pre><code>User ──┐
+       ├── HouseholdMember ── Household ──┬── Category ──┐
+       │                                  │              │
+       └────────────── Expense ───────────┴──────────────┘
+                       (createdByUserId, householdId, categoryId)
+</code></pre>
+
+<h3>Expense（支出）</h3>
+<table>
+<tr><th>カラム</th><th>型</th><th>備考</th></tr>
+<tr><td>id</td><td>String (cuid)</td><td>PK</td></tr>
+<tr><td>householdId</td><td>String</td><td>FK → Household（onDelete: Cascade）</td></tr>
+<tr><td>categoryId</td><td>String</td><td>FK → Category（onDelete: Restrict）</td></tr>
+<tr><td>amount</td><td>Int</td><td>円単位整数。1〜100,000,000</td></tr>
+<tr><td>spentAt</td><td>DateTime</td><td>JSTの「日」を表す（JST 00:00 を UTC で格納）</td></tr>
+<tr><td>storeName</td><td>String?</td><td>任意。最大100文字</td></tr>
+<tr><td>memo</td><td>String?</td><td>任意。最大500文字</td></tr>
+<tr><td>receiptImageUrl</td><td>String?</td><td>将来のレシート画像URL</td></tr>
+<tr><td>ocrRawText</td><td>String?</td><td>将来のOCR生テキスト</td></tr>
+<tr><td>createdByUserId</td><td>String</td><td>FK → User（onDelete: Restrict）</td></tr>
+<tr><td>createdAt / updatedAt</td><td>DateTime</td><td>Prisma 標準</td></tr>
+</table>
+<p><strong>インデックス:</strong> <code>(householdId, spentAt)</code>, <code>(categoryId, spentAt)</code></p>
+
+<h3>Category（カテゴリ）</h3>
+<table>
+<tr><th>カラム</th><th>型</th><th>備考</th></tr>
+<tr><td>id</td><td>String (cuid)</td><td>PK</td></tr>
+<tr><td>householdId</td><td>String</td><td>FK → Household</td></tr>
+<tr><td>name</td><td>String</td><td>世帯内ユニーク</td></tr>
+<tr><td>sortOrder</td><td>Int</td><td>表示順</td></tr>
+</table>
+<p><strong>初期カテゴリ:</strong> 食費 / 日用品 / 交通費 / 娯楽 / 医療 / 特別費 / 美容 / 教育 / その他</p>
+
+<h3>Household / User / HouseholdMember</h3>
+<p>Householdは <code>notificationDay</code> / <code>notificationTime</code> を持つが、通知機能は未実装。HouseholdMember の <code>role</code> は <code>"owner"</code> | <code>"member"</code> を想定。MVPでは認証なしで使われる。</p>
+</section>
+
+<section id="screens">
+<h2>画面構成</h2>
+
+<h3 id="screen-home">/ ホーム</h3>
+<p>当月支出のサマリーカードと、登録・サマリーへの導線。</p>
+<div class="ascii-art">┌─────────────────────────┐
+│       家計簿            │
+│  ┌───────────────────┐  │
+│  │  5月の支出         │  │
+│  │  ¥142,500    ↑ +8%│  │
+│  │  先月: ¥131,800    │  │
+│  └───────────────────┘  │
+│  ┌───────────────────┐  │
+│  │   支出を登録       │  │
+│  └───────────────────┘  │
+│  ┌───────────────────┐  │
+│  │   月次サマリー     │  │
+│  └───────────────────┘  │
+└─────────────────────────┘</div>
+<p><strong>データ:</strong> 当月合計、前月合計、トレンドアイコン、前月比%（前月0円の場合は非表示）。サーバコンポーネントで Prisma 直接取得。</p>
+
+<h3 id="screen-new">/expenses/new 支出登録</h3>
+<p>金額・日付・カテゴリ必須、店名・メモ任意。保存後トースト→ホームに遷移。</p>
+<table>
+<tr><th>項目</th><th>仕様</th></tr>
+<tr><td>金額</td><td>テンキー（<code>inputmode="numeric"</code>）、¥プレフィクス、右寄せ大きめフォント</td></tr>
+<tr><td>日付</td><td><code>&lt;input type="date"&gt;</code>、デフォルト <code>todayJst()</code></td></tr>
+<tr><td>カテゴリ</td><td>チップ横スクロール選択（タップ1回）</td></tr>
+<tr><td>店名 / メモ</td><td>任意。空文字なら null として送信</td></tr>
+<tr><td>保存</td><td><code>POST /api/expenses</code> → トースト「保存しました」→ 2秒後 <code>/</code></td></tr>
+</table>
+
+<h3 id="screen-summary">/summary 月次サマリー</h3>
+<p>月切り替え（◀▶）と、カテゴリ別の前月比バーチャート。</p>
+<table>
+<tr><th>項目</th><th>仕様</th></tr>
+<tr><td>月切り替え</td><td>クライアント側 useState で year/month を保持、API再取得</td></tr>
+<tr><td>翌月ボタン</td><td>当月なら disabled</td></tr>
+<tr><td>合計カード</td><td>当月合計、前月合計、前月比%、プログレスバー（先月100%基準、150%で頭打ち）</td></tr>
+<tr><td>カテゴリ行</td><td>金額・トレンドアイコン・幅 = 最大カテゴリ比のバー</td></tr>
+<tr><td>展開時</td><td>先月額・前月比% + 「明細を見る →」リンク（<code>/expenses?year=&amp;month=&amp;categoryId=</code>）</td></tr>
+</table>
+
+<h3 id="screen-list">/expenses 支出一覧</h3>
+<p>指定月（とオプションでカテゴリ）の支出を時系列降順で表示。各行タップで編集画面へ。</p>
+<table>
+<tr><th>クエリパラメータ</th><th>意味</th></tr>
+<tr><td><code>year</code> / <code>month</code></td><td>表示対象月（未指定なら当月）</td></tr>
+<tr><td><code>categoryId</code></td><td>カテゴリ絞り込み（空文字 = 全件）</td></tr>
+</table>
+<p><strong>表示要素:</strong> 件数 / 合計、行毎に日付（<code>M/D(曜)</code>） / 金額 / カテゴリバッジ / 店名 or メモ。</p>
+<p><strong>編集遷移:</strong> 各行に <code>?back=</code> で元の一覧URLを付与し、編集後に同じ絞り込みへ戻れるようにする。</p>
+
+<h3 id="screen-edit">/expenses/[id]/edit 編集</h3>
+<p><code>ExpenseForm</code> を編集モードで利用。保存・削除後は <code>?back=</code> で渡された URL に遷移（無ければ <code>/</code>）。</p>
+<table>
+<tr><th>操作</th><th>仕様</th></tr>
+<tr><td>更新</td><td><code>PATCH /api/expenses/[id]</code> → トースト「更新しました」</td></tr>
+<tr><td>削除</td><td>独自の確認ダイアログ → <code>DELETE</code> → トースト「削除しました」</td></tr>
+<tr><td>送信中ロック</td><td>state machine <code>idle | submitting | deleting | redirecting</code> でフォーム全体を disable</td></tr>
+<tr><td>ヘッダ補助</td><td>「YYYY-MM-DD ・ ¥金額」をサブテキストで表示</td></tr>
+</table>
+<p><strong>戻り先のサニタイズ:</strong> <code>?back=</code> は <code>/</code> 始まり（かつ <code>//</code> 除外）の内部リンクのみ許可。</p>
+</section>
+
+<section id="api">
+<h2>API仕様</h2>
+<p>すべてのエンドポイントは <code>DEMO_HOUSEHOLD_ID</code> に暗黙スコープされる。認証は未実装。</p>
+
+<div class="endpoint" id="api-categories">
+<h4><span class="method method-get">GET</span> /api/categories</h4>
+<p>世帯のカテゴリ一覧を <code>sortOrder</code> 昇順で返す。</p>
+<p><strong>レスポンス:</strong> <code>Category[]</code></p>
+<pre><code>[
+  { "id": "...", "name": "食費", "sortOrder": 0 },
+  ...
+]</code></pre>
+</div>
+
+<div class="endpoint" id="api-expenses-list">
+<h4><span class="method method-get">GET</span> /api/expenses</h4>
+<p>クエリで月とカテゴリで絞り込み。最大 <code>500</code> 件、<code>spentAt</code> 降順 → <code>createdAt</code> 降順。</p>
+<p><strong>クエリ:</strong> <code>year</code>, <code>month</code>, <code>categoryId</code>（いずれも任意）。<code>year</code> と <code>month</code> はペアで JST 月境界に変換される。</p>
+<p><strong>レスポンス:</strong> <code>Expense[]</code>（<code>category: { id, name }</code> を include）</p>
+</div>
+
+<div class="endpoint" id="api-expenses-create">
+<h4><span class="method method-post">POST</span> /api/expenses</h4>
+<p>支出を新規作成。</p>
+<p><strong>必須:</strong> <code>amount</code>（1〜100,000,000の整数）、<code>spentAt</code>（<code>YYYY-MM-DD</code>）、<code>categoryId</code>（世帯のカテゴリ）</p>
+<p><strong>任意:</strong> <code>storeName</code>（≤100）、<code>memo</code>（≤500）、<code>receiptImageUrl</code></p>
+<p><strong>レスポンス:</strong> <code>201</code> + 作成された <code>Expense</code> / <code>400</code> + <code>{ error }</code></p>
+<pre><code>{
+  "amount": 1280,
+  "spentAt": "2026-05-20",
+  "categoryId": "...",
+  "storeName": "スーパー〇〇",
+  "memo": null
+}</code></pre>
+</div>
+
+<div class="endpoint" id="api-expenses-get">
+<h4><span class="method method-get">GET</span> /api/expenses/[id]</h4>
+<p>1件取得。他世帯のIDは <code>404</code>。</p>
+</div>
+
+<div class="endpoint" id="api-expenses-patch">
+<h4><span class="method method-patch">PATCH</span> /api/expenses/[id]</h4>
+<p>部分更新。送信したフィールドのみ更新（<code>undefined</code> は無視）。</p>
+<p><strong>世帯スコープ:</strong> <code>updateMany({ where: { id, householdId } })</code> で 1 クエリ。0件なら <code>404</code>。</p>
+<p><strong>バリデーション:</strong> POSTと同じガード関数（<code>validateExpenseInput(body, { partial: true })</code>）。</p>
+<p><strong>空文字の扱い:</strong></p>
+<table>
+<tr><th>フィールド</th><th><code>undefined</code></th><th><code>""</code></th></tr>
+<tr><td>amount</td><td>スキップ</td><td>400</td></tr>
+<tr><td>spentAt</td><td>スキップ</td><td>400</td></tr>
+<tr><td>categoryId</td><td>スキップ</td><td>400</td></tr>
+<tr><td>storeName / memo / receiptImageUrl</td><td>スキップ</td><td>null にクリア</td></tr>
+</table>
+</div>
+
+<div class="endpoint" id="api-expenses-delete">
+<h4><span class="method method-delete">DELETE</span> /api/expenses/[id]</h4>
+<p>削除。<code>deleteMany({ where: { id, householdId } })</code> で 1 クエリ。0件なら <code>404</code>。</p>
+</div>
+
+<div class="endpoint" id="api-monthly-summary">
+<h4><span class="method method-get">GET</span> /api/monthly-summary</h4>
+<p>当月と前月のカテゴリ別集計。</p>
+<p><strong>クエリ:</strong> <code>year</code>, <code>month</code>（未指定なら当月）</p>
+<p><strong>レスポンス:</strong></p>
+<pre><code>{
+  "year": 2026,
+  "month": 5,
+  "total": 142500,
+  "prevTotal": 131800,
+  "categories": [
+    {
+      "categoryId": "...",
+      "name": "食費",
+      "sortOrder": 0,
+      "total": 52300,
+      "prevTotal": 48100
+    },
+    ...
+  ]
+}</code></pre>
+<p>前月は年跨ぎを考慮（month=1 のときは前年12月）。</p>
+</div>
+</section>
+
+<section id="business-rules">
+<h2>ビジネスルール</h2>
+
+<h3>日付・タイムゾーン</h3>
+<p>ユーザーが選ぶ「日付」は JST の暦日として解釈する。サーバの実行 TZ に依存しないよう、<code>src/lib/date.ts</code> で集中管理する。</p>
+<table>
+<tr><th>ヘルパ</th><th>挙動</th></tr>
+<tr><td><code>jstMonthRange(y, m)</code></td><td>JST 月初〜翌月初の <code>{ gte, lt }</code> を UTC Date で返す（<code>Date.UTC(..., -9, 0, 0)</code>）</td></tr>
+<tr><td><code>formatJstDate(date)</code></td><td><code>Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" })</code> で <code>YYYY-MM-DD</code> を返す</td></tr>
+<tr><td><code>todayJst()</code></td><td>今日の JST 日付（<code>YYYY-MM-DD</code>）</td></tr>
+<tr><td><code>parseJstDate("YYYY-MM-DD")</code></td><td>その日の JST 00:00 を UTC で表現した Date</td></tr>
+<tr><td><code>formatJstDateLabel(date)</code></td><td><code>M/D(曜)</code></td></tr>
+</table>
+<div class="note">画面表示・DB格納・クエリ境界はすべて同じヘルパを通すこと。直接 <code>new Date(year, month-1, 1)</code> 等を書かない。</div>
+
+<h3>入力バリデーション</h3>
+<p><code>src/lib/expenses.ts</code> の <code>validateExpenseInput(body, { partial })</code> に集約。POST/PATCH の双方が同じ関数を通る。</p>
+<table>
+<tr><th>フィールド</th><th>ルール</th></tr>
+<tr><td>amount</td><td>整数 / 1以上 / 100,000,000以下 / 有限値</td></tr>
+<tr><td>spentAt</td><td>正規表現 <code>/^\d{4}-\d{2}-\d{2}$/</code></td></tr>
+<tr><td>categoryId</td><td>非空文字列、かつ DB で <code>householdId = DEMO_HOUSEHOLD_ID</code> の Category に存在</td></tr>
+<tr><td>storeName</td><td>≤100文字、空文字は null</td></tr>
+<tr><td>memo</td><td>≤500文字、空文字は null</td></tr>
+<tr><td>receiptImageUrl</td><td>文字列、空文字は null</td></tr>
+</table>
+
+<h3>世帯スコープ（権限）</h3>
+<ul>
+  <li>全クエリの <code>where</code> に <code>householdId: DEMO_HOUSEHOLD_ID</code> を含める</li>
+  <li>POST/PATCH では <code>categoryId</code> の世帯所属を DB レベルで検証する（IDOR防止）</li>
+  <li>UPDATE/DELETE は <code>updateMany</code> / <code>deleteMany</code> で <code>where</code> に <code>householdId</code> を入れる</li>
+</ul>
+
+<h3>トレンドレベル</h3>
+<p><code>src/lib/trend.ts</code> の <code>getTrendLevel(current, prev)</code>。</p>
+<table>
+<tr><th>レベル</th><th>条件</th><th>アイコン</th><th>色</th></tr>
+<tr><td><code>up2</code></td><td>+20% 以上 / 前月0で当月&gt;0</td><td>↑↑</td><td>赤</td></tr>
+<tr><td><code>up1</code></td><td>+5% 以上 +20% 未満</td><td>↑</td><td>オレンジ</td></tr>
+<tr><td><code>flat</code></td><td>±5% 以内 / 前月0で当月0</td><td>→</td><td>グレー</td></tr>
+<tr><td><code>down</code></td><td>-5% 以下</td><td>↓</td><td>緑</td></tr>
+</table>
+
+<h3>ExpenseForm の状態</h3>
+<p>送信中のレース回避のため、フォーム全体を以下の状態機械で管理する。</p>
+<table>
+<tr><th>state</th><th>意味</th><th>UI</th></tr>
+<tr><td>idle</td><td>編集可能</td><td>全項目操作可</td></tr>
+<tr><td>submitting</td><td>API送信中</td><td>全項目 disabled、保存ボタンが「保存中…」</td></tr>
+<tr><td>deleting</td><td>削除中</td><td>全項目 disabled、削除ボタンが「削除中…」</td></tr>
+<tr><td>redirecting</td><td>トースト表示→画面遷移待ち（2秒）</td><td>全項目 disabled のまま維持</td></tr>
+</table>
+</section>
+
+<section id="design">
+<h2>UIガイド（抜粋）</h2>
+
+<h3>原則</h3>
+<ol>
+  <li><strong>片手で完結</strong> — 親指可動域に主要アクション</li>
+  <li><strong>3タップ以内</strong> — 支出登録は開く→入力→保存</li>
+  <li><strong>一目で分かる</strong> — 金額・トレンドは大きく</li>
+  <li><strong>余白で整理</strong> — 詰め込まない</li>
+</ol>
+
+<h3>カラーパレット</h3>
+<table>
+<tr><th>用途</th><th>トークン</th><th>値</th><th>サンプル</th></tr>
+<tr><td>背景</td><td>--background</td><td>#FAFAF8</td><td><span class="color-swatch" style="background:#FAFAF8"></span></td></tr>
+<tr><td>カード</td><td>--card</td><td>#FFFFFF</td><td><span class="color-swatch" style="background:#FFFFFF"></span></td></tr>
+<tr><td>テキスト</td><td>--foreground</td><td>#1A1A1A</td><td><span class="color-swatch" style="background:#1A1A1A"></span></td></tr>
+<tr><td>プライマリ</td><td>--primary</td><td>#2563EB</td><td><span class="color-swatch" style="background:#2563EB"></span></td></tr>
+<tr><td>成功</td><td>--success</td><td>#16A34A</td><td><span class="color-swatch" style="background:#16A34A"></span></td></tr>
+<tr><td>警告</td><td>--warning</td><td>#F59E0B</td><td><span class="color-swatch" style="background:#F59E0B"></span></td></tr>
+<tr><td>危険</td><td>--destructive</td><td>#DC2626</td><td><span class="color-swatch" style="background:#DC2626"></span></td></tr>
+</table>
+<p>本アプリの UI は常にライトモード固定（iOS 外観モードに関わらず）。将来のダークモードは CSS 変数の差し替えで対応する設計。</p>
+
+<h3>タッチターゲット</h3>
+<ul>
+  <li>最小 44×44 px（Apple HIG）</li>
+  <li>主要ボタン高 48 px（<code>h-12</code>）以上</li>
+  <li>リスト行 <code>min-h-[56px]</code></li>
+  <li><code>&lt;input&gt;</code> は 16 px 以上（iOS Safari の自動ズーム回避）</li>
+</ul>
+
+<h3>カード / 余白</h3>
+<ul>
+  <li>角丸 <code>rounded-2xl</code>（16 px）</li>
+  <li>パディング <code>p-4</code>、影 <code>shadow-sm</code></li>
+  <li>セクション間 <code>py-6</code>、左右 <code>px-4</code></li>
+</ul>
+
+<div class="note">詳細は <code>Design.md</code> を参照。Phase 1〜3（カラー/PWA/ボタン/カード/トースト/アニメーション/PWAアイコン）は 2026-04-09 に完了済み。</div>
+</section>
+
+<section id="out-of-scope">
+<h2>MVPスコープ外</h2>
+<ul>
+  <li><strong>認証・複数ユーザー</strong>:
+    <code>demo-household</code> 固定。<code>src/lib/auth.ts</code> を差し替える前提で各 API に集約済み。</li>
+  <li><strong>OCR レシート読み取り</strong>: <code>handleOcr()</code> のスタブのみ。<code>Expense.receiptImageUrl</code> / <code>ocrRawText</code> は将来用に存在。</li>
+  <li><strong>通知</strong>: <code>Household.notificationDay</code> / <code>notificationTime</code> はフィールドのみ。送信ロジックなし。</li>
+  <li><strong>カテゴリ管理 UI</strong>: seed 固定、追加・並び替え・リネーム未対応。</li>
+  <li><strong>予算機能</strong>: 未実装。</li>
+  <li><strong>ダークモード</strong>: 常にライト固定。</li>
+  <li><strong>多通貨</strong>: 円固定。</li>
+</ul>
+</section>
+
+<section id="changelog">
+<h2>改修履歴</h2>
+
+<h3>2026-05-20 — 支出 CRUD + コードレビュー対応</h3>
+<p><span class="badge badge-major">major</span> 新機能と品質向上を同梱。コミット <code>b6cc1e1</code>。</p>
+
+<h4>新機能</h4>
+<ul>
+  <li><code>/expenses</code> 一覧画面（月 + カテゴリ絞り込み）</li>
+  <li><code>/expenses/[id]/edit</code> 編集画面（更新・削除）</li>
+  <li><code>GET /api/expenses</code> / <code>GET|PATCH|DELETE /api/expenses/[id]</code></li>
+  <li>月次サマリーのカテゴリ展開部に「明細を見る →」リンク</li>
+</ul>
+
+<h4>品質向上（レビュー対応）</h4>
+<ul>
+  <li><span class="badge badge-critical">critical</span> POST/PATCH の <code>categoryId</code> 世帯スコープ検証で IDOR を遮断</li>
+  <li><span class="badge badge-major">major</span> 日付・月境界を JST 基準に統一（<code>src/lib/date.ts</code>）</li>
+  <li><span class="badge badge-major">major</span> 入力バリデーション集約（<code>src/lib/expenses.ts</code>）</li>
+  <li><span class="badge badge-major">major</span> PATCH/DELETE を <code>updateMany</code> / <code>deleteMany</code> でトランザクション化</li>
+  <li><span class="badge badge-major">major</span> <code>DEMO_HOUSEHOLD_ID</code> を <code>src/lib/auth.ts</code> に一元化</li>
+  <li><span class="badge badge-major">major</span> ExpenseForm の送信中ロック（state machine）</li>
+  <li><span class="badge badge-minor">minor</span> <code>confirm()</code> を独自モーダルに置換、トーストに <code>aria-live</code></li>
+  <li><span class="badge badge-minor">minor</span> 編集後の戻り先を <code>?back=</code> で保持（内部リンクのみ許可）</li>
+  <li><span class="badge badge-minor">minor</span> <code>findMany</code> に <code>take: 500</code> 上限</li>
+</ul>
+
+<h4>開発環境</h4>
+<ul>
+  <li><code>next.config.ts</code> に <code>allowedDevOrigins: ["192.168.1.12"]</code> を追加し LAN IP アクセスを許可</li>
+</ul>
+
+<hr>
+
+<h3>2026-04-09 — Design.md Phase 1〜3 完了</h3>
+<ul>
+  <li>Phase 1: カラーパレット、viewport/PWA、ボタン・入力スタイル、セーフエリア</li>
+  <li>Phase 2: ホームのサマリーカード、カテゴリチップ化、月次サマリーバーチャート</li>
+  <li>Phase 3: トースト、アニメーション、PWAアイコン（PNG生成）</li>
+</ul>
+</section>
+
+</main>
+</div>
+</body>
+</html>
