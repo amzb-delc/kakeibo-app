@@ -55,8 +55,8 @@ export async function validateExpenseInput(
   if (body.amount !== undefined) {
     const raw = body.amount;
     const n = typeof raw === "number" ? raw : Number(raw);
-    if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0 || n > MAX_AMOUNT) {
-      return { data, error: { field: "amount", message: "amount は1〜100,000,000の整数" } };
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0 || n > MAX_AMOUNT) {
+      return { data, error: { field: "amount", message: "amount は0〜100,000,000の整数" } };
     }
     data.amount = n;
   } else if (!opts.partial) {

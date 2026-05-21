@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -60,8 +59,14 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isValid =
-    form.amount !== "" && Number(form.amount) > 0 && form.categoryId !== "";
+  const amountEmpty = form.amount === "";
+  const categoryEmpty = form.categoryId === "";
+  // 金額は 0 も許可（未入力のみ不可）。カテゴリは選択必須。
+  const isValid = !amountEmpty && !categoryEmpty;
+
+  // 必須項目が空のときに枠を強調する
+  const emphasizeEmpty = "border-primary/70 ring-1 ring-primary/25";
+  const placeholderTone = "placeholder:text-muted-foreground/60";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,12 +125,16 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
           }
           disabled={submitting}
         >
-          <SelectTrigger className="h-12 w-full rounded-xl px-3 text-base data-[size=default]:h-12">
+          <SelectTrigger
+            className={`h-12 w-full rounded-xl px-3 text-base data-[size=default]:h-12 ${
+              categoryEmpty ? emphasizeEmpty : ""
+            }`}
+          >
             <SelectValue>
               {(value) => {
                 const c = categories.find((x) => x.id === value);
                 if (!c) {
-                  return <span className="text-muted-foreground">カテゴリ</span>;
+                  return <span className="text-muted-foreground/60">カテゴリ</span>;
                 }
                 return (
                   <span
@@ -159,7 +168,9 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
             type="text"
             inputMode="numeric"
             placeholder="0"
-            className="h-12 pl-7 text-right text-lg"
+            className={`h-12 pl-7 text-right text-lg ${placeholderTone} ${
+              amountEmpty ? emphasizeEmpty : ""
+            }`}
             value={form.amount}
             disabled={submitting}
             onChange={(e) =>
@@ -174,37 +185,32 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
         </div>
       </div>
 
-      {/* 店名 */}
-      <div>
-        <Label htmlFor="storeName">店名</Label>
-        <Input
-          id="storeName"
-          placeholder="例: スーパー〇〇"
-          maxLength={STORE_MAX}
-          value={form.storeName}
-          disabled={submitting}
-          onChange={(e) =>
-            setForm((p) => ({ ...p, storeName: e.target.value.slice(0, STORE_MAX) }))
-          }
-        />
-      </div>
+      {/* 店名（ラベルなし） */}
+      <Input
+        id="storeName"
+        placeholder="店名"
+        maxLength={STORE_MAX}
+        className={placeholderTone}
+        value={form.storeName}
+        disabled={submitting}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, storeName: e.target.value.slice(0, STORE_MAX) }))
+        }
+      />
 
-      {/* メモ */}
-      <div>
-        <Label htmlFor="memo">メモ</Label>
-        <Textarea
-          id="memo"
-          placeholder="メモ"
-          rows={3}
-          maxLength={MEMO_MAX}
-          className="resize-none"
-          value={form.memo}
-          disabled={submitting}
-          onChange={(e) =>
-            setForm((p) => ({ ...p, memo: e.target.value.slice(0, MEMO_MAX) }))
-          }
-        />
-      </div>
+      {/* メモ（ラベルなし） */}
+      <Textarea
+        id="memo"
+        placeholder="メモ"
+        rows={3}
+        maxLength={MEMO_MAX}
+        className={`resize-none ${placeholderTone}`}
+        value={form.memo}
+        disabled={submitting}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, memo: e.target.value.slice(0, MEMO_MAX) }))
+        }
+      />
 
       {error && (
         <p className="text-sm text-destructive" role="alert">

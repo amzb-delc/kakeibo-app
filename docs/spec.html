@@ -410,7 +410,7 @@ hr {
 <tr><td>id</td><td>String (cuid)</td><td>PK</td></tr>
 <tr><td>householdId</td><td>String</td><td>FK → Household（onDelete: Cascade）</td></tr>
 <tr><td>categoryId</td><td>String</td><td>FK → Category（onDelete: Restrict）</td></tr>
-<tr><td>amount</td><td>Int</td><td>円単位整数。1〜100,000,000</td></tr>
+<tr><td>amount</td><td>Int</td><td>円単位整数。0〜100,000,000（0円も可）</td></tr>
 <tr><td>spentAt</td><td>DateTime</td><td>JSTの「日」を表す（JST 00:00 を UTC で格納）</td></tr>
 <tr><td>storeName</td><td>String?</td><td>任意。最大100文字</td></tr>
 <tr><td>memo</td><td>String?</td><td>任意。最大500文字</td></tr>
@@ -558,11 +558,12 @@ hr {
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>表示</td><td><code>fixed inset-0 z-50</code>、下端 anchor（<code>items-end</code>）、最大高 <code>90vh</code> でスクロール、ヘッダは sticky</td></tr>
 <tr><td>開閉アニメ</td><td>バックドロップ（dim）はパネルと<strong>別レイヤー</strong>。パネルは <code>translateY(0 ⇄ 100%)</code> を <code>transition</code> で駆動（<code>cubic-bezier(0.32,0.72,0,1)</code> / 320ms）、dim は opacity を独立フェード。開く時は2フレーム後に表示状態へ切替えて transition を発火。閉じ切ったら DOM から除去（reduced-motion でも timeout で確実に teardown）</td></tr>
-<tr><td>フォーム構成</td><td>並び順は <strong>日付 → カテゴリ → 金額 → 店名 → メモ</strong>。日付・カテゴリ・金額は<strong>ラベルなし</strong>（見た目で分かるため）</td></tr>
+<tr><td>フォーム構成</td><td>並び順は <strong>日付 → カテゴリ → 金額 → 店名 → メモ</strong>。<strong>全項目ラベルなし</strong>（プレースホルダで補助、文字色は <code>text-muted-foreground/60</code> と薄め）</td></tr>
+<tr><td>未入力の強調</td><td>必須（カテゴリ・金額）が<strong>空のとき枠を強調</strong>（<code>border-primary/70 ring-1 ring-primary/25</code>）。入力すると解除</td></tr>
 <tr><td>日付</td><td>年月は固定表示（登録=元ページの選択月／編集=対象支出の月）。日のみ<strong>縦ホイール</strong>（<code>day-wheel.tsx</code>）で選択し、「<code>YYYY年M月 d 日</code>」の d にインライン埋め込み。<code>spentAt</code> は <code>YYYY-MM-DD</code> に組み立て</td></tr>
 <tr><td>カテゴリ</td><td><strong>Select（プルダウン）</strong>。画面外要素の誤選択を防ぐためチップ横スクロールから変更。色分けタグで表示。起動時に <code>GET /api/categories</code> を先読みキャッシュ。初期値は <code>setComposeContext</code> の展開カテゴリ</td></tr>
-<tr><td>金額</td><td>¥プレフィクス・右寄せ。<strong>システムの数値キーボード</strong>（<code>inputMode="numeric"</code>、数字のみ・最大9桁）。カテゴリと横並び・<strong>同じ高さ 48px</strong></td></tr>
-<tr><td>店名 / メモ</td><td>任意（空文字は null）。入力時にハードキャップ <strong>店名 32 / メモ 140 字</strong>（フォーム幅に収める）。メモは <strong>3行</strong></td></tr>
+<tr><td>金額</td><td>¥プレフィクス・右寄せ。<strong>システムの数値キーボード</strong>（<code>inputMode="numeric"</code>、数字のみ・最大9桁）。カテゴリと横並び・<strong>同じ高さ 48px</strong>。<strong>0円も可</strong>（未入力のみ不可）</td></tr>
+<tr><td>店名 / メモ</td><td>任意（空文字は null）。プレースホルダは「店名」「メモ」。入力時にハードキャップ <strong>店名 32 / メモ 140 字</strong>（フォーム幅に収める）。メモは <strong>3行</strong></td></tr>
 <tr><td>保存</td><td><strong>半分幅・中央</strong>。必須（金額&gt;0・カテゴリ）が未充足なら <code>disabled</code>（グレー）。新規 <code>POST /api/expenses</code> / 編集 <code>PATCH /api/expenses/[id]</code> → <code>onSuccess(message)</code></td></tr>
 <tr><td>削除</td><td>ヘッダ右上の<strong>ゴミ箱アイコン</strong>（✕ の左）。新規時は <code>disabled</code>（グレー）、編集時のみ有効。確認ダイアログ → <code>DELETE /api/expenses/[id]</code>。削除処理は Provider 側が保持（フォームは登録/更新のみ）</td></tr>
 <tr><td>成功後</td><td>親（Provider）がシートを閉じ、共通トースト（「保存/更新/削除しました」）を表示し、<code>mutationVersion</code> を増分</td></tr>
@@ -595,7 +596,7 @@ hr {
 <div class="endpoint" id="api-expenses-create">
 <h4><span class="method method-post">POST</span> /api/expenses</h4>
 <p>支出を新規作成。</p>
-<p><strong>必須:</strong> <code>amount</code>（1〜100,000,000の整数）、<code>spentAt</code>（<code>YYYY-MM-DD</code>）、<code>categoryId</code>（世帯のカテゴリ）</p>
+<p><strong>必須:</strong> <code>amount</code>（0〜100,000,000の整数。0円可）、<code>spentAt</code>（<code>YYYY-MM-DD</code>）、<code>categoryId</code>（世帯のカテゴリ）</p>
 <p><strong>任意:</strong> <code>storeName</code>（≤100）、<code>memo</code>（≤500）、<code>receiptImageUrl</code></p>
 <p><strong>レスポンス:</strong> <code>201</code> + 作成された <code>Expense</code> / <code>400</code> + <code>{ error }</code></p>
 <pre><code>{
@@ -685,7 +686,7 @@ hr {
 <p><code>src/lib/expenses.ts</code> の <code>validateExpenseInput(body, { partial })</code> に集約。POST/PATCH の双方が同じ関数を通る。</p>
 <table>
 <tr><th>フィールド</th><th>ルール</th></tr>
-<tr><td>amount</td><td>整数 / 1以上 / 100,000,000以下 / 有限値</td></tr>
+<tr><td>amount</td><td>整数 / 0以上 / 100,000,000以下 / 有限値（0円可）</td></tr>
 <tr><td>spentAt</td><td>正規表現 <code>/^\d{4}-\d{2}-\d{2}$/</code></td></tr>
 <tr><td>categoryId</td><td>非空文字列、かつ DB で <code>householdId = DEMO_HOUSEHOLD_ID</code> の Category に存在</td></tr>
 <tr><td>storeName</td><td>≤100文字、空文字は null</td></tr>
