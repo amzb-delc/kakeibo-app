@@ -321,7 +321,7 @@ hr {
 
 <header class="title">
   <h1>家計簿アプリ — MVP仕様書</h1>
-  <div class="meta">最終更新: 2026-05-21（登録・編集のボトムシート化 + サマリー明細インライン表示反映）</div>
+  <div class="meta">最終更新: 2026-05-21（モーダル化 + 開閉アニメ/下スワイプ + フォーム刷新・カテゴリ色分け反映）</div>
 </header>
 
 <section id="overview">
@@ -364,14 +364,16 @@ hr {
 │   ├── page-header.tsx       # 共通ヘッダ（全ページに sticky）
 │   ├── footer-nav.tsx        # 共通フッタ（ホーム / ＋FAB / サマリー）
 │   ├── expense-modal.tsx     # ExpenseModalProvider（全画面共通のボトムシート）
-│   ├── expense-form.tsx      # 登録 + 編集共用（モーダル内で使用）
+│   ├── expense-form.tsx      # 登録 + 編集フォーム（モーダル内で使用）
+│   ├── day-wheel.tsx         # 日のみの縦ホイール（ドラム）
 │   ├── monthly-summary.tsx
-│   └── ui/                   # shadcn コンポーネント
+│   └── ui/                   # shadcn / Base UI コンポーネント
 ├── lib/
 │   ├── auth.ts               # DEMO_HOUSEHOLD_ID / getDemoUserId
 │   ├── app-meta.ts           # HOUSEHOLD_NAME / APP_VERSION / APP_LABEL
 │   ├── date.ts               # JSTヘルパ
 │   ├── expenses.ts           # listExpenses + validateExpenseInput
+│   ├── category-color.ts     # カテゴリ色（タグ風）の集約
 │   ├── prisma.ts             # PrismaClient シングルトン
 │   └── trend.ts              # トレンドレベル判定
 ├── types/index.ts            # Expense / Category / MonthlySummary
@@ -519,7 +521,7 @@ hr {
 <tr><td>月切り替え</td><td>クライアント側 useState で year/month を保持、API再取得</td></tr>
 <tr><td>翌月ボタン</td><td>当月なら disabled</td></tr>
 <tr><td>合計カード</td><td>当月合計、前月合計、前月比%、プログレスバー（先月100%基準、150%で頭打ち）</td></tr>
-<tr><td>カテゴリ行</td><td>金額・トレンドアイコン・幅 = 最大カテゴリ比のバー。タップで展開（<code>aria-expanded</code>、可変高さアニメーション）</td></tr>
+<tr><td>カテゴリ行</td><td>カテゴリ名は<strong>色分けタグ</strong>（<code>category-color.ts</code>）、金額・トレンドアイコン・幅 = 最大カテゴリ比のバー（バーもカテゴリ色）。タップで展開（<code>aria-expanded</code>、可変高さアニメーション）。展開状態はサマリーページが保持（制御コンポーネント）</td></tr>
 <tr><td>展開時</td><td>先月額・前月比% + <strong>そのカテゴリの支出明細を日付降順でインライン表示</strong>（日付 <code>M/D(曜)</code> / 店名 or メモ / 金額）。明細は <code>monthly-summary</code> API が各カテゴリに同梱するため追加通信なし</td></tr>
 <tr><td>明細タップ</td><td>編集用ボトムシートを開く（<code>useExpenseModal().openEdit(...)</code>）</td></tr>
 <tr><td>更新反映</td><td>登録・編集・削除の成功で <code>ExpenseModalProvider</code> の <code>mutationVersion</code> が増分し、サマリーを自動再取得。画面遷移しないため<strong>選択月・展開カテゴリは保持</strong>される</td></tr>
@@ -528,27 +530,26 @@ hr {
 <h3 id="screen-modal">支出モーダル（登録・編集）</h3>
 <p>支出の登録・編集・削除は<strong>専用ページではなくボトムシートのモーダル</strong>で行う。<code>ExpenseModalProvider</code>（<code>src/components/expense-modal.tsx</code>）が <code>layout.tsx</code> で全体を包み、FAB・サマリー明細のどちらからでも開ける。<strong>画面遷移しない</strong>ため、背面のサマリー（選択月・展開カテゴリ）が保持される。</p>
 
-<div class="ascii-art">┌───────────────────────────┐
-│   サマリー（薄く透ける）  │  ← bg-black/40 のオーバーレイ
-│ ░░░░░░░░░░░░░░░░░░░░░░░░░ │
-│ ┌───────────────────────┐ │
-│ │          ──           │ │  ← グラバー
-│ │ 支出を登録/編集    ✕  │ │  ← sticky ヘッダ
-│ │ 金額   ¥ [_________]  │ │
-│ │ 日付   [__________]   │ │
-│ │ カテゴリ ○ ○ ○ ○ ○    │ │
-│ │ 店名   [__________]   │ │
-│ │ メモ   [__________]   │ │
-│ │ [      保存/更新      ]│ │
-│ │ [      削除する       ]│ │  ← 編集時のみ
-│ └───────────────────────┘ │
-└───────────────────────────┘</div>
+<div class="ascii-art">┌────────────────────────────┐
+│   サマリー（薄く透ける）   │  ← 別レイヤーの dim
+│ ░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+│ ┌────────────────────────┐ │
+│ │           ──           │ │  ← グラバー（ドラッグハンドル）
+│ │ 支出を登録/編集   🗑 ✕ │ │  ← ヘッダ（🗑 は ✕ の左／新規はグレー）
+│ │     2026年5月 [21] 日   │ │  ← 日付＝縦ホイール（日のみ）をインライン
+│ │ [カテゴリ ▼]   [¥   0]  │ │  ← カテゴリSelect｜金額 横並び（同高）
+│ │ 店名 [______________]   │ │
+│ │ メモ [______________]   │ │  ← 3行
+│ │        [ 保存/更新 ]    │ │  ← 半分幅・必須未入力でグレー
+│ └────────────────────────┘ │
+└────────────────────────────┘</div>
 
 <h4>起動 API（<code>useExpenseModal()</code>）</h4>
 <table>
 <tr><th>関数 / 値</th><th>用途</th></tr>
 <tr><td><code>openCreate()</code></td><td>登録用シートを開く（FAB から）</td></tr>
 <tr><td><code>openEdit(target)</code></td><td>編集用シートを開く（サマリー明細から）。<code>target</code> は <code>id / amount / spentAt / categoryId / storeName / memo</code></td></tr>
+<tr><td><code>setComposeContext(ctx)</code></td><td>元ページ（サマリー）が「選択月・展開カテゴリ」を publish。<code>openCreate()</code> の既定値に使う。ホーム等から開いた時は当月・カテゴリ未選択にフォールバック</td></tr>
 <tr><td><code>mutationVersion</code></td><td>登録・更新・削除の成功で増分。一覧側が購読して再取得する</td></tr>
 </table>
 
@@ -557,10 +558,13 @@ hr {
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>表示</td><td><code>fixed inset-0 z-50</code>、下端 anchor（<code>items-end</code>）、最大高 <code>90vh</code> でスクロール、ヘッダは sticky</td></tr>
 <tr><td>開閉アニメ</td><td>バックドロップ（dim）はパネルと<strong>別レイヤー</strong>。パネルは <code>translateY(0 ⇄ 100%)</code> を <code>transition</code> で駆動（<code>cubic-bezier(0.32,0.72,0,1)</code> / 320ms）、dim は opacity を独立フェード。開く時は2フレーム後に表示状態へ切替えて transition を発火。閉じ切ったら DOM から除去（reduced-motion でも timeout で確実に teardown）</td></tr>
-<tr><td>カテゴリ</td><td>起動時に <code>GET /api/categories</code> を先読みキャッシュ。チップ横スクロール選択（タップ1回）</td></tr>
-<tr><td>金額 / 日付 / 店名 / メモ</td><td>テンキー ¥プレフィクス / <code>type="date"</code>（既定 <code>todayJst()</code>）/ 任意（空文字は null）</td></tr>
-<tr><td>保存</td><td>新規 <code>POST /api/expenses</code> / 編集 <code>PATCH /api/expenses/[id]</code> → <code>onSuccess(message)</code></td></tr>
-<tr><td>削除</td><td>編集時のみ。入れ子の確認ダイアログ → <code>DELETE /api/expenses/[id]</code> → <code>onSuccess</code></td></tr>
+<tr><td>フォーム構成</td><td>並び順は <strong>日付 → カテゴリ → 金額 → 店名 → メモ</strong>。日付・カテゴリ・金額は<strong>ラベルなし</strong>（見た目で分かるため）</td></tr>
+<tr><td>日付</td><td>年月は固定表示（登録=元ページの選択月／編集=対象支出の月）。日のみ<strong>縦ホイール</strong>（<code>day-wheel.tsx</code>）で選択し、「<code>YYYY年M月 d 日</code>」の d にインライン埋め込み。<code>spentAt</code> は <code>YYYY-MM-DD</code> に組み立て</td></tr>
+<tr><td>カテゴリ</td><td><strong>Select（プルダウン）</strong>。画面外要素の誤選択を防ぐためチップ横スクロールから変更。色分けタグで表示。起動時に <code>GET /api/categories</code> を先読みキャッシュ。初期値は <code>setComposeContext</code> の展開カテゴリ</td></tr>
+<tr><td>金額</td><td>¥プレフィクス・右寄せ。<strong>システムの数値キーボード</strong>（<code>inputMode="numeric"</code>、数字のみ・最大9桁）。カテゴリと横並び・<strong>同じ高さ 48px</strong></td></tr>
+<tr><td>店名 / メモ</td><td>任意（空文字は null）。入力時にハードキャップ <strong>店名 32 / メモ 140 字</strong>（フォーム幅に収める）。メモは <strong>3行</strong></td></tr>
+<tr><td>保存</td><td><strong>半分幅・中央</strong>。必須（金額&gt;0・カテゴリ）が未充足なら <code>disabled</code>（グレー）。新規 <code>POST /api/expenses</code> / 編集 <code>PATCH /api/expenses/[id]</code> → <code>onSuccess(message)</code></td></tr>
+<tr><td>削除</td><td>ヘッダ右上の<strong>ゴミ箱アイコン</strong>（✕ の左）。新規時は <code>disabled</code>（グレー）、編集時のみ有効。確認ダイアログ → <code>DELETE /api/expenses/[id]</code>。削除処理は Provider 側が保持（フォームは登録/更新のみ）</td></tr>
 <tr><td>成功後</td><td>親（Provider）がシートを閉じ、共通トースト（「保存/更新/削除しました」）を表示し、<code>mutationVersion</code> を増分</td></tr>
 <tr><td>閉じる</td><td>暗幕タップ / ✕ボタン / Esc / <strong>下スワイプ</strong>。開いている間は背面スクロールをロック</td></tr>
 <tr><td>下スワイプ</td><td>ヘッダ（グラバー）起点の pointer ドラッグでパネルが指追従。<strong>110px 超</strong>または<strong>速い下フリック</strong>（&gt;0.5px/ms）で閉じ、未満は 0 へスナップバック。本文スクロールと混線しないようハンドルは <code>touch-none</code>、✕ 上では発火しない</td></tr>
@@ -706,13 +710,12 @@ hr {
 <tr><td><code>down</code></td><td>-5% 以下</td><td>↓</td><td>緑</td></tr>
 </table>
 
-<h3>ExpenseForm の状態</h3>
-<p>送信中のレース回避のため、フォーム全体を以下の状態機械で管理する。モーダル専用となり、成功時は <code>onSuccess(message)</code> を呼んで親（Provider）にシートのクローズ・トースト・再取得を委譲する（フォーム自身は画面遷移しない）。</p>
+<h3>ExpenseForm / モーダルの状態</h3>
+<p>フォームは<strong>登録・更新のみ</strong>を担当（削除は Provider 側）。成功時は <code>onSuccess(message)</code> を呼んで親（Provider）にシートのクローズ・トースト・再取得を委譲する（フォーム自身は画面遷移しない）。送信中のレース回避のため、送信中は全項目を <code>disabled</code> にする。</p>
 <table>
-<tr><th>state</th><th>意味</th><th>UI</th></tr>
-<tr><td>idle</td><td>編集可能</td><td>全項目操作可</td></tr>
-<tr><td>submitting</td><td>API送信中</td><td>全項目 disabled、保存ボタンが「保存中…」</td></tr>
-<tr><td>deleting</td><td>削除中</td><td>全項目 disabled、削除ボタンが「削除中…」</td></tr>
+<tr><th>箇所</th><th>状態</th><th>挙動</th></tr>
+<tr><td>フォーム</td><td><code>submitting</code></td><td>送信中は全項目 disabled、保存ボタンが「保存中…」。必須未充足時は保存ボタンが <code>disabled</code>（グレー）</td></tr>
+<tr><td>Provider</td><td><code>deleting</code></td><td>削除確認ダイアログの「削除する」を押下中。失敗時はトーストで通知</td></tr>
 </table>
 </section>
 
@@ -739,6 +742,14 @@ hr {
 <tr><td>危険</td><td>--destructive</td><td>#DC2626</td><td><span class="color-swatch" style="background:#DC2626"></span></td></tr>
 </table>
 <p>本アプリの UI は常にライトモード固定（iOS 外観モードに関わらず）。将来のダークモードは CSS 変数の差し替えで対応する設計。</p>
+
+<h3>カテゴリの色分け</h3>
+<p>カテゴリは固有色で識別する。配色は <code>src/lib/category-color.ts</code> に集約し、<strong>サマリー（タグ＋棒グラフ）とモーダル（Select のトリガー / ドロップダウン）で同一色</strong>を使う。</p>
+<ul>
+  <li>割り当ては seed の <code>sortOrder</code> 基準（10色パレットを <code>sortOrder % 10</code>）で安定。同じカテゴリは常に同じ色</li>
+  <li>タグは <code>bg-{hue}-100 / text-{hue}-700</code>、棒グラフは <code>bg-{hue}-500</code>。角丸は <code>rounded-lg</code>（フォーム欄の <code>rounded-xl</code> より1段小さく）</li>
+  <li>将来カテゴリ管理（追加・並べ替え）を入れる場合は色がずれるため、<code>Category</code> に <code>color</code> 列を持たせる方式へ移行する</li>
+</ul>
 
 <h3>タッチターゲット</h3>
 <ul>
@@ -774,6 +785,41 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-05-21 (続き2) — モーダル内フォーム刷新・カテゴリ色分け</h3>
+<p><span class="badge badge-major">major</span> モーダル内のフォームを大きく作り替え。コミット <code>0a4ffcc</code>。Playwright で検証済み。</p>
+<h4>新規</h4>
+<ul>
+  <li><code>src/components/day-wheel.tsx</code> — 日のみの縦ホイール（ドラム）</li>
+  <li><code>src/lib/category-color.ts</code> — カテゴリ色（タグ風）を集約。<code>sortOrder</code> 基準で安定割り当て、サマリー・モーダル共通配色</li>
+</ul>
+<h4>変更</h4>
+<ul>
+  <li>並び順を 日付→カテゴリ→金額 に変更、日付/カテゴリ/金額のラベル削除</li>
+  <li>日付＝縦ホイール（日のみ）を「<code>YYYY年M月 d 日</code>」の d にインライン埋め込み。年月は元ページの選択月（編集時は対象の月）から</li>
+  <li>カテゴリ＝Select（プルダウン）化。初期値は元ページの展開カテゴリから（<code>setComposeContext</code> で FAB↔サマリーを配線）。色分けタグ表示</li>
+  <li>カテゴリと金額を横並び・同高(48px)。金額はシステム数値キーボード（数字のみ）</li>
+  <li>カテゴリを色分け（タグ風 <code>rounded-lg</code>）。サマリーのタグ＋棒グラフ、モーダルの Select で共通配色</li>
+  <li>店名/メモの「(任意)」削除、上限ハードキャップ（店名32 / メモ140字）、メモ3行</li>
+  <li>保存ボタンを半分幅＋必須未入力でグレー</li>
+  <li><code>MonthlySummaryView</code> を制御コンポーネント化（展開状態をサマリーページが保持）</li>
+</ul>
+<h4>移設</h4>
+<ul>
+  <li>削除機能をフォーム→モーダル（Provider）へ移設。ゴミ箱アイコンをヘッダ右上（✕ の左）に配置。新規時は disabled（グレー）、編集時のみ有効</li>
+</ul>
+
+<hr>
+
+<h3>2026-05-21 (続き) — モーダルの開閉アニメーション + 下スワイプ</h3>
+<p><span class="badge badge-major">major</span> コミット <code>5f3bdce</code>。</p>
+<ul>
+  <li>バックドロップをパネルと別レイヤーに分離。パネルは <code>translateY</code> を <code>transition</code> で駆動（<code>cubic-bezier(0.32,0.72,0,1)</code> / 320ms）、dim は独立フェード。閉じる時の「スライドし切る前に消える」違和感を解消</li>
+  <li>閉じる exit アニメーションを追加（旧: 瞬間消滅）。reduced-motion でも timeout で確実に teardown</li>
+  <li><strong>下スワイプで閉じる</strong>を実装（ヘッダ起点・110px / 速いフリックで閉、未満はスナップバック）</li>
+</ul>
+
+<hr>
 
 <h3>2026-05-21 — 登録・編集のボトムシート化 + サマリー明細インライン表示</h3>
 <p><span class="badge badge-major">major</span> 支出の登録・編集を画面遷移からモーダルへ移行し、重複していた <code>/expenses</code> 系ページを廃止。ブランチ <code>feat/expense-modal</code>、コミット <code>09ad051</code>。Playwright で実機相当の挙動を検証済み（PASS）。</p>
