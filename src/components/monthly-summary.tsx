@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { getTrendLevel, TREND_ICON, TREND_TEXT_COLOR, TREND_BG_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
+import { categoryColor } from "@/lib/category-color";
 import { useExpenseModal } from "@/components/expense-modal";
 import type { MonthlySummary, CategorySummary } from "@/types";
 
@@ -28,6 +28,7 @@ function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps)
   const level = getTrendLevel(category.total, category.prevTotal);
   const percent = formatPercent(category.total, category.prevTotal);
   const barWidth = maxTotal > 0 ? (category.total / maxTotal) * 100 : 0;
+  const color = categoryColor(category.sortOrder);
 
   return (
     <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
@@ -38,7 +39,11 @@ function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps)
         onClick={onToggle}
       >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-base font-medium">{category.name}</span>
+          <span
+            className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-sm font-medium ${color.tag}`}
+          >
+            {category.name}
+          </span>
           <div className="flex items-center gap-2">
             <span className="text-base font-semibold">{formatYen(category.total)}</span>
             <span
@@ -51,7 +56,7 @@ function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps)
         {/* バーチャート */}
         <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
           <div
-            className="h-full bg-primary rounded-full transition-all duration-300"
+            className={`h-full rounded-full transition-all duration-300 ${color.bar}`}
             style={{ width: `${barWidth}%` }}
           />
         </div>
@@ -116,15 +121,11 @@ function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps)
 
 type Props = {
   summary: MonthlySummary;
+  openCategoryId: string | null;
+  onToggleCategory: (categoryId: string) => void;
 };
 
-export function MonthlySummaryView({ summary }: Props) {
-  const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
-
-  const handleToggle = (categoryId: string) => {
-    setOpenCategoryId((prev) => (prev === categoryId ? null : categoryId));
-  };
-
+export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }: Props) {
   const totalLevel = getTrendLevel(summary.total, summary.prevTotal);
   const totalPercent = formatPercent(summary.total, summary.prevTotal);
 
@@ -183,7 +184,7 @@ export function MonthlySummaryView({ summary }: Props) {
                   category={cat}
                   maxTotal={maxCategoryTotal}
                   isOpen={openCategoryId === cat.categoryId}
-                  onToggle={() => handleToggle(cat.categoryId)}
+                  onToggle={() => onToggleCategory(cat.categoryId)}
                 />
               ))
             )}

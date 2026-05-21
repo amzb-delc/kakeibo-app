@@ -13,8 +13,18 @@ export default function SummaryPage() {
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [fade, setFade] = useState(false);
+  const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
   const isInitial = useRef(true);
-  const { mutationVersion } = useExpenseModal();
+  const { mutationVersion, setComposeContext } = useExpenseModal();
+
+  // 登録モーダル（FAB）の既定値に「表示中の月・展開カテゴリ」を渡す
+  useEffect(() => {
+    setComposeContext({ year, month, categoryId: openCategoryId });
+  }, [year, month, openCategoryId, setComposeContext]);
+  useEffect(() => () => setComposeContext(null), [setComposeContext]);
+
+  const toggleCategory = (categoryId: string) =>
+    setOpenCategoryId((prev) => (prev === categoryId ? null : categoryId));
 
   const fetchSummary = useCallback(async () => {
     setLoading(true);
@@ -37,6 +47,7 @@ export default function SummaryPage() {
   }, [fetchSummary, mutationVersion]);
 
   const handlePrevMonth = () => {
+    setOpenCategoryId(null);
     if (month === 1) {
       setYear((y) => y - 1);
       setMonth(12);
@@ -46,6 +57,7 @@ export default function SummaryPage() {
   };
 
   const handleNextMonth = () => {
+    setOpenCategoryId(null);
     if (month === 12) {
       setYear((y) => y + 1);
       setMonth(1);
@@ -97,7 +109,11 @@ export default function SummaryPage() {
           className="transition-opacity duration-150"
           style={{ opacity: fade ? 0 : 1 }}
         >
-          <MonthlySummaryView summary={summary} />
+          <MonthlySummaryView
+            summary={summary}
+            openCategoryId={openCategoryId}
+            onToggleCategory={toggleCategory}
+          />
         </div>
       ) : null}
     </div>

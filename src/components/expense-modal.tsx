@@ -8,19 +8,30 @@ import {
   useRef,
   useState,
 } from "react";
-import { ExpenseForm, type ExpenseFormValues } from "@/components/expense-form";
+import { Trash2 } from "lucide-react";
+import {
+  ExpenseForm,
+  type ExpenseFormValues,
+  type ExpenseFormInitial,
+} from "@/components/expense-form";
+import { todayJst } from "@/lib/date";
 import type { Category } from "@/types";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
 export type ExpenseEditTarget = ExpenseFormValues;
 
+// 登録時の既定値の文脈（元ページの選択月・展開カテゴリ）
+type ComposeContext = { year: number; month: number; categoryId: string | null };
+
 type ActiveState =
-  | { mode: "create" }
+  | { mode: "create"; year: number; month: number; day: number; categoryId: string }
   | { mode: "edit"; expense: ExpenseEditTarget };
 
 type ContextValue = {
   openCreate: () => void;
   openEdit: (expense: ExpenseEditTarget) => void;
+  /** 元ページが選択月・展開カテゴリを publish する。openCreate の既定値に使う */
+  setComposeContext: (ctx: ComposeContext | null) => void;
   /** 登録・更新・削除のたびに増える。一覧側はこれを購読して再取得する。 */
   mutationVersion: number;
 };
@@ -41,10 +52,11 @@ const CLOSE_THRESHOLD = 110; // この px 超のドラッグで閉じる
 const FLICK_VELOCITY = 0.5; // px/ms。速い下フリックでも閉じる
 
 export function ExpenseModalProvider({ children }: { children: React.ReactNode }) {
-  // active = 中身（null で完全クローズ＝unmount）、shown = 表示状態（開閉アニメの駆動）
   const [active, setActive] = useState<ActiveState | null>(null);
   const [shown, setShown] = useState(false);
   const [dragY, setDragY] = useState<number | null>(null); // null = ドラッグ中でない
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [mutationVersion, setMutationVersion] = useState(0);
@@ -52,6 +64,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const teardownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragStart = useRef<{ y: number; t: number } | null>(null);
+  const composeRef = useRef<ComposeContext | null>(null);
 
   // カテゴリは滅多に変わらず軽量なので、起動時に先読みしておく
   useEffect(() => {
@@ -70,25 +83,44 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  const open = useCallback((next: ActiveState) => {
-    if (teardownTimer.current) clearTimeout(teardownTimer.current);
-    setActive(next);
-    setDragY(null);
-    setShown(false); // いったん画面外/透明に置いてから…
-    // 2フレーム後に表示状態へ。CSS transition を確実に発火させる
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => setShown(true))
-    );
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
   }, []);
 
-  const openCreate = useCallback(() => open({ mode: "create" }), [open]);
+  const open = useCallback((next: ActiveState) => {
+    if (teardownTimer.current) clearTimeout(teardownTimer.current);
+    setConfirmingDelete(false);
+    setDeleting(false);
+    setActive(next);
+    setDragY(null);
+    setShown(false);
+    requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
+  }, []);
+
+  const setComposeContext = useCallback((ctx: ComposeContext | null) => {
+    composeRef.current = ctx;
+  }, []);
+
+  const openCreate = useCallback(() => {
+    const [ty, tm, td] = todayJst().split("-").map(Number);
+    const ctx = composeRef.current;
+    const year = ctx?.year ?? ty;
+    const month = ctx?.month ?? tm;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const day = Math.min(td, lastDay);
+    open({ mode: "create", year, month, day, categoryId: ctx?.categoryId ?? "" });
+  }, [open]);
+
   const openEdit = useCallback(
     (expense: ExpenseEditTarget) => open({ mode: "edit", expense }),
     [open]
   );
 
   const close = useCallback(() => {
-    setShown(false); // バックドロップ fade-out + パネル slide-down
+    setConfirmingDelete(false);
+    setShown(false);
     if (teardownTimer.current) clearTimeout(teardownTimer.current);
     teardownTimer.current = setTimeout(() => {
       setActive(null);
@@ -100,12 +132,28 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     (message: string) => {
       close();
       setMutationVersion((v) => v + 1);
-      setToast(message);
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-      toastTimer.current = setTimeout(() => setToast(null), 2200);
+      showToast(message);
     },
-    [close]
+    [close, showToast]
   );
+
+  const handleDelete = useCallback(async () => {
+    if (active?.mode !== "edit") return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/expenses/${active.expense.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error();
+      setConfirmingDelete(false);
+      setDeleting(false);
+      handleSuccess("削除しました");
+    } catch {
+      setDeleting(false);
+      setConfirmingDelete(false);
+      showToast("削除に失敗しました");
+    }
+  }, [active, handleSuccess, showToast]);
 
   // アンマウント時にタイマーを後始末
   useEffect(
@@ -140,8 +188,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
 
   // --- ドラッグで閉じる（ヘッダ起点） ---
   const onDragPointerDown = (e: React.PointerEvent) => {
-    // ✕ などのボタン上ではドラッグを開始しない
-    if ((e.target as HTMLElement).closest("button")) return;
+    if ((e.target as HTMLElement).closest("button")) return; // ゴミ箱/✕上では発火しない
     dragStart.current = { y: e.clientY, t: performance.now() };
     setDragY(0);
     e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -149,7 +196,6 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   const onDragPointerMove = (e: React.PointerEvent) => {
     if (!dragStart.current) return;
     const dy = e.clientY - dragStart.current.y;
-    // 下方向は追従、上方向は弱い抵抗
     setDragY(dy > 0 ? dy : dy * 0.2);
   };
   const onDragPointerEnd = (e: React.PointerEvent) => {
@@ -160,9 +206,9 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     dragStart.current = null;
     if (dy > CLOSE_THRESHOLD || (dy > 24 && v > FLICK_VELOCITY)) {
       setDragY(null);
-      close(); // 現在位置から画面外へ滑らせて閉じる
+      close();
     } else {
-      setDragY(null); // しきい値未満：0 へスナップバック
+      setDragY(null);
     }
   };
   const onDragPointerCancel = () => {
@@ -179,13 +225,42 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
         : "translateY(100%)",
     transition: dragging ? "none" : `transform ${ANIM_MS}ms ${EASE}`,
   };
-  const title = active?.mode === "edit" ? "支出を編集" : "支出を登録";
+
+  const isEditMode = active?.mode === "edit";
+  const title = isEditMode ? "支出を編集" : "支出を登録";
+
+  let initial: ExpenseFormInitial | null = null;
+  if (active?.mode === "edit") {
+    const [y, m, d] = active.expense.spentAt.split("-").map(Number);
+    initial = {
+      id: active.expense.id,
+      year: y,
+      month: m,
+      day: d,
+      categoryId: active.expense.categoryId,
+      amount: String(active.expense.amount),
+      storeName: active.expense.storeName ?? "",
+      memo: active.expense.memo ?? "",
+    };
+  } else if (active?.mode === "create") {
+    initial = {
+      year: active.year,
+      month: active.month,
+      day: active.day,
+      categoryId: active.categoryId,
+      amount: "",
+      storeName: "",
+      memo: "",
+    };
+  }
 
   return (
-    <ExpenseModalContext.Provider value={{ openCreate, openEdit, mutationVersion }}>
+    <ExpenseModalContext.Provider
+      value={{ openCreate, openEdit, setComposeContext, mutationVersion }}
+    >
       {children}
 
-      {active && (
+      {active && initial && (
         <div
           role="dialog"
           aria-modal="true"
@@ -217,14 +292,25 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
               <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-muted-foreground/25" />
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold">{title}</h2>
-                <button
-                  type="button"
-                  onClick={close}
-                  aria-label="閉じる"
-                  className="w-9 h-9 -mr-1 rounded-full flex items-center justify-center text-lg text-muted-foreground hover:bg-muted transition-colors"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    aria-label="削除"
+                    disabled={!isEditMode}
+                    onClick={() => setConfirmingDelete(true)}
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={close}
+                    aria-label="閉じる"
+                    className="w-9 h-9 -mr-1 rounded-full flex items-center justify-center text-lg text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -237,10 +323,51 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
                 <ExpenseForm
                   key={active.mode === "edit" ? active.expense.id : "create"}
                   categories={categories}
-                  expense={active.mode === "edit" ? active.expense : undefined}
+                  initial={initial}
                   onSuccess={handleSuccess}
                 />
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 削除確認ダイアログ（シートより前面） */}
+      {active && confirmingDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-delete-title"
+          className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/40"
+          onClick={() => !deleting && setConfirmingDelete(false)}
+        >
+          <div
+            className="w-full sm:max-w-sm bg-card rounded-t-2xl sm:rounded-2xl p-5 m-0 sm:m-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="confirm-delete-title" className="text-base font-semibold mb-2">
+              この支出を削除しますか？
+            </h2>
+            <p className="text-sm text-muted-foreground mb-5">
+              この操作は取り消せません。
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirmingDelete(false)}
+                className="flex-1 h-12 rounded-xl border border-border text-base font-medium hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDelete}
+                className="flex-1 h-12 rounded-xl bg-destructive text-white text-base font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50"
+              >
+                {deleting ? "削除中…" : "削除する"}
+              </button>
             </div>
           </div>
         </div>
