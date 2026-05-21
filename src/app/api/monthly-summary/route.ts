@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const range = jstMonthRange(year, month);
   const prevRange = jstMonthRange(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1);
 
-  // 当月の支出をカテゴリ別に集計
+  // 当月の支出をカテゴリ別に集計（明細は日付降順で並べる）
   const expenses = await prisma.expense.findMany({
     where: {
       householdId: DEMO_HOUSEHOLD_ID,
@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     include: {
       category: { select: { id: true, name: true, sortOrder: true } },
     },
+    orderBy: [{ spentAt: "desc" }, { createdAt: "desc" }],
   });
 
   // 前月の支出を集計（トレンド計算用）
@@ -35,17 +36,36 @@ export async function GET(req: NextRequest) {
   });
 
   // カテゴリ別集計
-  const categoryMap = new Map<string, { name: string; sortOrder: number; total: number }>();
+  type CategoryExpense = {
+    id: string;
+    amount: number;
+    spentAt: Date;
+    storeName: string | null;
+    memo: string | null;
+  };
+  const categoryMap = new Map<
+    string,
+    { name: string; sortOrder: number; total: number; expenses: CategoryExpense[] }
+  >();
   for (const expense of expenses) {
     const key = expense.categoryId;
+    const item: CategoryExpense = {
+      id: expense.id,
+      amount: expense.amount,
+      spentAt: expense.spentAt,
+      storeName: expense.storeName,
+      memo: expense.memo,
+    };
     const existing = categoryMap.get(key);
     if (existing) {
       existing.total += expense.amount;
+      existing.expenses.push(item);
     } else {
       categoryMap.set(key, {
         name: expense.category.name,
         sortOrder: expense.category.sortOrder,
         total: expense.amount,
+        expenses: [item],
       });
     }
   }
@@ -62,12 +82,13 @@ export async function GET(req: NextRequest) {
   const prevTotal = prevExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   const categories = Array.from(categoryMap.entries())
-    .map(([categoryId, { name, sortOrder, total: categoryTotal }]) => ({
+    .map(([categoryId, { name, sortOrder, total: categoryTotal, expenses: categoryExpenses }]) => ({
       categoryId,
       name,
       sortOrder,
       total: categoryTotal,
       prevTotal: prevCategoryMap.get(categoryId) ?? 0,
+      expenses: categoryExpenses,
     }))
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -77,7 +98,5 @@ export async function GET(req: NextRequest) {
     total,
     prevTotal,
     categories,
-    // 個別明細は将来の詳細画面用
-    // expenses: expenses,
   });
 }

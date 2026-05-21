@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,11 +8,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { todayJst } from "@/lib/date";
 import type { Category, Expense } from "@/types";
 
+// フォームが実際に扱う項目だけを編集対象として受け取る
+export type ExpenseFormValues = Pick<
+  Expense,
+  "id" | "amount" | "spentAt" | "categoryId" | "storeName" | "memo"
+>;
+
 type Props = {
   categories: Category[];
-  expense?: Expense;
-  // 編集モード時、保存・削除後の戻り先（ない場合はホームへ）
-  backHref?: string;
+  expense?: ExpenseFormValues;
+  // 保存・削除の成功後に呼ばれる（モーダルを閉じる・トースト・再取得は親が担当）
+  onSuccess: (message: string) => void;
 };
 
 type FormState = {
@@ -24,10 +29,9 @@ type FormState = {
   memo: string;
 };
 
-type Pending = "idle" | "submitting" | "deleting" | "redirecting";
+type Pending = "idle" | "submitting" | "deleting";
 
-export function ExpenseForm({ categories, expense, backHref }: Props) {
-  const router = useRouter();
+export function ExpenseForm({ categories, expense, onSuccess }: Props) {
   const isEdit = expense !== undefined;
 
   const [form, setForm] = useState<FormState>(() =>
@@ -49,19 +53,9 @@ export function ExpenseForm({ categories, expense, backHref }: Props) {
   );
   const [pending, setPending] = useState<Pending>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const [toastFading, setToastFading] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const isLocked = pending !== "idle";
-
-  const finishWithToast = (message: string, redirect: string) => {
-    setPending("redirecting");
-    setToast(message);
-    setToastFading(false);
-    setTimeout(() => setToastFading(true), 1500);
-    setTimeout(() => router.push(redirect), 2000);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,8 +88,7 @@ export function ExpenseForm({ categories, expense, backHref }: Props) {
         throw new Error(data.error ?? "保存に失敗しました");
       }
 
-      const redirect = backHref ?? "/";
-      finishWithToast(expense ? "更新しました" : "保存しました", redirect);
+      onSuccess(expense ? "更新しました" : "保存しました");
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
       setPending("idle");
@@ -113,7 +106,7 @@ export function ExpenseForm({ categories, expense, backHref }: Props) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "削除に失敗しました");
       }
-      finishWithToast("削除しました", backHref ?? "/");
+      onSuccess("削除しました");
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
       setPending("idle");
@@ -259,21 +252,6 @@ export function ExpenseForm({ categories, expense, backHref }: Props) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* トースト */}
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`fixed bottom-6 left-4 right-4 bg-foreground text-background rounded-xl px-4 py-3 text-sm font-medium text-center transition-all duration-300 ${
-            toastFading
-              ? "opacity-0 translate-y-2"
-              : "opacity-100 translate-y-0 animate-in slide-in-from-bottom"
-          }`}
-        >
-          {toast}
         </div>
       )}
     </>

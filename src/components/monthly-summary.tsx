@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { getTrendLevel, TREND_ICON, TREND_TEXT_COLOR, TREND_BG_COLOR } from "@/lib/trend";
+import { formatJstDate, formatJstDateLabel } from "@/lib/date";
+import { useExpenseModal } from "@/components/expense-modal";
 import type { MonthlySummary, CategorySummary } from "@/types";
 
 function formatYen(amount: number) {
@@ -17,23 +18,22 @@ function formatPercent(current: number, prev: number) {
 
 type CategoryRowProps = {
   category: CategorySummary;
-  year: number;
-  month: number;
   maxTotal: number;
   isOpen: boolean;
   onToggle: () => void;
 };
 
-function CategoryRow({ category, year, month, maxTotal, isOpen, onToggle }: CategoryRowProps) {
+function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps) {
+  const { openEdit } = useExpenseModal();
   const level = getTrendLevel(category.total, category.prevTotal);
   const percent = formatPercent(category.total, category.prevTotal);
   const barWidth = maxTotal > 0 ? (category.total / maxTotal) * 100 : 0;
-  const detailsHref = `/expenses?year=${year}&month=${month}&categoryId=${category.categoryId}`;
 
   return (
     <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
       <button
         type="button"
+        aria-expanded={isOpen}
         className="w-full text-left p-4 min-h-[56px] active:bg-muted/50 transition-colors"
         onClick={onToggle}
       >
@@ -57,28 +57,57 @@ function CategoryRow({ category, year, month, maxTotal, isOpen, onToggle }: Cate
         </div>
       </button>
 
-      {/* 展開時: 前月比詳細 + 明細リンク */}
+      {/* 展開時: 前月比詳細 + 支出明細リスト（可変高さに対応） */}
       <div
-        className="overflow-hidden transition-all duration-200 ease-out"
-        style={{ maxHeight: isOpen ? "180px" : "0px", opacity: isOpen ? 1 : 0 }}
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
       >
-        <div className="px-4 pb-4 pt-0 text-sm space-y-1.5 border-t border-border/50">
-          <div className="flex justify-between text-muted-foreground pt-3">
-            <span>先月</span>
-            <span>{formatYen(category.prevTotal)}</span>
-          </div>
-          {percent && (
-            <div className={`flex justify-between font-medium ${TREND_TEXT_COLOR[level]}`}>
-              <span>前月比</span>
-              <span>{percent}</span>
+        <div className="overflow-hidden">
+          <div className="px-4 pb-4 pt-3 text-sm border-t border-border/50">
+            <div className="flex justify-between text-muted-foreground">
+              <span>先月</span>
+              <span>{formatYen(category.prevTotal)}</span>
             </div>
-          )}
-          <Link
-            href={detailsHref}
-            className="block mt-2 min-h-[44px] inline-flex items-center text-sm text-primary font-medium"
-          >
-            明細を見る →
-          </Link>
+            {percent && (
+              <div className={`flex justify-between font-medium ${TREND_TEXT_COLOR[level]}`}>
+                <span>前月比</span>
+                <span>{percent}</span>
+              </div>
+            )}
+
+            {/* 支出明細（タップで編集モーダルを開く） */}
+            <div className="mt-3 border-t border-border/50 divide-y divide-border/50">
+              {category.expenses.map((exp) => (
+                <button
+                  key={exp.id}
+                  type="button"
+                  onClick={() =>
+                    openEdit({
+                      id: exp.id,
+                      amount: exp.amount,
+                      spentAt: formatJstDate(new Date(exp.spentAt)),
+                      categoryId: category.categoryId,
+                      storeName: exp.storeName,
+                      memo: exp.memo,
+                    })
+                  }
+                  className="w-full text-left flex items-center justify-between gap-2 -mx-4 px-4 py-2.5 min-h-[44px] active:bg-muted/50 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <span className="text-muted-foreground">
+                      {formatJstDateLabel(new Date(exp.spentAt))}
+                    </span>
+                    {(exp.storeName || exp.memo) && (
+                      <span className="block text-xs text-muted-foreground truncate">
+                        {exp.storeName ?? exp.memo}
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-medium shrink-0">{formatYen(exp.amount)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -152,8 +181,6 @@ export function MonthlySummaryView({ summary }: Props) {
                 <CategoryRow
                   key={cat.categoryId}
                   category={cat}
-                  year={summary.year}
-                  month={summary.month}
                   maxTotal={maxCategoryTotal}
                   isOpen={openCategoryId === cat.categoryId}
                   onToggle={() => handleToggle(cat.categoryId)}

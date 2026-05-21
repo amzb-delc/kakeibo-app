@@ -15,12 +15,21 @@ export type Expense = {
   category: { id: string; name: string };
 };
 
+export type CategoryExpense = {
+  id: string;
+  amount: number;
+  spentAt: string;
+  storeName: string | null;
+  memo: string | null;
+};
+
 export type CategorySummary = {
   categoryId: string;
   name: string;
   sortOrder: number;
   total: number;
   prevTotal: number;
+  expenses: CategoryExpense[];
 };
 
 export type MonthlySummary = {

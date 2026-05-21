@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { MonthlySummaryView } from "@/components/monthly-summary";
 import { PageHeader } from "@/components/page-header";
+import { useExpenseModal } from "@/components/expense-modal";
 import type { MonthlySummary } from "@/types";
 
 export default function SummaryPage() {
@@ -13,6 +14,7 @@ export default function SummaryPage() {
   const [loading, setLoading] = useState(true);
   const [fade, setFade] = useState(false);
   const isInitial = useRef(true);
+  const { mutationVersion } = useExpenseModal();
 
   const fetchSummary = useCallback(async () => {
     setLoading(true);
@@ -29,9 +31,10 @@ export default function SummaryPage() {
     }
   }, [year, month]);
 
+  // year/month の変更時に加え、登録・編集・削除（mutationVersion）の後も再取得
   useEffect(() => {
     fetchSummary();
-  }, [fetchSummary]);
+  }, [fetchSummary, mutationVersion]);
 
   const handlePrevMonth = () => {
     if (month === 1) {
