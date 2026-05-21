@@ -31,7 +31,7 @@ async function main() {
     update: {},
     create: {
       id: "demo-household",
-      name: "我が家",
+      name: "ワレワレ",
       notificationDay: 25,
       notificationTime: "09:00",
     },
