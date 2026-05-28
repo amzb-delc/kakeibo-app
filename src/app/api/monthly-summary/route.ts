@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DEMO_HOUSEHOLD_ID } from "@/lib/auth";
 import { jstMonthRange, formatJstDate } from "@/lib/date";
+import { calculateBoxStats } from "@/lib/anomaly";
+
+function shiftMonth(year: number, month: number, delta: number) {
+  let y = year;
+  let m = month + delta;
+  while (m <= 0) {
+    m += 12;
+    y -= 1;
+  }
+  while (m > 12) {
+    m -= 12;
+    y += 1;
+  }
+  return { year: y, month: m };
+}
+
+function ymKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -17,6 +36,18 @@ export async function GET(req: NextRequest) {
   const range = jstMonthRange(year, month);
   // 当月閲覧時は比較しない。過去月閲覧時は「今月」を比較対象とする。
   const compareRange = isCurrentMonth ? null : jstMonthRange(currentYear, currentMonth);
+
+  // 偏差値用に「表示月含む過去6ヶ月」の範囲を作る
+  const sixMonthsAgo = shiftMonth(year, month, -5);
+  const sixMonthRange = {
+    gte: jstMonthRange(sixMonthsAgo.year, sixMonthsAgo.month).gte,
+    lt: range.lt,
+  };
+  const sixMonthKeys: string[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const { year: y, month: m } = shiftMonth(year, month, -i);
+    sixMonthKeys.push(ymKey(y, m));
+  }
 
   // 表示月の支出をカテゴリ別に集計（明細は日付降順で並べる）
   const expenses = await prisma.expense.findMany({
@@ -42,6 +73,15 @@ export async function GET(req: NextRequest) {
         },
       })
     : [];
+
+  // 偏差値算出用に過去6ヶ月の支出を取得（amount/categoryId/spentAtのみ）
+  const sixMonthExpenses = await prisma.expense.findMany({
+    where: {
+      householdId: DEMO_HOUSEHOLD_ID,
+      spentAt: sixMonthRange,
+    },
+    select: { amount: true, spentAt: true, categoryId: true },
+  });
 
   // カテゴリ別集計
   type CategoryExpense = {
@@ -91,15 +131,40 @@ export async function GET(req: NextRequest) {
     ? compareExpenses.reduce((sum, e) => sum + e.amount, 0)
     : null;
 
+  // 過去6ヶ月の月別合計 / 月別カテゴリ合計を JST 月キーで集計
+  const monthlyTotals = new Map<string, number>();
+  const monthlyCategoryTotals = new Map<string, Map<string, number>>();
+  for (const e of sixMonthExpenses) {
+    const ym = formatJstDate(e.spentAt).slice(0, 7);
+    monthlyTotals.set(ym, (monthlyTotals.get(ym) ?? 0) + e.amount);
+    let inner = monthlyCategoryTotals.get(ym);
+    if (!inner) {
+      inner = new Map();
+      monthlyCategoryTotals.set(ym, inner);
+    }
+    inner.set(e.categoryId, (inner.get(e.categoryId) ?? 0) + e.amount);
+  }
+  // 「データのある月」のみサンプルに使う（家計簿開始前の月をゼロ埋めしない）
+  const availableMonths = sixMonthKeys.filter((k) => monthlyTotals.has(k));
+  const totalSamples = availableMonths.map((k) => monthlyTotals.get(k)!);
+  const boxStats = calculateBoxStats(totalSamples);
+
   const categories = Array.from(categoryMap.entries())
-    .map(([categoryId, { name, sortOrder, total: categoryTotal, expenses: categoryExpenses }]) => ({
-      categoryId,
-      name,
-      sortOrder,
-      total: categoryTotal,
-      compareTotal: compareRange ? compareCategoryMap.get(categoryId) ?? 0 : null,
-      expenses: categoryExpenses,
-    }))
+    .map(([categoryId, { name, sortOrder, total: categoryTotal, expenses: categoryExpenses }]) => {
+      // カテゴリは「合計でデータがあった月」のうち、そのカテゴリ合計を0埋めで取る
+      const categorySamples = availableMonths.map(
+        (k) => monthlyCategoryTotals.get(k)?.get(categoryId) ?? 0
+      );
+      return {
+        categoryId,
+        name,
+        sortOrder,
+        total: categoryTotal,
+        compareTotal: compareRange ? compareCategoryMap.get(categoryId) ?? 0 : null,
+        boxStats: calculateBoxStats(categorySamples),
+        expenses: categoryExpenses,
+      };
+    })
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   return NextResponse.json({
@@ -107,6 +172,7 @@ export async function GET(req: NextRequest) {
     month,
     total,
     compareTotal,
+    boxStats,
     categories,
   });
 }
