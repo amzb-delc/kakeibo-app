@@ -515,14 +515,14 @@ hr {
 <p><strong>データ:</strong> 当月合計、前月合計、トレンドアイコン、前月比%（前月0円の場合は非表示）。サーバコンポーネントで Prisma 直接取得。</p>
 
 <h3 id="screen-summary">/summary 月次サマリー</h3>
-<p>月切り替え（◀▶）と、カテゴリ別の前月比バーチャート。</p>
+<p>月切り替え（◀▶）と、カテゴリ別の支出可視化。<strong>当月閲覧時は比較表示なし</strong>、<strong>過去月閲覧時は「今月」との差額</strong>を表示する（今月視点：今月が表示月より多ければ赤、少なければ緑）。</p>
 <table>
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>月切り替え</td><td>クライアント側 useState で year/month を保持、API再取得</td></tr>
 <tr><td>翌月ボタン</td><td>当月なら disabled</td></tr>
-<tr><td>合計カード</td><td>当月合計、前月合計、前月比%、プログレスバー（先月100%基準、150%で頭打ち）</td></tr>
-<tr><td>カテゴリ行</td><td>カテゴリ名は<strong>色分けタグ</strong>（<code>category-color.ts</code>）、金額・トレンドアイコン・幅 = 最大カテゴリ比のバー（バーもカテゴリ色）。タップで展開（<code>aria-expanded</code>、可変高さアニメーション）。展開状態はサマリーページが保持（制御コンポーネント）</td></tr>
-<tr><td>展開時</td><td>先月額・前月比% + <strong>そのカテゴリの支出明細を日付降順でインライン表示</strong>（日付 <code>M/D(曜)</code> / 店名 or メモ / 金額）。明細は <code>monthly-summary</code> API が各カテゴリに同梱するため追加通信なし</td></tr>
+<tr><td>合計カード</td><td>「合計」ラベル → 表示月合計（大）→ 差額（過去月閲覧時のみ、トレンド色） → プログレスバー（過去月閲覧時かつ今月>0、今月100%基準・150%頭打ち）の縦並び</td></tr>
+<tr><td>カテゴリ行</td><td>カテゴリ名は<strong>色分けタグ</strong>（<code>category-color.ts</code>）。右側は金額の下に差額（過去月閲覧時のみ、トレンド色）の縦並び。下に最大カテゴリ比のバー（バーもカテゴリ色）。タップで展開（<code>aria-expanded</code>、可変高さアニメーション）。展開状態はサマリーページが保持（制御コンポーネント）</td></tr>
+<tr><td>展開時</td><td><strong>そのカテゴリの支出明細を日付降順で一行表示</strong>（日付 <code>M/D(曜)</code> ／ 店名 or メモ ／ 金額）。明細は <code>monthly-summary</code> API が各カテゴリに同梱するため追加通信なし</td></tr>
 <tr><td>明細タップ</td><td>編集用ボトムシートを開く（<code>useExpenseModal().openEdit(...)</code>）</td></tr>
 <tr><td>更新反映</td><td>登録・編集・削除の成功で <code>ExpenseModalProvider</code> の <code>mutationVersion</code> が増分し、サマリーを自動再取得。画面遷移しないため<strong>選択月・展開カテゴリは保持</strong>される</td></tr>
 </table>
@@ -635,26 +635,26 @@ hr {
 
 <div class="endpoint" id="api-monthly-summary">
 <h4><span class="method method-get">GET</span> /api/monthly-summary</h4>
-<p>当月と前月のカテゴリ別集計。各カテゴリに当月の支出明細（<code>spentAt</code> 降順）を同梱するため、サマリー画面は追加通信なしで明細を展開できる。</p>
+<p>表示月のカテゴリ別集計と、比較用の「今月」集計を返す。当月閲覧時は <code>compareTotal: null</code>（比較なし）、過去月閲覧時は今月の合計・カテゴリ別合計を返す。各カテゴリに表示月の支出明細（<code>spentAt</code> 降順）を同梱するため、サマリー画面は追加通信なしで明細を展開できる。</p>
 <p><strong>クエリ:</strong> <code>year</code>, <code>month</code>（未指定なら当月）</p>
-<p><strong>レスポンス:</strong></p>
+<p><strong>レスポンス（過去月閲覧時）:</strong></p>
 <pre><code>{
   "year": 2026,
-  "month": 5,
-  "total": 142500,
-  "prevTotal": 131800,
+  "month": 4,
+  "total": 131800,
+  "compareTotal": 142500,
   "categories": [
     {
       "categoryId": "...",
       "name": "食費",
       "sortOrder": 0,
-      "total": 52300,
-      "prevTotal": 48100,
+      "total": 48100,
+      "compareTotal": 52300,
       "expenses": [
         {
           "id": "...",
           "amount": 1280,
-          "spentAt": "2026-05-20T15:00:00.000Z",
+          "spentAt": "2026-04-20T15:00:00.000Z",
           "storeName": "スーパー〇〇",
           "memo": null
         }
@@ -663,7 +663,7 @@ hr {
     ...
   ]
 }</code></pre>
-<p>前月は年跨ぎを考慮（month=1 のときは前年12月）。<code>spentAt</code> は ISO 文字列で返り、クライアントで JST 整形する。</p>
+<p>当月閲覧時は <code>compareTotal</code>（サマリー・各カテゴリ共）が <code>null</code> になる。当月判定はサーバ TZ に依存せず JST で行う（<code>formatJstDate(new Date())</code> から年月を抽出）。<code>spentAt</code> は ISO 文字列で返り、クライアントで JST 整形する。</p>
 </div>
 </section>
 
@@ -786,6 +786,20 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-05-28 — サマリー比較仕様の見直し（前月比 → 今月との差額）</h3>
+<p><span class="badge badge-major">major</span> 月次サマリーの比較表示を「前月比%」から「今月との差額（円）」に変更。</p>
+<h4>変更</h4>
+<ul>
+  <li><strong>当月閲覧時は比較表示を全廃</strong>（差額バッジ・プログレスバーすべて非表示）。過去月閲覧時のみ「今月」を比較対象として差額を表示</li>
+  <li>差額は<strong>今月視点</strong>で算出（<code>compareTotal - total</code>）: 今月 &gt; 表示月 なら <code>+¥X</code> 赤（今月の方が多い）、今月 &lt; 表示月 なら <code>-¥X</code> 緑（今月の方が少ない）。色と符号が一致</li>
+  <li>合計カードは「合計」ラベル → 金額 → 差額 → プログレスバーの<strong>縦並び</strong>に。「先月 ¥XXX」テキスト行と背景色つきバッジを撤去</li>
+  <li>カテゴリ行は右側を「金額 ＋ 直下に差額」の<strong>縦並び</strong>に。トレンド矢印アイコン（↑↑/↑/→/↓）を撤去、差額の文字色のみで方向表示</li>
+  <li>カテゴリ展開時の「先月額・前月比%」行を削除し、支出明細のみに。明細は<strong>1行表示</strong>（日付 ／ 店名・メモ ／ 金額）</li>
+  <li><code>GET /api/monthly-summary</code>: <code>prevTotal: number</code> → <code>compareTotal: number | null</code>（当月閲覧時は <code>null</code>）。当月判定を JST 化（<code>formatJstDate</code> 経由）してサーバ TZ 依存を解消</li>
+</ul>
+
+<hr>
 
 <h3>2026-05-21 (続き2) — モーダル内フォーム刷新・カテゴリ色分け</h3>
 <p><span class="badge badge-major">major</span> モーダル内のフォームを大きく作り替え。コミット <code>0a4ffcc</code>。Playwright で検証済み。</p>
