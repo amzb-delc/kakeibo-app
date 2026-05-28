@@ -28,7 +28,7 @@ export type CategorySummary = {
   name: string;
   sortOrder: number;
   total: number;
-  prevTotal: number;
+  compareTotal: number | null;
   expenses: CategoryExpense[];
 };
 
@@ -36,6 +36,6 @@ export type MonthlySummary = {
   year: number;
   month: number;
   total: number;
-  prevTotal: number;
+  compareTotal: number | null;
   categories: CategorySummary[];
 };

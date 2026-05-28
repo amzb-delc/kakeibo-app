@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DEMO_HOUSEHOLD_ID } from "@/lib/auth";
-import { jstMonthRange } from "@/lib/date";
+import { jstMonthRange, formatJstDate } from "@/lib/date";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const now = new Date();
-  const year = Number(searchParams.get("year") ?? now.getFullYear());
-  const month = Number(searchParams.get("month") ?? now.getMonth() + 1);
+  // 当月判定はサーバTZに依存せずJSTで行う
+  const [todayYearStr, todayMonthStr] = formatJstDate(new Date()).split("-");
+  const currentYear = Number(todayYearStr);
+  const currentMonth = Number(todayMonthStr);
+  const year = Number(searchParams.get("year") ?? currentYear);
+  const month = Number(searchParams.get("month") ?? currentMonth);
+
+  const isCurrentMonth = year === currentYear && month === currentMonth;
 
   const range = jstMonthRange(year, month);
-  const prevRange = jstMonthRange(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1);
+  // 当月閲覧時は比較しない。過去月閲覧時は「今月」を比較対象とする。
+  const compareRange = isCurrentMonth ? null : jstMonthRange(currentYear, currentMonth);
 
-  // 当月の支出をカテゴリ別に集計（明細は日付降順で並べる）
+  // 表示月の支出をカテゴリ別に集計（明細は日付降順で並べる）
   const expenses = await prisma.expense.findMany({
     where: {
       householdId: DEMO_HOUSEHOLD_ID,
@@ -24,16 +30,18 @@ export async function GET(req: NextRequest) {
     orderBy: [{ spentAt: "desc" }, { createdAt: "desc" }],
   });
 
-  // 前月の支出を集計（トレンド計算用）
-  const prevExpenses = await prisma.expense.findMany({
-    where: {
-      householdId: DEMO_HOUSEHOLD_ID,
-      spentAt: prevRange,
-    },
-    include: {
-      category: { select: { id: true, name: true } },
-    },
-  });
+  // 比較対象（今月）の支出を集計
+  const compareExpenses = compareRange
+    ? await prisma.expense.findMany({
+        where: {
+          householdId: DEMO_HOUSEHOLD_ID,
+          spentAt: compareRange,
+        },
+        include: {
+          category: { select: { id: true, name: true } },
+        },
+      })
+    : [];
 
   // カテゴリ別集計
   type CategoryExpense = {
@@ -70,16 +78,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const prevCategoryMap = new Map<string, number>();
-  for (const expense of prevExpenses) {
-    prevCategoryMap.set(
+  const compareCategoryMap = new Map<string, number>();
+  for (const expense of compareExpenses) {
+    compareCategoryMap.set(
       expense.categoryId,
-      (prevCategoryMap.get(expense.categoryId) ?? 0) + expense.amount
+      (compareCategoryMap.get(expense.categoryId) ?? 0) + expense.amount
     );
   }
 
   const total = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const prevTotal = prevExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const compareTotal = compareRange
+    ? compareExpenses.reduce((sum, e) => sum + e.amount, 0)
+    : null;
 
   const categories = Array.from(categoryMap.entries())
     .map(([categoryId, { name, sortOrder, total: categoryTotal, expenses: categoryExpenses }]) => ({
@@ -87,7 +97,7 @@ export async function GET(req: NextRequest) {
       name,
       sortOrder,
       total: categoryTotal,
-      prevTotal: prevCategoryMap.get(categoryId) ?? 0,
+      compareTotal: compareRange ? compareCategoryMap.get(categoryId) ?? 0 : null,
       expenses: categoryExpenses,
     }))
     .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -96,7 +106,7 @@ export async function GET(req: NextRequest) {
     year,
     month,
     total,
-    prevTotal,
+    compareTotal,
     categories,
   });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { getTrendLevel, TREND_ICON, TREND_TEXT_COLOR, TREND_BG_COLOR } from "@/lib/trend";
+import { getTrendLevel, TREND_TEXT_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
 import { categoryColor } from "@/lib/category-color";
 import { useExpenseModal } from "@/components/expense-modal";
@@ -10,10 +10,10 @@ function formatYen(amount: number) {
   return `¥${amount.toLocaleString("ja-JP")}`;
 }
 
-function formatPercent(current: number, prev: number) {
-  if (prev === 0) return null;
-  const ratio = Math.round(((current - prev) / prev) * 100);
-  return ratio >= 0 ? `+${ratio}%` : `${ratio}%`;
+function formatDiff(diff: number) {
+  if (diff === 0) return "±¥0";
+  const abs = Math.abs(diff).toLocaleString("ja-JP");
+  return diff > 0 ? `+¥${abs}` : `-¥${abs}`;
 }
 
 type CategoryRowProps = {
@@ -25,8 +25,10 @@ type CategoryRowProps = {
 
 function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps) {
   const { openEdit } = useExpenseModal();
-  const level = getTrendLevel(category.total, category.prevTotal);
-  const percent = formatPercent(category.total, category.prevTotal);
+  // 今月視点で比較する: 今月 > 表示月 なら up(赤=今月の方が多い), 今月 < 表示月 なら down(緑=今月の方が少ない)
+  const compareTotal = category.compareTotal;
+  const level = compareTotal !== null ? getTrendLevel(compareTotal, category.total) : null;
+  const diff = compareTotal !== null ? formatDiff(compareTotal - category.total) : null;
   const barWidth = maxTotal > 0 ? (category.total / maxTotal) * 100 : 0;
   const color = categoryColor(category.sortOrder);
 
@@ -44,13 +46,13 @@ function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps)
           >
             {category.name}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end">
             <span className="text-base font-semibold">{formatYen(category.total)}</span>
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${TREND_TEXT_COLOR[level]} ${TREND_BG_COLOR[level]}`}
-            >
-              {TREND_ICON[level]}
-            </span>
+            {level && (
+              <span className={`text-xs font-medium ${TREND_TEXT_COLOR[level]}`}>
+                {diff}
+              </span>
+            )}
           </div>
         </div>
         {/* バーチャート */}
@@ -62,26 +64,15 @@ function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps)
         </div>
       </button>
 
-      {/* 展開時: 前月比詳細 + 支出明細リスト（可変高さに対応） */}
+      {/* 展開時: 支出明細リスト（可変高さに対応） */}
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"
         style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">
           <div className="px-4 pb-4 pt-3 text-sm border-t border-border/50">
-            <div className="flex justify-between text-muted-foreground">
-              <span>先月</span>
-              <span>{formatYen(category.prevTotal)}</span>
-            </div>
-            {percent && (
-              <div className={`flex justify-between font-medium ${TREND_TEXT_COLOR[level]}`}>
-                <span>前月比</span>
-                <span>{percent}</span>
-              </div>
-            )}
-
             {/* 支出明細（タップで編集モーダルを開く） */}
-            <div className="mt-3 border-t border-border/50 divide-y divide-border/50">
+            <div className="divide-y divide-border/50">
               {category.expenses.map((exp) => (
                 <button
                   key={exp.id}
@@ -98,12 +89,12 @@ function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps)
                   }
                   className="w-full text-left flex items-center justify-between gap-2 -mx-4 px-4 py-2.5 min-h-[44px] active:bg-muted/50 transition-colors"
                 >
-                  <div className="min-w-0">
-                    <span className="text-muted-foreground">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-muted-foreground shrink-0">
                       {formatJstDateLabel(new Date(exp.spentAt))}
                     </span>
                     {(exp.storeName || exp.memo) && (
-                      <span className="block text-xs text-muted-foreground truncate">
+                      <span className="text-xs text-muted-foreground truncate">
                         {exp.storeName ?? exp.memo}
                       </span>
                     )}
@@ -126,46 +117,37 @@ type Props = {
 };
 
 export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }: Props) {
-  const totalLevel = getTrendLevel(summary.total, summary.prevTotal);
-  const totalPercent = formatPercent(summary.total, summary.prevTotal);
+  const compareTotal = summary.compareTotal;
+  const totalLevel = compareTotal !== null ? getTrendLevel(compareTotal, summary.total) : null;
+  const totalDiff = compareTotal !== null ? formatDiff(compareTotal - summary.total) : null;
 
   const maxCategoryTotal = Math.max(...summary.categories.map((c) => c.total), 0);
 
-  // 前月比プログレスバー（先月を100%として当月の割合を表示）
-  const progressPercent = summary.prevTotal > 0
-    ? Math.min((summary.total / summary.prevTotal) * 100, 150)
+  // 今月比プログレスバー（今月を100%として表示月の割合を表示）
+  const progressPercent = compareTotal !== null && compareTotal > 0
+    ? Math.min((summary.total / compareTotal) * 100, 150)
     : 0;
 
   return (
     <main className="px-4 py-6 space-y-6">
         {/* 合計カード */}
         <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50">
-          <div className="flex items-baseline justify-between mb-1">
-            <span className="text-sm text-muted-foreground">合計</span>
-            {totalPercent && (
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${TREND_TEXT_COLOR[totalLevel]} ${TREND_BG_COLOR[totalLevel]}`}
-              >
-                {TREND_ICON[totalLevel]} {totalPercent}
-              </span>
-            )}
-          </div>
+          <span className="text-sm text-muted-foreground">合計</span>
           <p className="text-3xl font-bold">{formatYen(summary.total)}</p>
-          {summary.prevTotal > 0 && (
-            <>
-              <p className="text-xs text-muted-foreground mt-1">
-                先月 {formatYen(summary.prevTotal)}
-              </p>
-              {/* プログレスバー */}
-              <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden mt-3">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    progressPercent > 100 ? "bg-destructive/70" : "bg-primary"
-                  }`}
-                  style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                />
-              </div>
-            </>
+          {totalLevel && (
+            <p className={`text-xs font-medium mt-1 ${TREND_TEXT_COLOR[totalLevel]}`}>
+              {totalDiff}
+            </p>
+          )}
+          {compareTotal !== null && compareTotal > 0 && (
+            <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden mt-3">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  progressPercent > 100 ? "bg-destructive/70" : "bg-primary"
+                }`}
+                style={{ width: `${Math.min(progressPercent, 100)}%` }}
+              />
+            </div>
           )}
         </div>
 
