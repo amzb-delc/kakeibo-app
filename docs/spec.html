@@ -346,7 +346,7 @@ hr {
 <tr><td>UI</td><td>shadcn-ui + Tailwind CSS</td></tr>
 <tr><td>DB</td><td>PostgreSQL</td></tr>
 <tr><td>ORM</td><td>Prisma 5（<code>src/lib/prisma.ts</code> でシングルトン）</td></tr>
-<tr><td>PWA</td><td><code>public/manifest.json</code>、アイコン PNG/SVG</td></tr>
+<tr><td>PWA</td><td><code>public/manifest.json</code>、アイコン PNG（<code>public/character.png</code> から生成）</td></tr>
 </table>
 
 <h3>主なディレクトリ</h3>
@@ -498,22 +498,17 @@ hr {
 <h2>画面構成</h2>
 
 <h3 id="screen-home">/ ホーム</h3>
-<p>当月支出のサマリーカードと、登録・サマリーへの導線。</p>
+<p>当月支出のサマリーカード。左にキャラクター（<code>public/character.png</code>）を配置。</p>
 <div class="ascii-art">┌─────────────────────────┐
-│       家計簿            │
+│       ホーム            │
 │  ┌───────────────────┐  │
-│  │  5月の支出         │  │
-│  │  ¥142,500    ↑ +8%│  │
-│  │  先月: ¥131,800    │  │
-│  └───────────────────┘  │
-│  ┌───────────────────┐  │
-│  │   支出を登録       │  │
-│  └───────────────────┘  │
-│  ┌───────────────────┐  │
-│  │   月次サマリー     │  │
+│  │ (^o^)  5月の支出   │  │  ← 左にキャラ（72px）
+│  │  👽    ¥142,500 ↑+8%│ │
+│  │        先月:¥131,800│ │
 │  └───────────────────┘  │
 └─────────────────────────┘</div>
 <p><strong>データ:</strong> 当月合計、前月合計、トレンドアイコン、前月比%（前月0円の場合は非表示）。サーバコンポーネントで Prisma 直接取得。</p>
+<p><strong>空状態:</strong> 当月合計が <code>0</code> のときはキャラを大きく中央配置（128/160px）し、「<code>{month}月の記録はまだないよ</code>」「<code>右下の ＋ から登録してね</code>」を表示。</p>
 
 <h3 id="screen-summary">/summary 月次サマリー</h3>
 <p>月切り替え（◀▶）と、カテゴリ別の支出可視化。<strong>当月閲覧時は比較表示なし</strong>、<strong>過去月閲覧時は「今月」との差額</strong>を表示する（今月視点：今月が表示月より多ければ赤、少なければ緑）。</p>
@@ -527,6 +522,7 @@ hr {
 <tr><td>展開時</td><td><strong>そのカテゴリの支出明細を日付降順で一行表示</strong>（日付 <code>M/D(曜)</code> ／ 店名 or メモ ／ 金額）。明細は <code>monthly-summary</code> API が各カテゴリに同梱するため追加通信なし</td></tr>
 <tr><td>明細タップ</td><td>編集用ボトムシートを開く（<code>useExpenseModal().openEdit(...)</code>）</td></tr>
 <tr><td>更新反映</td><td>登録・編集・削除の成功で <code>ExpenseModalProvider</code> の <code>mutationVersion</code> が増分し、サマリーを自動再取得。画面遷移しないため<strong>選択月・展開カテゴリは保持</strong>される</td></tr>
+<tr><td>空状態</td><td>カテゴリ件数が <code>0</code> のときはキャラクター（<code>public/character.png</code>、112px）を中央に置き、「この月の支出はありません」を表示</td></tr>
 </table>
 
 <h3 id="screen-modal">支出モーダル（登録・編集）</h3>
@@ -796,6 +792,17 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-06-04 — キャラクター導入（ヒーロー / 空状態 / PWAアイコン）</h3>
+<p><span class="badge badge-minor">minor</span> アプリのキャラクター（緑のがま口×宇宙人）を <code>public/character.png</code> に追加。ホームの合計カード・サマリーの空状態・PWA/ファビコンに採用。</p>
+<h4>変更</h4>
+<ul>
+  <li><strong>ホーム</strong>: 合計カードの左にキャラ（72px）を配置。当月合計が <code>0</code> のときはキャラを大きく中央表示（128/160px）した空状態に切替</li>
+  <li><strong>サマリー</strong>: カテゴリ件数が <code>0</code> の月で、キャラ（112px）＋「この月の支出はありません」を中央表示</li>
+  <li><strong>PWA / ファビコン</strong>: <code>character.png</code> から <code>public/icon-192.png</code>、<code>public/icon-512.png</code>、<code>src/app/apple-icon.png</code>（180px）、<code>src/app/icon.png</code>（32px）を生成。古い <code>public/icon.svg</code> と <code>src/app/favicon.ico</code> を削除し、<code>layout.tsx</code> の <code>icons</code> 手動指定を撤去（Next.js が <code>icon.png</code>/<code>apple-icon.png</code> を自動検出して <code>&lt;link&gt;</code> 化）</li>
+</ul>
+
+<hr>
 
 <h3>2026-05-28 (続き) — プログレスバー → 直近6ヶ月の異常値バー</h3>
 <p><span class="badge badge-major">major</span> サマリーのバーを「先月100%基準のプログレスバー / 最大カテゴリ比のバー」から、<strong>直近6ヶ月（表示月含む）の box stats を使った異常値バー</strong>に置き換え。当月閲覧時も表示する。</p>
