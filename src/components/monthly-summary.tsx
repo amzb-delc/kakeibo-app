@@ -98,12 +98,7 @@ function CategoryRow({ category, isOpen, onToggle }: CategoryRowProps) {
         className="w-full text-left p-4 min-h-[56px] active:bg-muted/50 transition-colors"
         onClick={onToggle}
       >
-        <div className="flex items-center justify-between mb-2">
-          <span
-            className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-sm font-medium ${color.tag}`}
-          >
-            {category.name}
-          </span>
+        <div className="flex items-center justify-end mb-2">
           <div className="flex flex-col items-end">
             <span className="text-base font-semibold">{formatYen(category.total)}</span>
             {level && (
@@ -174,12 +169,27 @@ type Props = {
 };
 
 export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }: Props) {
+  const { categories: allCategories } = useExpenseModal();
   const compareTotal = summary.compareTotal;
   const totalLevel = compareTotal !== null ? getTrendLevel(compareTotal, summary.total) : null;
   const totalDiff = compareTotal !== null ? formatDiff(compareTotal - summary.total) : null;
   // ドーナツは金額の大きい順に並べる（カテゴリ別リストの sortOrder 順とは独立）
   const sortedByTotal = [...summary.categories].sort((a, b) => b.total - a.total);
   const topCategories = sortedByTotal.slice(0, 7);
+  // 「解除なし」設計: 未選択(null)のときだけ最大カテゴリにフォールバックする（初回描画フリッカ防止。
+  // 親 summary/page.tsx の useEffect と同じ初期選択を view 側でも先取りする）。
+  // 一度選択された後は openCategoryId をそのまま使う → 当月にそのカテゴリが無ければ
+  // visibleCategories が空になり下の「キロクナシ」表示に落ちる（選択は親で保持され、戻れば再表示）。
+  const effectiveSelectedId = openCategoryId ?? sortedByTotal[0]?.categoryId ?? null;
+  const visibleCategories = effectiveSelectedId
+    ? summary.categories.filter((c) => c.categoryId === effectiveSelectedId)
+    : [];
+  // 明細見出し横のラベル: 当月に明細があればそれを使い、無い（キロクナシ）場合も
+  // 全カテゴリから名前を解決して表示する。
+  const selectedLabel =
+    visibleCategories[0] ??
+    allCategories.find((c) => c.id === effectiveSelectedId) ??
+    null;
 
   return (
     <main className="px-4 py-6 space-y-6">
@@ -209,13 +219,24 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
               <ul className="flex-1 min-w-0 space-y-1 pt-1">
                 {topCategories.map((c) => {
                   const color = categoryColor(c.sortOrder);
+                  const isSelected = effectiveSelectedId === c.categoryId;
                   return (
                     <li key={c.categoryId} className="min-w-0">
-                      <span
-                        className={`inline-block max-w-full truncate rounded-lg px-2 py-0.5 text-xs font-medium ${color.tag}`}
+                      <button
+                        type="button"
+                        onClick={() => onToggleCategory(c.categoryId)}
+                        aria-pressed={isSelected}
+                        className="flex w-full items-center justify-between gap-2 text-left"
                       >
-                        {c.name}
-                      </span>
+                        <span
+                          className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-1 text-sm font-medium ${color.tag} ${isSelected ? "ring-2 ring-current ring-offset-1" : ""}`}
+                        >
+                          <span className="truncate">{c.name}</span>
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          {formatYen(c.total)}
+                        </span>
+                      </button>
                     </li>
                   );
                 })}
@@ -224,11 +245,20 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
           </div>
         </div>
 
-        {/* カテゴリ別 */}
+        {/* 明細（選択中カテゴリの支出明細）。見出しの右に選択カテゴリのラベルを表示 */}
         <div>
-          <h2 className="text-base font-semibold mb-3">カテゴリ別</h2>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-base font-semibold">明細</h2>
+            {selectedLabel && (
+              <span
+                className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-sm font-medium ${categoryColor(selectedLabel.sortOrder).tag}`}
+              >
+                {selectedLabel.name}
+              </span>
+            )}
+          </div>
           <div className="space-y-3">
-            {summary.categories.length === 0 ? (
+            {visibleCategories.length === 0 ? (
               <div className="py-8 flex flex-col items-center text-center">
                 <Image
                   src="/character.png"
@@ -243,11 +273,11 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
                 </p>
               </div>
             ) : (
-              summary.categories.map((cat) => (
+              visibleCategories.map((cat) => (
                 <CategoryRow
                   key={cat.categoryId}
                   category={cat}
-                  isOpen={openCategoryId === cat.categoryId}
+                  isOpen={effectiveSelectedId === cat.categoryId}
                   onToggle={() => onToggleCategory(cat.categoryId)}
                 />
               ))

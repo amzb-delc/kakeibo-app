@@ -34,6 +34,8 @@ type ContextValue = {
   setComposeContext: (ctx: ComposeContext | null) => void;
   /** 登録・更新・削除のたびに増える。一覧側はこれを購読して再取得する。 */
   mutationVersion: number;
+  /** 先読みした全カテゴリ。当月に明細が無いカテゴリ名の解決などに使う */
+  categories: Category[];
 };
 
 const ExpenseModalContext = createContext<ContextValue | null>(null);
@@ -256,7 +258,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
 
   return (
     <ExpenseModalContext.Provider
-      value={{ openCreate, openEdit, setComposeContext, mutationVersion }}
+      value={{ openCreate, openEdit, setComposeContext, mutationVersion, categories }}
     >
       {children}
 
