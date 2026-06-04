@@ -179,7 +179,7 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
   const totalDiff = compareTotal !== null ? formatDiff(compareTotal - summary.total) : null;
   // ドーナツは金額の大きい順に並べる（カテゴリ別リストの sortOrder 順とは独立）
   const sortedByTotal = [...summary.categories].sort((a, b) => b.total - a.total);
-  const topCategories = sortedByTotal.slice(0, 3);
+  const topCategories = sortedByTotal.slice(0, 7);
 
   return (
     <main className="px-4 py-6 space-y-6">
