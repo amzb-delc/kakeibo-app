@@ -1,104 +1,133 @@
-import Image from "next/image";
-import { prisma } from "@/lib/prisma";
-import { getTrendLevel, TREND_ICON, TREND_TEXT_COLOR, TREND_BG_COLOR } from "@/lib/trend";
-import { DEMO_HOUSEHOLD_ID } from "@/lib/auth";
-import { jstMonthRange } from "@/lib/date";
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import { MonthlySummaryView } from "@/components/monthly-summary";
 import { PageHeader } from "@/components/page-header";
+import { useExpenseModal } from "@/components/expense-modal";
+import type { MonthlySummary } from "@/types";
 
-// new Date() / Prisma に依存するため SSG 化を防ぐ。
-// SSG だとビルド時の月が固定され、月跨ぎで古い表示になる。
-export const dynamic = "force-dynamic";
-
-async function getHomeSummary() {
+export default function SummaryPage() {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [summary, setSummary] = useState<MonthlySummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fade, setFade] = useState(false);
+  const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
+  const isInitial = useRef(true);
+  const { mutationVersion, setComposeContext } = useExpenseModal();
 
-  const range = jstMonthRange(year, month);
-  const prevRange = jstMonthRange(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1);
+  // 当月の最大カテゴリ（金額降順の先頭）。未選択時の初期選択と FAB 既定値の両方に使う。
+  const topCategoryId =
+    summary && summary.categories.length > 0
+      ? [...summary.categories].sort((a, b) => b.total - a.total)[0].categoryId
+      : null;
 
-  const [expenses, prevExpenses] = await Promise.all([
-    prisma.expense.aggregate({
-      where: { householdId: DEMO_HOUSEHOLD_ID, spentAt: range },
-      _sum: { amount: true },
-    }),
-    prisma.expense.aggregate({
-      where: { householdId: DEMO_HOUSEHOLD_ID, spentAt: prevRange },
-      _sum: { amount: true },
-    }),
-  ]);
+  // 登録モーダル（FAB）の既定値に「表示中の月・表示中カテゴリ」を渡す。
+  // openCategoryId が未確定（null）の初回フレームでも、view と同じ最大カテゴリを既定にする。
+  useEffect(() => {
+    setComposeContext({ year, month, categoryId: openCategoryId ?? topCategoryId });
+  }, [year, month, openCategoryId, topCategoryId, setComposeContext]);
+  useEffect(() => () => setComposeContext(null), [setComposeContext]);
 
-  const total = expenses._sum.amount ?? 0;
-  const prevTotal = prevExpenses._sum.amount ?? 0;
+  // 「解除なし」設計: タップは常に選択を切替えるだけで、再タップで null には戻さない。
+  const toggleCategory = (categoryId: string) => setOpenCategoryId(categoryId);
 
-  return { total, prevTotal, month };
-}
+  const fetchSummary = useCallback(async () => {
+    setLoading(true);
+    if (!isInitial.current) {
+      setFade(true);
+    }
+    try {
+      const res = await fetch(`/api/monthly-summary?year=${year}&month=${month}`);
+      if (res.ok) setSummary(await res.json());
+    } finally {
+      setLoading(false);
+      isInitial.current = false;
+      requestAnimationFrame(() => setFade(false));
+    }
+  }, [year, month]);
 
-export default async function Home() {
-  const { total, prevTotal, month } = await getHomeSummary();
-  const trend = getTrendLevel(total, prevTotal);
-  const diffPercent = prevTotal > 0
-    ? Math.round(((total - prevTotal) / prevTotal) * 100)
-    : null;
+  // year/month の変更時に加え、登録・編集・削除（mutationVersion）の後も再取得
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary, mutationVersion]);
+
+  // 「解除なし」設計の初期選択: まだ何も選んでいない（null）ときだけ最大カテゴリを自動選択する。
+  // 一度ユーザーが選んだ後は補正しない → 月跨ぎで選択を維持し、当月に無ければ「キロクナシ」表示にする。
+  useEffect(() => {
+    if (openCategoryId !== null || topCategoryId === null) return;
+    setOpenCategoryId(topCategoryId);
+  }, [topCategoryId, openCategoryId]);
+
+  const handlePrevMonth = () => {
+    if (month === 1) {
+      setYear((y) => y - 1);
+      setMonth(12);
+    } else {
+      setMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (month === 12) {
+      setYear((y) => y + 1);
+      setMonth(1);
+    } else {
+      setMonth((m) => m + 1);
+    }
+  };
+
+  const isCurrentMonth =
+    year === now.getFullYear() && month === now.getMonth() + 1;
+
+  const monthSwitcher = (
+    <div className="flex items-center justify-center gap-2">
+      <button
+        type="button"
+        onClick={handlePrevMonth}
+        disabled={loading}
+        aria-label="前月"
+        className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+      >
+        ◀
+      </button>
+      <span className="text-base font-semibold tabular-nums">
+        {year}年{month}月
+      </span>
+      <button
+        type="button"
+        onClick={handleNextMonth}
+        disabled={isCurrentMonth || loading}
+        aria-label={isCurrentMonth ? "翌月（未来は表示できません）" : "翌月"}
+        className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+      >
+        ▶
+      </button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader title="ホーム" />
-      <main className="px-4 py-6">
-        {total === 0 ? (
-          <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50 flex flex-col items-center text-center">
-            <Image
-              src="/character.png"
-              alt=""
-              width={160}
-              height={160}
-              priority
-              sizes="(min-width: 640px) 160px, 128px"
-              className="w-32 h-32 sm:w-40 sm:h-40 mb-3"
-            />
-            <h2 className="text-base font-semibold mb-1">
-              {month}月の記録はまだないよ
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              右下の ＋ から登録してね
-            </p>
-          </div>
-        ) : (
-          <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50 flex items-center gap-4">
-            <Image
-              src="/character.png"
-              alt=""
-              width={72}
-              height={72}
-              priority
-              sizes="(min-width: 640px) 72px, 64px"
-              className="w-16 h-16 sm:w-[72px] sm:h-[72px] shrink-0"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm text-muted-foreground mb-1">
-                {month}月の支出
-              </p>
-              <div className="flex items-baseline gap-3 flex-wrap">
-                <p className="text-3xl font-bold">
-                  ¥{total.toLocaleString()}
-                </p>
-                {diffPercent !== null && (
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${TREND_TEXT_COLOR[trend]} ${TREND_BG_COLOR[trend]}`}
-                  >
-                    {TREND_ICON[trend]} {diffPercent > 0 ? "+" : ""}{diffPercent}%
-                  </span>
-                )}
-              </div>
-              {prevTotal > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  先月: ¥{prevTotal.toLocaleString()}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-      </main>
+      {/* PageHeader の title が JSX のため h1 が失われる。ランドマーク確保用に sr-only で補う。 */}
+      <h1 className="sr-only">月次サマリー</h1>
+      <PageHeader title={monthSwitcher} />
+      {!summary && loading ? (
+        <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+          読み込み中…
+        </div>
+      ) : summary ? (
+        <div
+          className="transition-opacity duration-150"
+          style={{ opacity: fade ? 0 : 1 }}
+        >
+          <MonthlySummaryView
+            summary={summary}
+            openCategoryId={openCategoryId}
+            onToggleCategory={toggleCategory}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

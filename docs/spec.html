@@ -301,8 +301,7 @@ hr {
   </ul>
   <h2>画面</h2>
   <ul>
-    <li><a href="#screen-home">/ ホーム</a></li>
-    <li><a href="#screen-summary">/summary</a></li>
+    <li><a href="#screen-summary">/ 月次サマリー（ホーム）</a></li>
     <li><a href="#screen-modal">支出モーダル（登録・編集）</a></li>
   </ul>
   <h2>API</h2>
@@ -353,8 +352,7 @@ hr {
 <pre><code>src/
 ├── app/
 │   ├── layout.tsx            # ExpenseModalProvider で全体を包む
-│   ├── page.tsx              # / ホーム
-│   ├── summary/page.tsx      # /summary 月次サマリー（登録・編集の起点）
+│   ├── page.tsx              # / 月次サマリー（ホーム・アプリの起点。登録・編集の起点）
 │   └── api/
 │       ├── categories/route.ts
 │       ├── expenses/route.ts
@@ -362,7 +360,7 @@ hr {
 │       └── monthly-summary/route.ts
 ├── components/
 │   ├── page-header.tsx       # 共通ヘッダ（全ページに sticky）
-│   ├── footer-nav.tsx        # 共通フッタ（ホーム / ＋FAB / サマリー）
+│   ├── footer-nav.tsx        # 共通フッタ（サマリー / ＋FAB / 右は将来の設定枠）
 │   ├── expense-modal.tsx     # ExpenseModalProvider（全画面共通のボトムシート）
 │   ├── expense-form.tsx      # 登録 + 編集フォーム（モーダル内で使用）
 │   ├── day-wheel.tsx         # 日のみの縦ホイール（ドラム）
@@ -450,9 +448,9 @@ hr {
 ├───────────────────────────┤
 │        ┏━━━━━━━━┓         │
 │        ┃   ＋   ┃         │  ← FAB（青グラデ + 白リング）
-│  [⌂]   ┗━━━━━━━━┛   [📊]  │
+│  [📊]   ┗━━━━━━━━┛        │  ← 右は将来の設定タブ用に空き
 └───────────────────────────┘
-       ↑ ホーム      ↑ サマリー</div>
+       ↑ サマリー</div>
 
 <h3>PageHeader（src/components/page-header.tsx）</h3>
 <table>
@@ -462,17 +460,17 @@ hr {
 <tr><td>下段</td><td>左: 戻る（ChevronLeft、44×44）、中央: ページタイトル（文字列なら <code>&lt;h1&gt;</code>、JSX も可）、右: アクション枠</td></tr>
 <tr><td>Props</td><td><code>title: ReactNode</code>, <code>subtitle?</code>, <code>backHref?</code>, <code>right?</code></td></tr>
 <tr><td>戻る</td><td><code>backHref</code> の文字列リンク（<code>router.back()</code> は使わない）。サニタイズは呼び出し元責任（<code>safeBackHref</code> を各ページで実装）</td></tr>
-<tr><td>注意</td><td><code>title</code> が JSX のときは <code>&lt;h1&gt;</code> 不在になるため、利用元で <code>&lt;h1 className="sr-only"&gt;</code> を別途置く（/summary がこれ）</td></tr>
+<tr><td>注意</td><td><code>title</code> が JSX のときは <code>&lt;h1&gt;</code> 不在になるため、利用元で <code>&lt;h1 className="sr-only"&gt;</code> を別途置く（/ サマリーがこれ）</td></tr>
 </table>
 
 <h3>FooterNav（src/components/footer-nav.tsx）</h3>
 <table>
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>位置</td><td><code>fixed bottom-0 z-30</code>、<code>safe-area-inset-bottom</code> 対応、フッタ高 <code>h-24</code>（96px）</td></tr>
-<tr><td>3タブ</td><td>左: ホーム（Home アイコン）、中央: ＋FAB、右: サマリー（BarChart3 アイコン）。アクティブタブは <code>text-primary</code> + <code>aria-current="page"</code></td></tr>
+<tr><td>タブ構成</td><td>左: サマリー（BarChart3 アイコン、<code>href="/"</code>）、中央: ＋FAB、右: <strong>将来の「設定」タブ用に確保（現状は空きプレースホルダ、FAB を中央に保つ）</strong>。アクティブタブは <code>text-primary</code> + <code>aria-current="page"</code></td></tr>
 <tr><td>＋FAB</td><td>88×88、青グラデ <code>from-blue-500 to-blue-700</code>、白リング 8px、青系の接地シャドウ2層、<code>active:scale-90 translate-y-0.5</code> の押下感。<code>&lt;button&gt;</code>（リンクではない）</td></tr>
 <tr><td>FAB の動線</td><td><code>useExpenseModal().openCreate()</code> を呼び、登録用ボトムシートをその場で開く（画面遷移しない）</td></tr>
-<tr><td>アクティブ判定</td><td>ホーム: <code>pathname === "/"</code> / サマリー: <code>/summary</code> 配下</td></tr>
+<tr><td>アクティブ判定</td><td>サマリー: <code>pathname === "/"</code></td></tr>
 </table>
 
 <h3>余白計算</h3>
@@ -497,21 +495,8 @@ hr {
 <section id="screens">
 <h2>画面構成</h2>
 
-<h3 id="screen-home">/ ホーム</h3>
-<p>当月支出のサマリーカード。左にキャラクター（<code>public/character.png</code>）を配置。</p>
-<div class="ascii-art">┌─────────────────────────┐
-│       ホーム            │
-│  ┌───────────────────┐  │
-│  │ (^o^)  5月の支出   │  │  ← 左にキャラ（72px）
-│  │  👽    ¥142,500 ↑+8%│ │
-│  │        先月:¥131,800│ │
-│  └───────────────────┘  │
-└─────────────────────────┘</div>
-<p><strong>データ:</strong> 当月合計、前月合計、トレンドアイコン、前月比%（前月0円の場合は非表示）。サーバコンポーネントで Prisma 直接取得。</p>
-<p><strong>空状態:</strong> 当月合計が <code>0</code> のときはキャラを大きく中央配置（128/160px）し、「<code>{month}月の記録はまだないよ</code>」「<code>右下の ＋ から登録してね</code>」を表示。</p>
-
-<h3 id="screen-summary">/summary 月次サマリー</h3>
-<p>月切り替え（◀▶）と、カテゴリ別の支出可視化。<strong>当月閲覧時は比較表示なし</strong>、<strong>過去月閲覧時は「今月」との差額</strong>を表示する（今月視点：今月が表示月より多ければ赤、少なければ緑）。</p>
+<h3 id="screen-summary">/ 月次サマリー（ホーム）</h3>
+<p><strong>アプリの起点（ホーム）。開くとこの画面。</strong>月切り替え（◀▶）と、カテゴリ別の支出可視化。<strong>当月閲覧時は比較表示なし</strong>、<strong>過去月閲覧時は「今月」との差額</strong>を表示する（今月視点：今月が表示月より多ければ赤、少なければ緑）。</p>
 <table>
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>月切り替え</td><td>クライアント側 useState で year/month を保持、API再取得</td></tr>
@@ -792,6 +777,17 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-06-04 (続き7) — サマリーをホーム（<code>/</code>）に昇格、旧ホーム廃止</h3>
+<p><span class="badge badge-minor">minor</span> アプリの起点を月次サマリーに変更。旧ホーム（当月合計＋前月比カード）はサマリーに情報が集約済みのため廃止。</p>
+<h4>変更</h4>
+<ul>
+  <li><strong>ルーティング</strong>: <code>src/app/summary/page.tsx</code> を <code>src/app/page.tsx</code> へ移動（<code>/summary</code> ルートは廃止＝404）。アプリを開くと即サマリー。PWA の <code>start_url: "/"</code> もそのまま起点になる</li>
+  <li><strong>旧ホーム廃止</strong>: 当月合計＋前月比カード・空状態・<code>getHomeSummary</code> のサーバーロジックを削除。当月合計はサマリーのドーナツ中央に表示済みで重複のため</li>
+  <li><strong>フッターナビ</strong>: 2タブ（ホーム/サマリー）→ <strong>サマリータブ1つ＋FAB</strong>に。右スロットは<strong>将来の「設定」タブ用に確保</strong>（FAB を中央に保つ空きプレースホルダ）。アクティブ判定は <code>pathname === "/"</code></li>
+</ul>
+
+<hr>
 
 <h3>2026-06-04 (続き6) — サマリー改修のレビュー指摘反映</h3>
 <p><span class="badge badge-minor">minor</span> PR #7（続き5）のレビュー指摘を反映。挙動は概ね維持したままの整理・堅牢化。</p>
