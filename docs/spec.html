@@ -360,8 +360,9 @@ hr {
 │       └── monthly-summary/route.ts
 ├── components/
 │   ├── page-header.tsx       # 共通ヘッダ（全ページに sticky）
-│   ├── footer-nav.tsx        # 共通フッタ（サマリー / ＋FAB / 右は将来の設定枠）
+│   ├── footer-nav.tsx        # 共通フッタ（サマリー / ＋FAB / 設定）
 │   ├── expense-modal.tsx     # ExpenseModalProvider（全画面共通のボトムシート）
+│   ├── settings-modal.tsx    # SettingsModalProvider（設定のボトムシート）
 │   ├── expense-form.tsx      # 登録 + 編集フォーム（モーダル内で使用）
 │   ├── day-wheel.tsx         # 日のみの縦ホイール（ドラム）
 │   ├── monthly-summary.tsx
@@ -448,9 +449,9 @@ hr {
 ├───────────────────────────┤
 │        ┏━━━━━━━━┓         │
 │        ┃   ＋   ┃         │  ← FAB（青グラデ + 白リング）
-│  [📊]   ┗━━━━━━━━┛        │  ← 右は将来の設定タブ用に空き
+│  [📊]   ┗━━━━━━━━┛   [⚙]  │  ← 右: 設定（モーダルを開く）
 └───────────────────────────┘
-       ↑ サマリー</div>
+       ↑ サマリー      ↑ 設定</div>
 
 <h3>PageHeader（src/components/page-header.tsx）</h3>
 <table>
@@ -467,7 +468,7 @@ hr {
 <table>
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>位置</td><td><code>fixed bottom-0 z-30</code>、<code>safe-area-inset-bottom</code> 対応、フッタ高 <code>h-24</code>（96px）</td></tr>
-<tr><td>タブ構成</td><td>左: サマリー（BarChart3 アイコン、<code>href="/"</code>）、中央: ＋FAB、右: <strong>将来の「設定」タブ用に確保（現状は空きプレースホルダ、FAB を中央に保つ）</strong>。アクティブタブは <code>text-primary</code> + <code>aria-current="page"</code></td></tr>
+<tr><td>タブ構成</td><td>左: サマリー（BarChart3 アイコン、<code>href="/"</code>）、中央: ＋FAB、右: <strong>設定（Settings アイコン）— リンクではなく <code>useSettingsModal().openSettings()</code> で設定ボトムシートを開くボタン</strong>。アクティブタブは <code>text-primary</code> + <code>aria-current="page"</code></td></tr>
 <tr><td>＋FAB</td><td>88×88、青グラデ <code>from-blue-500 to-blue-700</code>、白リング 8px、青系の接地シャドウ2層、<code>active:scale-90 translate-y-0.5</code> の押下感。<code>&lt;button&gt;</code>（リンクではない）</td></tr>
 <tr><td>FAB の動線</td><td><code>useExpenseModal().openCreate()</code> を呼び、登録用ボトムシートをその場で開く（画面遷移しない）</td></tr>
 <tr><td>アクティブ判定</td><td>サマリー: <code>pathname === "/"</code></td></tr>
@@ -778,6 +779,20 @@ hr {
 <section id="changelog">
 <h2>改修履歴</h2>
 
+<h3>2026-06-04 (続き8) — 設定モーダルの器を追加（設定機能の土台）</h3>
+<p><span class="badge badge-minor">minor</span> 設定機能（合言葉ロック・カテゴリ管理）の土台として、設定用ボトムシートとフッタの「設定」ボタンを追加。中身は最小（合言葉セクションの枠のみ）。</p>
+<h4>新規</h4>
+<ul>
+  <li><code>src/components/settings-modal.tsx</code> — <code>SettingsModalProvider</code> / <code>useSettingsModal()</code>。支出モーダルと同じスライド/フェード演出のボトムシート（背面スクロールロック / Esc クローズ）。<code>layout.tsx</code> で <code>ExpenseModalProvider</code> の内側に配置</li>
+</ul>
+<h4>変更</h4>
+<ul>
+  <li>フッタ右スロット（続き7で確保した空き）に<strong>「設定」ボタン</strong>（Settings アイコン）を配置。リンクではなく <code>openSettings()</code> でモーダルを開く</li>
+  <li>設定モーダルの中身は<strong>「合言葉」セクションのプレースホルダのみ</strong>。実際の解錠・ロック（合言葉＝household id を cookie に保持し API をガード）は後続 PR で実装予定</li>
+</ul>
+
+<hr>
+
 <h3>2026-06-04 (続き7) — サマリーをホーム（<code>/</code>）に昇格、旧ホーム廃止</h3>
 <p><span class="badge badge-minor">minor</span> アプリの起点を月次サマリーに変更。旧ホーム（当月合計＋前月比カード）はサマリーに情報が集約済みのため廃止。</p>
 <h4>変更</h4>
@@ -953,6 +968,7 @@ hr {
 <h4>新規</h4>
 <ul>
   <li><code>src/components/expense-modal.tsx</code> — <code>ExpenseModalProvider</code> / <code>useExpenseModal()</code>。全画面共通のボトムシート、カテゴリ先読み、共通トースト、<code>mutationVersion</code> による一覧再取得、背面スクロールロック / Esc クローズ</li>
+  <li><code>src/components/settings-modal.tsx</code> — <code>SettingsModalProvider</code> / <code>useSettingsModal()</code>。設定用のボトムシート（フッタ「設定」から <code>openSettings()</code> で開く）。支出モーダルと同じスライド/フェード演出・背面スクロールロック / Esc クローズ。中身は「合言葉」セクション（解錠・ロックUIは後続PRで実装）</li>
 </ul>
 
 <h4>変更</h4>
@@ -982,7 +998,7 @@ hr {
 
 <h4>新規</h4>
 <ul>
-  <li><code>src/components/footer-nav.tsx</code> — 3タブ + 中央 ＋FAB のフッタ。<code>aria-current</code>、青グラデ + 白リング + 接地シャドウ + active 演出</li>
+  <li><code>src/components/footer-nav.tsx</code> — サマリータブ + 中央 ＋FAB + 設定ボタン のフッタ。<code>aria-current</code>、青グラデ + 白リング + 接地シャドウ + active 演出</li>
   <li><code>src/components/page-header.tsx</code> — 全ページ共通の sticky ヘッダ。アプリラベル（<code>aria-hidden</code>）+ 戻る + ページタイトル + アクション枠</li>
   <li><code>src/lib/app-meta.ts</code> — <code>HOUSEHOLD_NAME</code> / <code>APP_VERSION</code> / <code>APP_LABEL</code> を集約（prisma 非依存、<code>package.json</code> も直 import しない）</li>
 </ul>

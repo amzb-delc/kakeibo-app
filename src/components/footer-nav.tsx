@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Plus, type LucideIcon } from "lucide-react";
+import { BarChart3, Plus, Settings, type LucideIcon } from "lucide-react";
 import { useExpenseModal } from "@/components/expense-modal";
+import { useSettingsModal } from "@/components/settings-modal";
 
 type TabProps = {
   href: string;
@@ -30,6 +31,7 @@ function Tab({ href, label, active, Icon }: TabProps) {
 export function FooterNav() {
   const pathname = usePathname();
   const { openCreate } = useExpenseModal();
+  const { openSettings } = useSettingsModal();
 
   const isSummary = pathname === "/";
 
@@ -42,8 +44,14 @@ export function FooterNav() {
       <div className="relative flex items-stretch h-24">
         <Tab href="/" label="サマリー" active={isSummary} Icon={BarChart3} />
         <div className="w-32 shrink-0" aria-hidden="true" />
-        {/* 右スロットは将来の「設定」タブ用に確保（FAB を中央に保つためのプレースホルダ） */}
-        <div className="flex-1" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={openSettings}
+          aria-label="設定"
+          className="flex-1 flex items-center justify-center h-full min-h-[72px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Settings size={40} strokeWidth={2} aria-hidden="true" />
+        </button>
 
         <button
           type="button"
