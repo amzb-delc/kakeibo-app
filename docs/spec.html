@@ -516,7 +516,7 @@ hr {
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>月切り替え</td><td>クライアント側 useState で year/month を保持、API再取得</td></tr>
 <tr><td>翌月ボタン</td><td>当月なら disabled</td></tr>
-<tr><td>合計カード</td><td><strong>ドーナツチャート</strong>（<code>src/components/donut-chart.tsx</code>、自前 SVG、max 180px / ringWidth 22）の中央に「合計」ラベル → 表示月合計（<code>text-xl</code>）→ 差額（過去月閲覧時のみ、トレンド色）を配置。ドーナツのセグメントは<strong>金額の大きい順（降順）</strong>、カテゴリ色で塗り。カード右上に<strong>上位3カテゴリ</strong>のレジェンド（カテゴリ色のドット＋カテゴリ名のみ、%なし）。合計カードの異常値バーは廃止（カテゴリ行のバーは継続）</td></tr>
+<tr><td>合計カード</td><td>flex 横並びレイアウト: <strong>左にドーナツチャート</strong>（<code>src/components/donut-chart.tsx</code>、自前 SVG、外側コンテナ <code>w-[160px]</code> 固定 / ringWidth 22）、<strong>右に上位7カテゴリのレジェンド</strong>（<code>flex-1 min-w-0</code>、カテゴリ色のタグ風表示 <code>category-color.ts</code> の <code>tag</code> を <code>text-xs</code> サイズで適用、長いカテゴリ名は <code>truncate</code>）。ドーナツ中央に「合計」ラベル → 表示月合計（<code>text-xl whitespace-nowrap</code>）→ 差額（過去月閲覧時のみ、トレンド色）を配置。ドーナツのセグメントは<strong>金額の大きい順（降順）</strong>、カテゴリ色で塗り。合計カードの異常値バーは廃止（カテゴリ行のバーは継続）</td></tr>
 <tr><td>カテゴリ行</td><td>カテゴリ名は<strong>色分けタグ</strong>（<code>category-color.ts</code>）。右側は金額の下に差額（過去月閲覧時のみ、トレンド色）の縦並び。下に異常値バー（フィル長＝支出量、バー色はカテゴリ色）。タップで展開（<code>aria-expanded</code>、可変高さアニメーション）。展開状態はサマリーページが保持（制御コンポーネント）</td></tr>
 <tr><td>異常値バー</td><td>過去6ヶ月（表示月含む）の box stats から「いつもの幅」を算出し、<strong>上フェンス（Q3+1.5×IQR）を 100%</strong> としてフィル長で支出量を可視化。やたら使った月＝バーが長い、やたら使わなかった月＝バーが短い。サンプル不足（N&lt;2 or IQR=0）の月は<strong>斜めストライプ表示</strong>（「判定なし」を視覚的に区別、<code>aria-label</code> に明示）。値ありの月は <code>role="progressbar"</code> + <code>aria-valuenow</code> を付与。カテゴリの異常値サンプルは<strong>そのカテゴリの支出があった月のみ</strong>から採る（ゼロ埋めしない）。初回マウントでも 0%→target にトランジションするよう <code>requestAnimationFrame</code> で1フレーム遅延</td></tr>
 <tr><td>展開時</td><td><strong>そのカテゴリの支出明細を日付降順で一行表示</strong>（日付 <code>M/D(曜)</code> ／ 店名 or メモ ／ 金額）。明細は <code>monthly-summary</code> API が各カテゴリに同梱するため追加通信なし</td></tr>
@@ -813,6 +813,20 @@ hr {
 
 <hr>
 
+<h3>2026-06-04 (続き4) — ドーナツチャートのレビュー指摘反映</h3>
+<p><span class="badge badge-minor">minor</span> fc83d2d（ドーナツチャート導入）のレビュー指摘を反映。</p>
+<h4>変更</h4>
+<ul>
+  <li><strong>レイアウト</strong>: 合計カードを <code>absolute right-4 top-4</code> でレジェンドを浮かべる構成から、<strong>flex 横並び</strong>（左ドーナツ <code>w-[160px]</code> shrink-0、右レジェンド <code>flex-1 min-w-0</code>）に変更。iPhone SE (375px) 等の小幅端末でレジェンドとドーナツが重なる問題を解消</li>
+  <li>レジェンドの各項目に <code>truncate</code> + ドットに <code>shrink-0</code> を追加。長いカテゴリ名でも安全に省略表示</li>
+  <li>中央合計金額に <code>whitespace-nowrap</code> を追加（¥1,000,000+ クラスの大きな数で折返ししないように）</li>
+  <li><code>DonutSegment</code> に <code>id?: string</code> を追加、<code>key</code> を index から id ベースに（React 慣例）</li>
+  <li><code>DonutChart</code> 外側コンテナから <code>mx-auto max-w-[180px]</code> を撤去。サイズは consumer 側で制御する責務に</li>
+  <li><code>category-color.ts</code> の <code>hex</code> コメントに「Tailwind v3 -500 系と一致、v4 (OKLCH) とは sRGB 換算で微差あり」と注記</li>
+</ul>
+
+<hr>
+
 <h3>2026-06-04 (続き3) — サマリー合計カードにドーナツチャート導入</h3>
 <p><span class="badge badge-minor">minor</span> サマリーの合計カードを「金額＋異常値バー」から<strong>ドーナツチャート＋中央に合計</strong>に置き換え。</p>
 <h4>新規</h4>
@@ -823,7 +837,7 @@ hr {
 <h4>変更</h4>
 <ul>
   <li>合計カード: 「合計」ラベル → 金額 → 差額 をドーナツ中央に配置。ドーナツのセグメントは<strong>金額の大きい順</strong>（カテゴリリストの sortOrder 順とは独立）、カテゴリ色で塗り</li>
-  <li>合計カード右上に<strong>上位3カテゴリ</strong>のレジェンド（カテゴリ色のドット＋カテゴリ名のみ、%なし）</li>
+  <li>合計カード右上に<strong>上位7カテゴリ</strong>のレジェンド（カテゴリ色のドット＋カテゴリ名のみ、%なし）</li>
   <li>合計カードの<strong>異常値バーを廃止</strong>。カテゴリ行のバーは継続</li>
   <li>サマリー空状態のコピーを「この月の支出はありません」→「<strong>キロクナシ</strong>」に変更（ワレワレ宇宙人のカタコト感に合わせる）</li>
 </ul>

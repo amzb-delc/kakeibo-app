@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 
 export type DonutSegment = {
+  id?: string; // React key 用。未指定なら index にフォールバック
   value: number;
   color: string; // 実 hex（Tailwind class ではない）
 };
@@ -41,7 +42,7 @@ export function DonutChart({
           offset += segLen;
           return (
             <circle
-              key={i}
+              key={seg.id ?? i}
               cx={cx}
               cy={cy}
               r={r}
@@ -56,7 +57,7 @@ export function DonutChart({
       : null;
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[180px]">
+    <div className="relative aspect-square w-full">
       <svg
         viewBox={`0 0 ${size} ${size}`}
         className="w-full h-full"

@@ -179,42 +179,49 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
   const totalDiff = compareTotal !== null ? formatDiff(compareTotal - summary.total) : null;
   // ドーナツは金額の大きい順に並べる（カテゴリ別リストの sortOrder 順とは独立）
   const sortedByTotal = [...summary.categories].sort((a, b) => b.total - a.total);
-  const topCategories = sortedByTotal.slice(0, 3);
+  const topCategories = sortedByTotal.slice(0, 7);
 
   return (
     <main className="px-4 py-6 space-y-6">
-        {/* 合計カード（ドーナツの中央に金額、右上に上位3カテゴリ） */}
-        <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50 relative">
-          {topCategories.length > 0 && (
-            <ul className="absolute right-4 top-4 space-y-1">
-              {topCategories.map((c) => {
-                const color = categoryColor(c.sortOrder);
-                return (
-                  <li
-                    key={c.categoryId}
-                    className="flex items-center gap-1.5 text-xs text-foreground"
-                  >
-                    <span className={`inline-block w-2 h-2 rounded-full ${color.bar}`} />
-                    {c.name}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <DonutChart
-            segments={sortedByTotal.map((c) => ({
-              value: c.total,
-              color: categoryColor(c.sortOrder).hex,
-            }))}
-          >
-            <span className="text-xs text-muted-foreground">合計</span>
-            <p className="text-xl font-bold tabular-nums">{formatYen(summary.total)}</p>
-            {totalLevel && (
-              <p className={`text-[11px] font-medium mt-0.5 ${TREND_TEXT_COLOR[totalLevel]}`}>
-                {totalDiff}
-              </p>
+        {/* 合計カード: 左にドーナツ（中央に合計金額）、右に上位3カテゴリのレジェンド */}
+        <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 w-[160px]">
+              <DonutChart
+                segments={sortedByTotal.map((c) => ({
+                  id: c.categoryId,
+                  value: c.total,
+                  color: categoryColor(c.sortOrder).hex,
+                }))}
+              >
+                <span className="text-xs text-muted-foreground">合計</span>
+                <p className="text-xl font-bold tabular-nums whitespace-nowrap">
+                  {formatYen(summary.total)}
+                </p>
+                {totalLevel && (
+                  <p className={`text-[11px] font-medium mt-0.5 ${TREND_TEXT_COLOR[totalLevel]}`}>
+                    {totalDiff}
+                  </p>
+                )}
+              </DonutChart>
+            </div>
+            {topCategories.length > 0 && (
+              <ul className="flex-1 min-w-0 space-y-1 pt-1">
+                {topCategories.map((c) => {
+                  const color = categoryColor(c.sortOrder);
+                  return (
+                    <li key={c.categoryId} className="min-w-0">
+                      <span
+                        className={`inline-block max-w-full truncate rounded-lg px-2 py-0.5 text-xs font-medium ${color.tag}`}
+                      >
+                        {c.name}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-          </DonutChart>
+          </div>
         </div>
 
         {/* カテゴリ別 */}

@@ -5,7 +5,10 @@
 export type CategoryColor = {
   tag: string; // pill 用の背景＋文字色
   bar: string; // 棒グラフ等の塗り色
-  hex: string; // SVG 等で実 hex が必要な場面用（tailwind の 500 値と一致）
+  // SVG 等で実 hex が必要な場面用。値は Tailwind v3 の -500 系と一致させている。
+  // 本プロジェクトは Tailwind v4 で動作するが、v4 の OKLCH 由来色は sRGB 換算で微差が出るため
+  // 「bar / tag の見た目と完全一致」は保証しない（chart は装飾扱いなので許容範囲）。
+  hex: string;
 };
 
 const PALETTE: CategoryColor[] = [
