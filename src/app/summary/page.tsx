@@ -17,10 +17,17 @@ export default function SummaryPage() {
   const isInitial = useRef(true);
   const { mutationVersion, setComposeContext } = useExpenseModal();
 
-  // 登録モーダル（FAB）の既定値に「表示中の月・展開カテゴリ」を渡す
+  // 当月の最大カテゴリ（金額降順の先頭）。未選択時の初期選択と FAB 既定値の両方に使う。
+  const topCategoryId =
+    summary && summary.categories.length > 0
+      ? [...summary.categories].sort((a, b) => b.total - a.total)[0].categoryId
+      : null;
+
+  // 登録モーダル（FAB）の既定値に「表示中の月・表示中カテゴリ」を渡す。
+  // openCategoryId が未確定（null）の初回フレームでも、view と同じ最大カテゴリを既定にする。
   useEffect(() => {
-    setComposeContext({ year, month, categoryId: openCategoryId });
-  }, [year, month, openCategoryId, setComposeContext]);
+    setComposeContext({ year, month, categoryId: openCategoryId ?? topCategoryId });
+  }, [year, month, openCategoryId, topCategoryId, setComposeContext]);
   useEffect(() => () => setComposeContext(null), [setComposeContext]);
 
   // 「解除なし」設計: タップは常に選択を切替えるだけで、再タップで null には戻さない。
@@ -49,11 +56,9 @@ export default function SummaryPage() {
   // 「解除なし」設計の初期選択: まだ何も選んでいない（null）ときだけ最大カテゴリを自動選択する。
   // 一度ユーザーが選んだ後は補正しない → 月跨ぎで選択を維持し、当月に無ければ「キロクナシ」表示にする。
   useEffect(() => {
-    if (!summary || summary.categories.length === 0) return;
-    if (openCategoryId !== null) return;
-    const top = [...summary.categories].sort((a, b) => b.total - a.total)[0];
-    setOpenCategoryId(top.categoryId);
-  }, [summary, openCategoryId]);
+    if (openCategoryId !== null || topCategoryId === null) return;
+    setOpenCategoryId(topCategoryId);
+  }, [topCategoryId, openCategoryId]);
 
   const handlePrevMonth = () => {
     if (month === 1) {
