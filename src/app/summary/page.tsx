@@ -23,8 +23,8 @@ export default function SummaryPage() {
   }, [year, month, openCategoryId, setComposeContext]);
   useEffect(() => () => setComposeContext(null), [setComposeContext]);
 
-  const toggleCategory = (categoryId: string) =>
-    setOpenCategoryId((prev) => (prev === categoryId ? null : categoryId));
+  // 「解除なし」設計: タップは常に選択を切替えるだけで、再タップで null には戻さない。
+  const toggleCategory = (categoryId: string) => setOpenCategoryId(categoryId);
 
   const fetchSummary = useCallback(async () => {
     setLoading(true);
@@ -45,6 +45,17 @@ export default function SummaryPage() {
   useEffect(() => {
     fetchSummary();
   }, [fetchSummary, mutationVersion]);
+
+  // 「解除なし」設計のため、サマリー受領後に選択が不正（null or 当月に存在しない）なら
+  // 最大カテゴリを自動選択する。月切り替え・データ変更時もここで自動補正。
+  useEffect(() => {
+    if (!summary || summary.categories.length === 0) return;
+    const valid = summary.categories.some((c) => c.categoryId === openCategoryId);
+    if (!valid) {
+      const top = [...summary.categories].sort((a, b) => b.total - a.total)[0];
+      setOpenCategoryId(top.categoryId);
+    }
+  }, [summary, openCategoryId]);
 
   const handlePrevMonth = () => {
     setOpenCategoryId(null);

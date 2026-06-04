@@ -180,6 +180,15 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
   // ドーナツは金額の大きい順に並べる（カテゴリ別リストの sortOrder 順とは独立）
   const sortedByTotal = [...summary.categories].sort((a, b) => b.total - a.total);
   const topCategories = sortedByTotal.slice(0, 7);
+  // 「解除なし」設計: openCategoryId が null/不正でも、必ず最大カテゴリにフォールバックする。
+  // 親 (summary/page.tsx) の useEffect でも同期するが、初回描画フリッカ防止のため view 側でも吸収。
+  const effectiveSelectedId =
+    openCategoryId && summary.categories.some((c) => c.categoryId === openCategoryId)
+      ? openCategoryId
+      : sortedByTotal[0]?.categoryId ?? null;
+  const visibleCategories = effectiveSelectedId
+    ? summary.categories.filter((c) => c.categoryId === effectiveSelectedId)
+    : [];
 
   return (
     <main className="px-4 py-6 space-y-6">
@@ -209,13 +218,24 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
               <ul className="flex-1 min-w-0 space-y-1 pt-1">
                 {topCategories.map((c) => {
                   const color = categoryColor(c.sortOrder);
+                  const isSelected = effectiveSelectedId === c.categoryId;
                   return (
                     <li key={c.categoryId} className="min-w-0">
-                      <span
-                        className={`inline-block max-w-full truncate rounded-lg px-2 py-0.5 text-xs font-medium ${color.tag}`}
+                      <button
+                        type="button"
+                        onClick={() => onToggleCategory(c.categoryId)}
+                        aria-pressed={isSelected}
+                        className="flex w-full items-center justify-between gap-2 text-left"
                       >
-                        {c.name}
-                      </span>
+                        <span
+                          className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-1 text-sm font-medium ${color.tag} ${isSelected ? "ring-2 ring-current ring-offset-1" : ""}`}
+                        >
+                          <span className="truncate">{c.name}</span>
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          {formatYen(c.total)}
+                        </span>
+                      </button>
                     </li>
                   );
                 })}
@@ -243,11 +263,11 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
                 </p>
               </div>
             ) : (
-              summary.categories.map((cat) => (
+              visibleCategories.map((cat) => (
                 <CategoryRow
                   key={cat.categoryId}
                   category={cat}
-                  isOpen={openCategoryId === cat.categoryId}
+                  isOpen={effectiveSelectedId === cat.categoryId}
                   onToggle={() => onToggleCategory(cat.categoryId)}
                 />
               ))
