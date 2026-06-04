@@ -516,13 +516,13 @@ hr {
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>月切り替え</td><td>クライアント側 useState で year/month を保持、API再取得</td></tr>
 <tr><td>翌月ボタン</td><td>当月なら disabled</td></tr>
-<tr><td>合計カード</td><td>「合計」ラベル → 表示月合計（大）→ 差額（過去月閲覧時のみ、トレンド色） → 異常値バー（フィル長で支出量を可視化、青系）の縦並び</td></tr>
+<tr><td>合計カード</td><td><strong>ドーナツチャート</strong>（<code>src/components/donut-chart.tsx</code>、自前 SVG、max 180px / ringWidth 22）の中央に「合計」ラベル → 表示月合計（<code>text-xl</code>）→ 差額（過去月閲覧時のみ、トレンド色）を配置。ドーナツのセグメントは<strong>金額の大きい順（降順）</strong>、カテゴリ色で塗り。カード右上に<strong>上位3カテゴリ</strong>のレジェンド（カテゴリ色のドット＋カテゴリ名のみ、%なし）。合計カードの異常値バーは廃止（カテゴリ行のバーは継続）</td></tr>
 <tr><td>カテゴリ行</td><td>カテゴリ名は<strong>色分けタグ</strong>（<code>category-color.ts</code>）。右側は金額の下に差額（過去月閲覧時のみ、トレンド色）の縦並び。下に異常値バー（フィル長＝支出量、バー色はカテゴリ色）。タップで展開（<code>aria-expanded</code>、可変高さアニメーション）。展開状態はサマリーページが保持（制御コンポーネント）</td></tr>
 <tr><td>異常値バー</td><td>過去6ヶ月（表示月含む）の box stats から「いつもの幅」を算出し、<strong>上フェンス（Q3+1.5×IQR）を 100%</strong> としてフィル長で支出量を可視化。やたら使った月＝バーが長い、やたら使わなかった月＝バーが短い。サンプル不足（N&lt;2 or IQR=0）の月は<strong>斜めストライプ表示</strong>（「判定なし」を視覚的に区別、<code>aria-label</code> に明示）。値ありの月は <code>role="progressbar"</code> + <code>aria-valuenow</code> を付与。カテゴリの異常値サンプルは<strong>そのカテゴリの支出があった月のみ</strong>から採る（ゼロ埋めしない）。初回マウントでも 0%→target にトランジションするよう <code>requestAnimationFrame</code> で1フレーム遅延</td></tr>
 <tr><td>展開時</td><td><strong>そのカテゴリの支出明細を日付降順で一行表示</strong>（日付 <code>M/D(曜)</code> ／ 店名 or メモ ／ 金額）。明細は <code>monthly-summary</code> API が各カテゴリに同梱するため追加通信なし</td></tr>
 <tr><td>明細タップ</td><td>編集用ボトムシートを開く（<code>useExpenseModal().openEdit(...)</code>）</td></tr>
 <tr><td>更新反映</td><td>登録・編集・削除の成功で <code>ExpenseModalProvider</code> の <code>mutationVersion</code> が増分し、サマリーを自動再取得。画面遷移しないため<strong>選択月・展開カテゴリは保持</strong>される</td></tr>
-<tr><td>空状態</td><td>カテゴリ件数が <code>0</code> のときはキャラクター（<code>public/character.png</code>、112px）を中央に置き、「この月の支出はありません」を表示</td></tr>
+<tr><td>空状態</td><td>カテゴリ件数が <code>0</code> のときはキャラクター（<code>public/character.png</code>、112px）を中央に置き、「キロクナシ」を表示（ワレワレ宇宙人のカタコト感に合わせたコピー）</td></tr>
 </table>
 
 <h3 id="screen-modal">支出モーダル（登録・編集）</h3>
@@ -809,6 +809,23 @@ hr {
   <li>ホーム空状態の「○月の記録はまだないよ」を <code>&lt;p&gt;</code> → <code>&lt;h2&gt;</code> に格上げ（見出し階層整備）</li>
   <li>全 <code>&lt;Image&gt;</code> に <code>sizes</code> 指定を追加。Next.js Image の最適化サイズを表示寸法に合わせて配信帯域を削減</li>
   <li><code>public/character.png</code> を 1024×1024（1.5MB）→ 512×512（230KB）に縮小。最大表示が 512px（PWA icon-512）のため画質劣化なし。アイコン群も再生成</li>
+</ul>
+
+<hr>
+
+<h3>2026-06-04 (続き3) — サマリー合計カードにドーナツチャート導入</h3>
+<p><span class="badge badge-minor">minor</span> サマリーの合計カードを「金額＋異常値バー」から<strong>ドーナツチャート＋中央に合計</strong>に置き換え。</p>
+<h4>新規</h4>
+<ul>
+  <li><code>src/components/donut-chart.tsx</code> — 自前 SVG ドーナツ。<code>&lt;circle&gt;</code> + <code>stroke-dasharray</code> で各セグメントを描画する方式（path arc 方式と違い 100% セグメントが破綻しない）。中央には任意の JSX を <code>children</code> で重ねられる。装飾扱い（<code>aria-hidden</code>）</li>
+  <li><code>src/lib/category-color.ts</code> の <code>CategoryColor</code> に <code>hex</code> フィールドを追加（SVG stroke は Tailwind クラスを評価できないため実 hex が必要）。Tailwind の <code>-500</code> 値と一致</li>
+</ul>
+<h4>変更</h4>
+<ul>
+  <li>合計カード: 「合計」ラベル → 金額 → 差額 をドーナツ中央に配置。ドーナツのセグメントは<strong>金額の大きい順</strong>（カテゴリリストの sortOrder 順とは独立）、カテゴリ色で塗り</li>
+  <li>合計カード右上に<strong>上位3カテゴリ</strong>のレジェンド（カテゴリ色のドット＋カテゴリ名のみ、%なし）</li>
+  <li>合計カードの<strong>異常値バーを廃止</strong>。カテゴリ行のバーは継続</li>
+  <li>サマリー空状態のコピーを「この月の支出はありません」→「<strong>キロクナシ</strong>」に変更（ワレワレ宇宙人のカタコト感に合わせる）</li>
 </ul>
 
 <hr>
