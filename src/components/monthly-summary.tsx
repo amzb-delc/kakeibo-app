@@ -184,9 +184,10 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
               <div className="py-8 flex flex-col items-center text-center">
                 <Image
                   src="/character.png"
-                  alt="ワレワレ"
+                  alt=""
                   width={128}
                   height={128}
+                  sizes="128px"
                   className="w-28 h-28 mb-3 opacity-90"
                 />
                 <p className="text-sm text-muted-foreground">

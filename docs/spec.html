@@ -802,6 +802,15 @@ hr {
   <li><strong>PWA / ファビコン</strong>: <code>character.png</code> から <code>public/icon-192.png</code>、<code>public/icon-512.png</code>、<code>src/app/apple-icon.png</code>（180px）、<code>src/app/icon.png</code>（32px）を生成。古い <code>public/icon.svg</code> と <code>src/app/favicon.ico</code> を削除し、<code>layout.tsx</code> の <code>icons</code> 手動指定を撤去（Next.js が <code>icon.png</code>/<code>apple-icon.png</code> を自動検出して <code>&lt;link&gt;</code> 化）</li>
 </ul>
 
+<h4>続き — レビュー指摘の反映</h4>
+<ul>
+  <li><code>src/app/page.tsx</code> に <code>export const dynamic = "force-dynamic"</code> を追加。SSG 化されると <code>new Date()</code> がビルド時固定されて月跨ぎで古い月表示になるのを防ぐ</li>
+  <li>キャラ <code>&lt;Image&gt;</code> の <code>alt</code> を空文字（装飾画像扱い）に変更。隣接テキストで情報完結しているため、スクリーンリーダーに「ワレワレ」を読ませない</li>
+  <li>ホーム空状態の「○月の記録はまだないよ」を <code>&lt;p&gt;</code> → <code>&lt;h2&gt;</code> に格上げ（見出し階層整備）</li>
+  <li>全 <code>&lt;Image&gt;</code> に <code>sizes</code> 指定を追加。Next.js Image の最適化サイズを表示寸法に合わせて配信帯域を削減</li>
+  <li><code>public/character.png</code> を 1024×1024（1.5MB）→ 512×512（230KB）に縮小。最大表示が 512px（PWA icon-512）のため画質劣化なし。アイコン群も再生成</li>
+</ul>
+
 <hr>
 
 <h3>2026-05-28 (続き) — プログレスバー → 直近6ヶ月の異常値バー</h3>
