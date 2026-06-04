@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BarChart3, Plus, type LucideIcon } from "lucide-react";
+import { BarChart3, Plus, type LucideIcon } from "lucide-react";
 import { useExpenseModal } from "@/components/expense-modal";
 
 type TabProps = {
@@ -31,8 +31,7 @@ export function FooterNav() {
   const pathname = usePathname();
   const { openCreate } = useExpenseModal();
 
-  const isHome = pathname === "/";
-  const isSummary = pathname === "/summary" || pathname.startsWith("/summary/");
+  const isSummary = pathname === "/";
 
   return (
     <nav
@@ -41,9 +40,10 @@ export function FooterNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="relative flex items-stretch h-24">
-        <Tab href="/" label="ホーム" active={isHome} Icon={Home} />
+        <Tab href="/" label="サマリー" active={isSummary} Icon={BarChart3} />
         <div className="w-32 shrink-0" aria-hidden="true" />
-        <Tab href="/summary" label="サマリー" active={isSummary} Icon={BarChart3} />
+        {/* 右スロットは将来の「設定」タブ用に確保（FAB を中央に保つためのプレースホルダ） */}
+        <div className="flex-1" aria-hidden="true" />
 
         <button
           type="button"
