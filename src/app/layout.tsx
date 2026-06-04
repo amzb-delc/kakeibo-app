@@ -33,10 +33,6 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: APP_TITLE,
   },
-  icons: {
-    icon: "/icon.svg",
-    apple: "/icon-192.png",
-  },
   manifest: "/manifest.json",
 };
 

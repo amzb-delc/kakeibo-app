@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { getTrendLevel, TREND_TEXT_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
 import { categoryColor } from "@/lib/category-color";
@@ -180,9 +181,18 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
           <h2 className="text-base font-semibold mb-3">カテゴリ別</h2>
           <div className="space-y-3">
             {summary.categories.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                この月の支出はありません
-              </p>
+              <div className="py-8 flex flex-col items-center text-center">
+                <Image
+                  src="/character.png"
+                  alt="ワレワレ"
+                  width={128}
+                  height={128}
+                  className="w-28 h-28 mb-3 opacity-90"
+                />
+                <p className="text-sm text-muted-foreground">
+                  この月の支出はありません
+                </p>
+              </div>
             ) : (
               summary.categories.map((cat) => (
                 <CategoryRow
