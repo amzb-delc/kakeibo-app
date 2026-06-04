@@ -2,6 +2,16 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+// 決定論的な疑似乱数（mulberry32）。固定 seed で繰り返し実行しても同じデータが得られる。
+function mulberry32(seed: number) {
+  return function () {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 const INITIAL_CATEGORIES = [
   "食費",
   "日用品",
@@ -71,7 +81,17 @@ async function main() {
     });
   }
 
-  // サンプル支出（12ヶ月分）を再生成。既存はクリアして idempotent に。
+  // ここから下はデモ用支出データの生成（破壊的）。
+  // 本番DBで誤って実行されないよう、NODE_ENV=production の時は SEED_DEMO=1 を要求する。
+  if (process.env.NODE_ENV === "production" && process.env.SEED_DEMO !== "1") {
+    console.warn(
+      "[seed] Skipping demo expense generation in production. Set SEED_DEMO=1 to override."
+    );
+    console.log("Seed completed (categories only).");
+    return;
+  }
+
+  // サンプル支出（12ヶ月分）を再生成。既存はクリアして再実行可能に。
   await prisma.expense.deleteMany({ where: { householdId: household.id } });
 
   const allCategories = await prisma.category.findMany({
@@ -90,8 +110,12 @@ async function main() {
   // JST 12:00 (UTC 03:00) として保存する
   const dateAt = (y: number, m: number, d: number) =>
     new Date(Date.UTC(y, m - 1, d, 3, 0, 0));
+
+  // 再現性のため seedable RNG (mulberry32) を使う。組込み乱数だと実行毎に値が変わり、
+  // 「先月と同じ条件で再現したい」レビュー検証が困難になる。
+  const rng = mulberry32(20260528);
   const rand = (min: number, max: number) =>
-    Math.floor(min + Math.random() * (max - min + 1));
+    Math.floor(min + rng() * (max - min + 1));
   const pick = <T>(arr: T[]): T => arr[rand(0, arr.length - 1)];
 
   const foodStores = ["スーパー〇〇", "コンビニ", "イオン", "OKストア", "外食", "デリバリー"];
@@ -163,36 +187,36 @@ async function main() {
     }
 
     // 娯楽
-    if (Math.random() < 0.8) {
+    if (rng() < 0.8) {
       for (let k = 0; k < rand(1, 4); k++) {
         push(y, m, rand(1, daysInMonth), "娯楽", rand(1500, 8000));
       }
     }
 
     // 医療
-    if (Math.random() < 0.5) {
+    if (rng() < 0.5) {
       push(y, m, rand(1, daysInMonth), "医療", rand(800, 5000));
     }
 
     // 特別費
     if (isAnomalyHighSpecial) {
       push(y, m, rand(1, daysInMonth), "特別費", 150000, null, "大物家具");
-    } else if (Math.random() < 0.3) {
+    } else if (rng() < 0.3) {
       push(y, m, rand(1, daysInMonth), "特別費", rand(15000, 50000));
     }
 
     // 美容
-    if (Math.random() < 0.7) {
+    if (rng() < 0.7) {
       push(y, m, rand(1, daysInMonth), "美容", rand(4000, 12000));
     }
 
     // 教育
-    if (Math.random() < 0.4) {
+    if (rng() < 0.4) {
       push(y, m, rand(1, daysInMonth), "教育", rand(8000, 25000));
     }
 
     // その他
-    if (Math.random() < 0.4) {
+    if (rng() < 0.4) {
       push(y, m, rand(1, daysInMonth), "その他", rand(2000, 7000));
     }
   }

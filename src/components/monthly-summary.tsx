@@ -20,7 +20,7 @@ function formatDiff(diff: number) {
 
 // 過去6ヶ月の異常値検出バー（フィル方式）。
 // 100% = 上フェンス(Q3+1.5*IQR)、超過時は 100% でクランプ。
-// サンプル不足 (boxStats=null) は中央(50%)で表示。
+// サンプル不足 (boxStats=null) はストライプ表示にして「判定不能」を視覚的に区別する。
 function AnomalyBar({
   value,
   boxStats,
@@ -30,22 +30,43 @@ function AnomalyBar({
   boxStats: BoxStats | null;
   fillClass: string;
 }) {
-  const targetFill =
-    boxStats && boxStats.upperFence > 0
-      ? Math.min((value / boxStats.upperFence) * 100, 100)
-      : value > 0
-        ? 50
-        : 0;
+  const isInsufficient = !boxStats || boxStats.upperFence <= 0;
+  const targetFill = isInsufficient
+    ? 0
+    : Math.min((value / boxStats.upperFence) * 100, 100);
 
   // 初回マウント時も 0% → target にトランジションさせるため、1フレーム遅らせて反映
   const [renderedFill, setRenderedFill] = useState(0);
   useEffect(() => {
+    if (isInsufficient) return;
     const id = requestAnimationFrame(() => setRenderedFill(targetFill));
     return () => cancelAnimationFrame(id);
-  }, [targetFill]);
+  }, [targetFill, isInsufficient]);
 
+  if (isInsufficient) {
+    return (
+      <div
+        className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden"
+        title="サンプル不足のため参考表示"
+        aria-label="サンプル不足のため判定なし"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(45deg, transparent 0 4px, rgba(0,0,0,0.06) 4px 8px)",
+        }}
+      />
+    );
+  }
+
+  const rounded = Math.round(targetFill);
   return (
-    <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+    <div
+      className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={rounded}
+      aria-label={`直近6ヶ月の上限基準で ${rounded}%`}
+    >
       <div
         className={`h-full rounded-full transition-all duration-500 ${fillClass}`}
         style={{ width: `${renderedFill}%` }}

@@ -9,6 +9,7 @@ export type BoxStats = {
   upperFence: number; // Q3 + 1.5 * IQR
 };
 
+// 線形補間（R-7 / Excel `PERCENTILE.INC` 相当）。sorted は昇順前提。
 function quantile(sorted: number[], p: number): number {
   const n = sorted.length;
   if (n === 1) return sorted[0];

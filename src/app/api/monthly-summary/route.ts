@@ -151,10 +151,11 @@ export async function GET(req: NextRequest) {
 
   const categories = Array.from(categoryMap.entries())
     .map(([categoryId, { name, sortOrder, total: categoryTotal, expenses: categoryExpenses }]) => {
-      // カテゴリは「合計でデータがあった月」のうち、そのカテゴリ合計を0埋めで取る
-      const categorySamples = availableMonths.map(
-        (k) => monthlyCategoryTotals.get(k)?.get(categoryId) ?? 0
-      );
+      // カテゴリの異常値は「そのカテゴリの支出があった月」のみをサンプルに採る。
+      // 0埋めすると、たまにしか使わないカテゴリで IQR=0 になり判定不能になるため。
+      const categorySamples = availableMonths
+        .map((k) => monthlyCategoryTotals.get(k)?.get(categoryId))
+        .filter((v): v is number => typeof v === "number" && v > 0);
       return {
         categoryId,
         name,
