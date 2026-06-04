@@ -306,6 +306,7 @@ hr {
   </ul>
   <h2>API</h2>
   <ul>
+    <li><a href="#api-session">GET/POST/DELETE /api/session</a></li>
     <li><a href="#api-categories">GET /api/categories</a></li>
     <li><a href="#api-expenses-list">GET /api/expenses</a></li>
     <li><a href="#api-expenses-create">POST /api/expenses</a></li>
@@ -331,7 +332,7 @@ hr {
 <tr><td>利用者</td><td>夫婦2人（1世帯）</td></tr>
 <tr><td>主要デバイス</td><td>iPhone（Safari、PWAインストール想定）</td></tr>
 <tr><td>目的</td><td>支出の即時記録 + 月次の使い方の可視化</td></tr>
-<tr><td>認証</td><td>MVPでは未実装。固定の <code>demo-household</code> にスコープ</td></tr>
+<tr><td>認証</td><td>ユーザー管理なし。<strong>世帯共有の「合言葉」＝ <code>household.id</code></strong> でロック。解錠 cookie（httpOnly・署名なし）を <code>household</code> に保持し、各 API は cookie 無しなら 401</td></tr>
 <tr><td>タイムゾーン</td><td>JST（Asia/Tokyo）固定</td></tr>
 </table>
 </section>
@@ -362,13 +363,14 @@ hr {
 │   ├── page-header.tsx       # 共通ヘッダ（全ページに sticky）
 │   ├── footer-nav.tsx        # 共通フッタ（サマリー / ＋FAB / 設定）
 │   ├── expense-modal.tsx     # ExpenseModalProvider（全画面共通のボトムシート）
-│   ├── settings-modal.tsx    # SettingsModalProvider（設定のボトムシート）
+│   ├── settings-modal.tsx    # SettingsModalProvider（設定のボトムシート / 解錠・ロックUI）
+│   ├── session-provider.tsx  # SessionProvider（合言葉ロック状態。unlock/lock）
 │   ├── expense-form.tsx      # 登録 + 編集フォーム（モーダル内で使用）
 │   ├── day-wheel.tsx         # 日のみの縦ホイール（ドラム）
 │   ├── monthly-summary.tsx
 │   └── ui/                   # shadcn / Base UI コンポーネント
 ├── lib/
-│   ├── auth.ts               # DEMO_HOUSEHOLD_ID / getDemoUserId
+│   ├── auth.ts               # getHouseholdId(cookie) / HOUSEHOLD_COOKIE / getDemoUserId
 │   ├── app-meta.ts           # HOUSEHOLD_NAME / APP_VERSION / APP_LABEL
 │   ├── date.ts               # JSTヘルパ
 │   ├── expenses.ts           # listExpenses + validateExpenseInput
@@ -432,7 +434,7 @@ hr {
 <p><strong>初期カテゴリ:</strong> 食費 / 日用品 / 交通費 / 娯楽 / 医療 / 特別費 / 美容 / 教育 / その他</p>
 
 <h3>Household / User / HouseholdMember</h3>
-<p>Householdは <code>notificationDay</code> / <code>notificationTime</code> を持つが、通知機能は未実装。HouseholdMember の <code>role</code> は <code>"owner"</code> | <code>"member"</code> を想定。MVPでは認証なしで使われる。</p>
+<p>Householdは <code>notificationDay</code> / <code>notificationTime</code> を持つが、通知機能は未実装。HouseholdMember の <code>role</code> は <code>"owner"</code> | <code>"member"</code> を想定。ユーザー管理は持たず、世帯共有の合言葉ロック（<code>household.id</code>）で保護する。</p>
 </section>
 
 <section id="layout">
@@ -558,7 +560,17 @@ hr {
 
 <section id="api">
 <h2>API仕様</h2>
-<p>すべてのエンドポイントは <code>DEMO_HOUSEHOLD_ID</code> に暗黙スコープされる。認証は未実装。</p>
+<p>データ系エンドポイントは <code>getHouseholdId()</code>（<code>household</code> cookie）で世帯にスコープされる。<strong>cookie 無し（未解錠）は 401</strong>。<code>/api/session</code> のみ解錠前でも叩ける。</p>
+
+<div class="endpoint" id="api-session">
+<h4><span class="method method-get">GET</span> / <span class="method method-post">POST</span> / <span class="method method-delete">DELETE</span> /api/session</h4>
+<p>合言葉ロックの解錠・ロック・状態取得。合言葉 = <code>household.id</code>、cookie は<strong>署名なし</strong>（合言葉を知っていること自体が認可）。</p>
+<ul>
+  <li><strong>GET</strong> — 現在の解錠状態。<code>{ unlocked: boolean, householdName: string | null }</code></li>
+  <li><strong>POST</strong> <code>{ passphrase }</code> — 合言葉に一致する世帯があれば <code>household</code> cookie（httpOnly / SameSite=lax / 約400日 / 本番のみ secure）を発行して <code>{ ok: true }</code>。無ければ 401</li>
+  <li><strong>DELETE</strong> — cookie を破棄（ロック）</li>
+</ul>
+</div>
 
 <div class="endpoint" id="api-categories">
 <h4><span class="method method-get">GET</span> /api/categories</h4>
@@ -680,7 +692,7 @@ hr {
 <tr><th>フィールド</th><th>ルール</th></tr>
 <tr><td>amount</td><td>整数 / 0以上 / 100,000,000以下 / 有限値（0円可）</td></tr>
 <tr><td>spentAt</td><td>正規表現 <code>/^\d{4}-\d{2}-\d{2}$/</code></td></tr>
-<tr><td>categoryId</td><td>非空文字列、かつ DB で <code>householdId = DEMO_HOUSEHOLD_ID</code> の Category に存在</td></tr>
+<tr><td>categoryId</td><td>非空文字列、かつ DB で解錠世帯（cookie の <code>householdId</code>）の Category に存在</td></tr>
 <tr><td>storeName</td><td>≤100文字、空文字は null</td></tr>
 <tr><td>memo</td><td>≤500文字、空文字は null</td></tr>
 <tr><td>receiptImageUrl</td><td>文字列、空文字は null</td></tr>
@@ -688,7 +700,7 @@ hr {
 
 <h3>世帯スコープ（権限）</h3>
 <ul>
-  <li>全クエリの <code>where</code> に <code>householdId: DEMO_HOUSEHOLD_ID</code> を含める</li>
+  <li>全クエリの <code>where</code> に <code>householdId</code>（<code>getHouseholdId()</code> = cookie 由来）を含める。未解錠なら 401 で早期 return</li>
   <li>POST/PATCH では <code>categoryId</code> の世帯所属を DB レベルで検証する（IDOR防止）</li>
   <li>UPDATE/DELETE は <code>updateMany</code> / <code>deleteMany</code> で <code>where</code> に <code>householdId</code> を入れる</li>
 </ul>
@@ -778,6 +790,32 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-06-04 (続き9) — 合言葉ロック（サーバー保護）</h3>
+<p><span class="badge badge-major">major</span> 家計データを<strong>夫婦共有の「合言葉」＝ <code>household.id</code></strong> でロック。ユーザー管理は持たず、合言葉を知っていること自体を認可とする。<code>AUTH_SECRET</code> / middleware / スキーマ変更なし。</p>
+<h4>サーバー</h4>
+<ul>
+  <li><code>src/lib/auth.ts</code>: <code>getHouseholdId()</code>（<code>household</code> cookie から世帯id）と <code>HOUSEHOLD_COOKIE</code> を追加。<code>DEMO_HOUSEHOLD_ID</code> は seed / スクリプトの既定値としてのみ残置</li>
+  <li><code>/api/session</code> 新設: GET=解錠状態 / POST=合言葉照合で httpOnly cookie 発行（署名なし・約400日） / DELETE=ロック</li>
+  <li>データ系 API（categories / expenses / expenses/[id] / monthly-summary）を <code>getHouseholdId()</code> スコープに変更し、<strong>未解錠は 401</strong>。<code>lib/expenses.ts</code> の <code>listExpenses</code> / <code>validateExpenseInput</code> は householdId を引数で受け取る形にリファクタ</li>
+  <li><code>prisma/set-passphrase.ts</code>（<code>npm run db:set-passphrase -- "合言葉"</code>）: 既存世帯の id を合言葉へ付け替える一度きりのスクリプト（子レコードもトランザクションで移行）。アプリから合言葉は変更しない</li>
+</ul>
+<h4>クライアント</h4>
+<ul>
+  <li><code>src/components/session-provider.tsx</code> 新設: ロック状態（<code>unlocked</code>）と <code>unlock()/lock()</code> をアプリ全体で共有。<code>layout.tsx</code> の最外に配置</li>
+  <li>設定モーダルの合言葉セクションを実装: 未解錠＝合言葉入力＋解錠（誤りはエラー表示）、解錠済＝状態表示＋「ロックする」</li>
+  <li>ロック中は <code>/</code> がロック画面（キャラ＋「ロックされています」＋「設定を開く」）。FAB はロック中は非表示。解錠は設定モーダルで行い、成功で自動的に閉じてデータ表示</li>
+  <li><code>ExpenseModalProvider</code> のカテゴリ先読みを解錠後に行う（ロック中は 401 のため取得しない）</li>
+</ul>
+<h4>レビュー反映・追補</h4>
+<ul>
+  <li><code>/api/session</code> GET: cookie はあるが世帯が存在しない場合に<strong>無効 cookie を破棄</strong>して返す</li>
+  <li><code>/</code> の解錠判定待ち（<code>unlocked === null</code>）は<strong>中立のローディング</strong>を表示（サマリーのシェルもロック画面も出さずちらつき防止）</li>
+  <li>合言葉入力を <code>type="text"</code> にし<strong>日本語IMEで入力可能</strong>に。変換確定の Enter で誤送信しないよう composition 中は送信しない</li>
+  <li><strong>ロック中バッジ</strong>: フッタの設定アイコン（赤ドット＋ <code>aria-label</code>「設定（ロック中）」）と、設定モーダルの「合言葉」ラベル（「ロック中」バッジ）に表示</li>
+</ul>
+
+<hr>
 
 <h3>2026-06-04 (続き8) — 設定モーダルの器を追加（設定機能の土台）</h3>
 <p><span class="badge badge-minor">minor</span> 設定機能（合言葉ロック・カテゴリ管理）の土台として、設定用ボトムシートとフッタの「設定」ボタンを追加。中身は最小（合言葉セクションの枠のみ）。</p>

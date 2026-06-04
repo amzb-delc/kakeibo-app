@@ -15,6 +15,7 @@ import {
   type ExpenseFormInitial,
 } from "@/components/expense-form";
 import { todayJst } from "@/lib/date";
+import { useSession } from "@/components/session-provider";
 import type { Category } from "@/types";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
@@ -54,6 +55,7 @@ const CLOSE_THRESHOLD = 110; // この px 超のドラッグで閉じる
 const FLICK_VELOCITY = 0.5; // px/ms。速い下フリックでも閉じる
 
 export function ExpenseModalProvider({ children }: { children: React.ReactNode }) {
+  const { unlocked } = useSession();
   const [active, setActive] = useState<ActiveState | null>(null);
   const [shown, setShown] = useState(false);
   const [dragY, setDragY] = useState<number | null>(null); // null = ドラッグ中でない
@@ -68,8 +70,10 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   const dragStart = useRef<{ y: number; t: number } | null>(null);
   const composeRef = useRef<ComposeContext | null>(null);
 
-  // カテゴリは滅多に変わらず軽量なので、起動時に先読みしておく
+  // カテゴリは滅多に変わらず軽量なので、解錠後に先読みしておく。
+  // ロック中は /api/categories が 401 になるため取得しない（解錠で再取得）。
   useEffect(() => {
+    if (!unlocked) return;
     let alive = true;
     fetch("/api/categories")
       .then((r) => (r.ok ? r.json() : []))
@@ -83,7 +87,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     return () => {
       alive = false;
     };
-  }, []);
+  }, [unlocked]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);

@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import Image from "next/image";
 import { MonthlySummaryView } from "@/components/monthly-summary";
 import { PageHeader } from "@/components/page-header";
 import { useExpenseModal } from "@/components/expense-modal";
+import { useSettingsModal } from "@/components/settings-modal";
+import { useSession } from "@/components/session-provider";
 import type { MonthlySummary } from "@/types";
 
 export default function SummaryPage() {
@@ -16,6 +19,8 @@ export default function SummaryPage() {
   const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
   const isInitial = useRef(true);
   const { mutationVersion, setComposeContext } = useExpenseModal();
+  const { openSettings } = useSettingsModal();
+  const { unlocked } = useSession();
 
   // 当月の最大カテゴリ（金額降順の先頭）。未選択時の初期選択と FAB 既定値の両方に使う。
   const topCategoryId =
@@ -48,10 +53,11 @@ export default function SummaryPage() {
     }
   }, [year, month]);
 
-  // year/month の変更時に加え、登録・編集・削除（mutationVersion）の後も再取得
+  // 解錠済みのときだけ取得。year/month・mutationVersion の変化に加え、
+  // 解錠された瞬間（unlocked が true へ）にも取得する。
   useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary, mutationVersion]);
+    if (unlocked) fetchSummary();
+  }, [fetchSummary, mutationVersion, unlocked]);
 
   // 「解除なし」設計の初期選択: まだ何も選んでいない（null）ときだけ最大カテゴリを自動選択する。
   // 一度ユーザーが選んだ後は補正しない → 月跨ぎで選択を維持し、当月に無ければ「キロクナシ」表示にする。
@@ -106,6 +112,53 @@ export default function SummaryPage() {
       </button>
     </div>
   );
+
+  // 解錠判定の応答待ち（null）の間は中立のローディング。
+  // サマリーのシェルもロック画面も出さず、ちらつきを防ぐ。
+  if (unlocked === null) {
+    return (
+      <div className="min-h-screen bg-background">
+        <h1 className="sr-only">読み込み中</h1>
+        <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+          読み込み中…
+        </div>
+      </div>
+    );
+  }
+
+  // ロック中: 合言葉を入力するまで家計データは出さない（API も 401）。
+  // 解錠は設定モーダルで行う。
+  if (unlocked === false) {
+    return (
+      <div className="min-h-screen bg-background">
+        <h1 className="sr-only">ロック中</h1>
+        <PageHeader title="ロック中" />
+        <main className="px-4 py-12 flex flex-col items-center text-center">
+          <Image
+            src="/character.png"
+            alt=""
+            width={128}
+            height={128}
+            sizes="128px"
+            className="w-32 h-32 mb-4 opacity-90"
+          />
+          <h2 className="text-base font-semibold mb-1">ロックされています</h2>
+          <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+            合言葉を入力すると
+            <br />
+            家計データが表示されます。
+          </p>
+          <button
+            type="button"
+            onClick={openSettings}
+            className="inline-flex items-center justify-center h-11 px-6 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 active:scale-95 transition-all"
+          >
+            設定を開く
+          </button>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

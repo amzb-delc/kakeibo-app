@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node prisma/seed.ts"
+    "db:seed": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node prisma/seed.ts",
+    "db:set-passphrase": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node prisma/set-passphrase.ts"
   },
   "prisma": {
     "seed": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node prisma/seed.ts"

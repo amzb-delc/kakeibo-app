@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { DEMO_HOUSEHOLD_ID } from "@/lib/auth";
+import { getHouseholdId } from "@/lib/auth";
 import { jstMonthRange, formatJstDate } from "@/lib/date";
 import { calculateBoxStats } from "@/lib/anomaly";
 
@@ -23,6 +23,10 @@ function ymKey(year: number, month: number) {
 }
 
 export async function GET(req: NextRequest) {
+  const householdId = await getHouseholdId();
+  if (!householdId) {
+    return NextResponse.json({ error: "locked" }, { status: 401 });
+  }
   const { searchParams } = new URL(req.url);
   // 当月判定はサーバTZに依存せずJSTで行う
   const [todayYearStr, todayMonthStr] = formatJstDate(new Date()).split("-");
@@ -52,7 +56,7 @@ export async function GET(req: NextRequest) {
   // 表示月の支出をカテゴリ別に集計（明細は日付降順で並べる）
   const expenses = await prisma.expense.findMany({
     where: {
-      householdId: DEMO_HOUSEHOLD_ID,
+      householdId,
       spentAt: range,
     },
     include: {
@@ -65,7 +69,7 @@ export async function GET(req: NextRequest) {
   const compareExpenses = compareRange
     ? await prisma.expense.findMany({
         where: {
-          householdId: DEMO_HOUSEHOLD_ID,
+          householdId,
           spentAt: compareRange,
         },
         include: {
@@ -77,7 +81,7 @@ export async function GET(req: NextRequest) {
   // 偏差値算出用に過去6ヶ月の支出を取得（amount/categoryId/spentAtのみ）
   const sixMonthExpenses = await prisma.expense.findMany({
     where: {
-      householdId: DEMO_HOUSEHOLD_ID,
+      householdId,
       spentAt: sixMonthRange,
     },
     select: { amount: true, spentAt: true, categoryId: true },
