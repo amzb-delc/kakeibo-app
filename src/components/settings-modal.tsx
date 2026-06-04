@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useSession } from "@/components/session-provider";
 
 // 支出モーダル（expense-modal.tsx）と同じボトムシートの流儀に揃える。
 const ANIM_MS = 320;
@@ -28,12 +29,18 @@ export function useSettingsModal(): ContextValue {
 }
 
 export function SettingsModalProvider({ children }: { children: React.ReactNode }) {
+  const { unlocked, householdName, unlock, lock } = useSession();
   const [open, setOpen] = useState(false); // マウント状態
   const [shown, setShown] = useState(false); // アニメーション用（true で前面/不透明）
+  const [passphrase, setPassphrase] = useState("");
+  const [authError, setAuthError] = useState(false);
+  const [busy, setBusy] = useState(false);
   const teardownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openSettings = useCallback(() => {
     if (teardownTimer.current) clearTimeout(teardownTimer.current);
+    setPassphrase("");
+    setAuthError(false);
     setOpen(true);
     setShown(false);
     requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
@@ -44,6 +51,32 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
     if (teardownTimer.current) clearTimeout(teardownTimer.current);
     teardownTimer.current = setTimeout(() => setOpen(false), ANIM_MS);
   }, []);
+
+  const handleUnlock = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      const value = passphrase.trim();
+      if (!value || busy) return;
+      setBusy(true);
+      setAuthError(false);
+      const ok = await unlock(value);
+      setBusy(false);
+      if (ok) {
+        setPassphrase("");
+        close(); // 解錠できたら閉じて家計データを表示
+      } else {
+        setAuthError(true);
+      }
+    },
+    [passphrase, busy, unlock, close]
+  );
+
+  const handleLock = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    await lock();
+    setBusy(false);
+  }, [busy, lock]);
 
   // 開いている間は Esc で閉じ、背面スクロールをロック
   useEffect(() => {
@@ -118,12 +151,55 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
               className="px-4 py-4 space-y-4"
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
             >
-              {/* 合言葉セクション（解錠・ロックUIは PR2 で実装） */}
+              {/* 合言葉セクション: 解錠/ロック */}
               <section className="bg-muted/30 rounded-2xl border border-border/50 p-4">
-                <h3 className="text-sm font-semibold mb-1">合言葉</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  家計データのロックに使う合言葉。次のアップデートで、ここから解錠・ロックができるようになります。
-                </p>
+                <h3 className="text-sm font-semibold mb-2">合言葉</h3>
+                {unlocked ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      解錠済み{householdName ? `（${householdName}）` : ""}。この端末では合言葉の再入力なしで表示されます。
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleLock}
+                      disabled={busy}
+                      className="inline-flex items-center justify-center h-11 px-5 rounded-xl border border-border text-sm font-medium hover:bg-muted active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {busy ? "処理中…" : "ロックする"}
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleUnlock} className="space-y-3">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      家計データを表示するには合言葉を入力してください。
+                    </p>
+                    <input
+                      type="password"
+                      value={passphrase}
+                      onChange={(e) => {
+                        setPassphrase(e.target.value);
+                        setAuthError(false);
+                      }}
+                      placeholder="合言葉"
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      className={`w-full h-11 px-3 rounded-xl border bg-background text-base outline-none focus:ring-2 focus:ring-primary/30 ${
+                        authError ? "border-destructive" : "border-border"
+                      }`}
+                    />
+                    {authError && (
+                      <p className="text-xs text-destructive">合言葉が違います。</p>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={busy || passphrase.trim().length === 0}
+                      className="inline-flex items-center justify-center h-11 px-6 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {busy ? "確認中…" : "解錠する"}
+                    </button>
+                  </form>
+                )}
               </section>
             </div>
           </div>

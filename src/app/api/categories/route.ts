@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { DEMO_HOUSEHOLD_ID } from "@/lib/auth";
+import { getHouseholdId } from "@/lib/auth";
 
 export async function GET() {
+  const householdId = await getHouseholdId();
+  if (!householdId) {
+    return NextResponse.json({ error: "locked" }, { status: 401 });
+  }
   const categories = await prisma.category.findMany({
-    where: { householdId: DEMO_HOUSEHOLD_ID },
+    where: { householdId },
     orderBy: { sortOrder: "asc" },
     select: {
       id: true,

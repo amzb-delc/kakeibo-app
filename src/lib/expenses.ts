@@ -1,6 +1,5 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { DEMO_HOUSEHOLD_ID } from "@/lib/auth";
 import { jstMonthRange, parseJstDate } from "@/lib/date";
 
 export const EXPENSE_LIST_LIMIT = 500;
@@ -11,8 +10,8 @@ export type ExpenseListParams = {
   categoryId?: string;
 };
 
-export async function listExpenses(params: ExpenseListParams) {
-  const where: Prisma.ExpenseWhereInput = { householdId: DEMO_HOUSEHOLD_ID };
+export async function listExpenses(params: ExpenseListParams, householdId: string) {
+  const where: Prisma.ExpenseWhereInput = { householdId };
   if (params.year && params.month) {
     where.spentAt = jstMonthRange(params.year, params.month);
   }
@@ -47,7 +46,7 @@ type RawInput = Record<string, unknown>;
 // partial=true で PATCH 用（未指定フィールドはスキップ）
 export async function validateExpenseInput(
   body: RawInput,
-  opts: { partial: boolean }
+  opts: { partial: boolean; householdId: string }
 ): Promise<{ data: Partial<ExpenseInput>; error?: ValidationError }> {
   const data: Partial<ExpenseInput> = {};
 
@@ -83,7 +82,7 @@ export async function validateExpenseInput(
       return { data, error: { field: "categoryId", message: "categoryId は必須" } };
     }
     const cat = await prisma.category.findFirst({
-      where: { id: body.categoryId, householdId: DEMO_HOUSEHOLD_ID },
+      where: { id: body.categoryId, householdId: opts.householdId },
       select: { id: true },
     });
     if (!cat) {
