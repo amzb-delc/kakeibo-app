@@ -5,6 +5,10 @@ import { DEMO_HOUSEHOLD_ID } from "@/lib/auth";
 import { jstMonthRange } from "@/lib/date";
 import { PageHeader } from "@/components/page-header";
 
+// new Date() / Prisma に依存するため SSG 化を防ぐ。
+// SSG だとビルド時の月が固定され、月跨ぎで古い表示になる。
+export const dynamic = "force-dynamic";
+
 async function getHomeSummary() {
   const now = new Date();
   const year = now.getFullYear();
@@ -45,15 +49,16 @@ export default async function Home() {
           <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50 flex flex-col items-center text-center">
             <Image
               src="/character.png"
-              alt="ワレワレ"
+              alt=""
               width={160}
               height={160}
               priority
+              sizes="(min-width: 640px) 160px, 128px"
               className="w-32 h-32 sm:w-40 sm:h-40 mb-3"
             />
-            <p className="text-base font-semibold mb-1">
+            <h2 className="text-base font-semibold mb-1">
               {month}月の記録はまだないよ
-            </p>
+            </h2>
             <p className="text-xs text-muted-foreground">
               右下の ＋ から登録してね
             </p>
@@ -62,10 +67,11 @@ export default async function Home() {
           <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50 flex items-center gap-4">
             <Image
               src="/character.png"
-              alt="ワレワレ"
+              alt=""
               width={72}
               height={72}
               priority
+              sizes="(min-width: 640px) 72px, 64px"
               className="w-16 h-16 sm:w-[72px] sm:h-[72px] shrink-0"
             />
             <div className="min-w-0 flex-1">
