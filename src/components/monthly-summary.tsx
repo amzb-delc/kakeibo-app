@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { getTrendLevel, TREND_TEXT_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
 import { categoryColor } from "@/lib/category-color";
 import { useExpenseModal } from "@/components/expense-modal";
-import type { MonthlySummary, CategorySummary } from "@/types";
+import type { MonthlySummary, CategorySummary, BoxStats } from "@/types";
 
 function formatYen(amount: number) {
   return `¥${amount.toLocaleString("ja-JP")}`;
@@ -16,20 +17,54 @@ function formatDiff(diff: number) {
   return diff > 0 ? `+¥${abs}` : `-¥${abs}`;
 }
 
+// 過去6ヶ月の異常値検出バー（フィル方式）。
+// 100% = 上フェンス(Q3+1.5*IQR)、超過時は 100% でクランプ。
+// サンプル不足 (boxStats=null) は中央(50%)で表示。
+function AnomalyBar({
+  value,
+  boxStats,
+  fillClass,
+}: {
+  value: number;
+  boxStats: BoxStats | null;
+  fillClass: string;
+}) {
+  const targetFill =
+    boxStats && boxStats.upperFence > 0
+      ? Math.min((value / boxStats.upperFence) * 100, 100)
+      : value > 0
+        ? 50
+        : 0;
+
+  // 初回マウント時も 0% → target にトランジションさせるため、1フレーム遅らせて反映
+  const [renderedFill, setRenderedFill] = useState(0);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setRenderedFill(targetFill));
+    return () => cancelAnimationFrame(id);
+  }, [targetFill]);
+
+  return (
+    <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-all duration-500 ${fillClass}`}
+        style={{ width: `${renderedFill}%` }}
+      />
+    </div>
+  );
+}
+
 type CategoryRowProps = {
   category: CategorySummary;
-  maxTotal: number;
   isOpen: boolean;
   onToggle: () => void;
 };
 
-function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps) {
+function CategoryRow({ category, isOpen, onToggle }: CategoryRowProps) {
   const { openEdit } = useExpenseModal();
   // 今月視点で比較する: 今月 > 表示月 なら up(赤=今月の方が多い), 今月 < 表示月 なら down(緑=今月の方が少ない)
   const compareTotal = category.compareTotal;
   const level = compareTotal !== null ? getTrendLevel(compareTotal, category.total) : null;
   const diff = compareTotal !== null ? formatDiff(compareTotal - category.total) : null;
-  const barWidth = maxTotal > 0 ? (category.total / maxTotal) * 100 : 0;
   const color = categoryColor(category.sortOrder);
 
   return (
@@ -55,13 +90,12 @@ function CategoryRow({ category, maxTotal, isOpen, onToggle }: CategoryRowProps)
             )}
           </div>
         </div>
-        {/* バーチャート */}
-        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-300 ${color.bar}`}
-            style={{ width: `${barWidth}%` }}
-          />
-        </div>
+        {/* 直近6ヶ月の異常値バー（フィル長で支出量を可視化） */}
+        <AnomalyBar
+          value={category.total}
+          boxStats={category.boxStats}
+          fillClass={color.bar}
+        />
       </button>
 
       {/* 展開時: 支出明細リスト（可変高さに対応） */}
@@ -121,13 +155,6 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
   const totalLevel = compareTotal !== null ? getTrendLevel(compareTotal, summary.total) : null;
   const totalDiff = compareTotal !== null ? formatDiff(compareTotal - summary.total) : null;
 
-  const maxCategoryTotal = Math.max(...summary.categories.map((c) => c.total), 0);
-
-  // 今月比プログレスバー（今月を100%として表示月の割合を表示）
-  const progressPercent = compareTotal !== null && compareTotal > 0
-    ? Math.min((summary.total / compareTotal) * 100, 150)
-    : 0;
-
   return (
     <main className="px-4 py-6 space-y-6">
         {/* 合計カード */}
@@ -139,16 +166,13 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
               {totalDiff}
             </p>
           )}
-          {compareTotal !== null && compareTotal > 0 && (
-            <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden mt-3">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  progressPercent > 100 ? "bg-destructive/70" : "bg-primary"
-                }`}
-                style={{ width: `${Math.min(progressPercent, 100)}%` }}
-              />
-            </div>
-          )}
+          <div className="mt-3">
+            <AnomalyBar
+              value={summary.total}
+              boxStats={summary.boxStats}
+              fillClass="bg-primary"
+            />
+          </div>
         </div>
 
         {/* カテゴリ別 */}
@@ -164,7 +188,6 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
                 <CategoryRow
                   key={cat.categoryId}
                   category={cat}
-                  maxTotal={maxCategoryTotal}
                   isOpen={openCategoryId === cat.categoryId}
                   onToggle={() => onToggleCategory(cat.categoryId)}
                 />

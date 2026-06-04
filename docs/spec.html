@@ -375,7 +375,8 @@ hr {
 │   ├── expenses.ts           # listExpenses + validateExpenseInput
 │   ├── category-color.ts     # カテゴリ色（タグ風）の集約
 │   ├── prisma.ts             # PrismaClient シングルトン
-│   └── trend.ts              # トレンドレベル判定
+│   ├── trend.ts              # トレンドレベル判定（差額の色付け用）
+│   └── anomaly.ts            # 直近6ヶ月の box stats（IQR）算出
 ├── types/index.ts            # Expense / Category / MonthlySummary
 └── ...
 </code></pre>
@@ -520,8 +521,9 @@ hr {
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>月切り替え</td><td>クライアント側 useState で year/month を保持、API再取得</td></tr>
 <tr><td>翌月ボタン</td><td>当月なら disabled</td></tr>
-<tr><td>合計カード</td><td>「合計」ラベル → 表示月合計（大）→ 差額（過去月閲覧時のみ、トレンド色） → プログレスバー（過去月閲覧時かつ今月>0、今月100%基準・150%頭打ち）の縦並び</td></tr>
-<tr><td>カテゴリ行</td><td>カテゴリ名は<strong>色分けタグ</strong>（<code>category-color.ts</code>）。右側は金額の下に差額（過去月閲覧時のみ、トレンド色）の縦並び。下に最大カテゴリ比のバー（バーもカテゴリ色）。タップで展開（<code>aria-expanded</code>、可変高さアニメーション）。展開状態はサマリーページが保持（制御コンポーネント）</td></tr>
+<tr><td>合計カード</td><td>「合計」ラベル → 表示月合計（大）→ 差額（過去月閲覧時のみ、トレンド色） → 異常値バー（フィル長で支出量を可視化、青系）の縦並び</td></tr>
+<tr><td>カテゴリ行</td><td>カテゴリ名は<strong>色分けタグ</strong>（<code>category-color.ts</code>）。右側は金額の下に差額（過去月閲覧時のみ、トレンド色）の縦並び。下に異常値バー（フィル長＝支出量、バー色はカテゴリ色）。タップで展開（<code>aria-expanded</code>、可変高さアニメーション）。展開状態はサマリーページが保持（制御コンポーネント）</td></tr>
+<tr><td>異常値バー</td><td>過去6ヶ月（表示月含む）の box stats から「いつもの幅」を算出し、<strong>上フェンス（Q3+1.5×IQR）を 100%</strong> としてフィル長で支出量を可視化。やたら使った月＝バーが長い、やたら使わなかった月＝バーが短い。サンプル不足（N&lt;2 or IQR=0）の月は中央（50%）で表示。初回マウントでも 0%→target にトランジションするよう <code>requestAnimationFrame</code> で1フレーム遅延</td></tr>
 <tr><td>展開時</td><td><strong>そのカテゴリの支出明細を日付降順で一行表示</strong>（日付 <code>M/D(曜)</code> ／ 店名 or メモ ／ 金額）。明細は <code>monthly-summary</code> API が各カテゴリに同梱するため追加通信なし</td></tr>
 <tr><td>明細タップ</td><td>編集用ボトムシートを開く（<code>useExpenseModal().openEdit(...)</code>）</td></tr>
 <tr><td>更新反映</td><td>登録・編集・削除の成功で <code>ExpenseModalProvider</code> の <code>mutationVersion</code> が増分し、サマリーを自動再取得。画面遷移しないため<strong>選択月・展開カテゴリは保持</strong>される</td></tr>
@@ -635,7 +637,7 @@ hr {
 
 <div class="endpoint" id="api-monthly-summary">
 <h4><span class="method method-get">GET</span> /api/monthly-summary</h4>
-<p>表示月のカテゴリ別集計と、比較用の「今月」集計を返す。当月閲覧時は <code>compareTotal: null</code>（比較なし）、過去月閲覧時は今月の合計・カテゴリ別合計を返す。各カテゴリに表示月の支出明細（<code>spentAt</code> 降順）を同梱するため、サマリー画面は追加通信なしで明細を展開できる。</p>
+<p>表示月のカテゴリ別集計と、比較用の「今月」集計、そして直近6ヶ月（表示月含む）の box stats（中央値・四分位・フェンス）を返す。当月閲覧時は <code>compareTotal: null</code>。box stats はサマリーの「異常値バー」のフィル基準として使う。各カテゴリに表示月の支出明細（<code>spentAt</code> 降順）を同梱するため、サマリー画面は追加通信なしで明細を展開できる。</p>
 <p><strong>クエリ:</strong> <code>year</code>, <code>month</code>（未指定なら当月）</p>
 <p><strong>レスポンス（過去月閲覧時）:</strong></p>
 <pre><code>{
@@ -643,6 +645,13 @@ hr {
   "month": 4,
   "total": 131800,
   "compareTotal": 142500,
+  "boxStats": {
+    "median": 130000,
+    "q1": 120000,
+    "q3": 145000,
+    "lowerFence": 82500,
+    "upperFence": 182500
+  },
   "categories": [
     {
       "categoryId": "...",
@@ -650,6 +659,7 @@ hr {
       "sortOrder": 0,
       "total": 48100,
       "compareTotal": 52300,
+      "boxStats": { "median": 49000, "q1": 45750, "q3": 51500, "lowerFence": 37125, "upperFence": 60125 },
       "expenses": [
         {
           "id": "...",
@@ -663,7 +673,7 @@ hr {
     ...
   ]
 }</code></pre>
-<p>当月閲覧時は <code>compareTotal</code>（サマリー・各カテゴリ共）が <code>null</code> になる。当月判定はサーバ TZ に依存せず JST で行う（<code>formatJstDate(new Date())</code> から年月を抽出）。<code>spentAt</code> は ISO 文字列で返り、クライアントで JST 整形する。</p>
+<p><code>compareTotal</code> は当月閲覧時に <code>null</code>。<code>boxStats</code> はサンプル&lt;2件 or IQR=0 のときに <code>null</code>。box stats のサンプルは「過去6ヶ月のうち合計支出があった月」を使い、カテゴリ別はその月の該当カテゴリ合計を 0 埋めで取る。当月判定はサーバ TZ に依存せず JST で行う（<code>formatJstDate(new Date())</code> から年月を抽出）。<code>spentAt</code> は ISO 文字列で返り、クライアントで JST 整形する。</p>
 </div>
 </section>
 
@@ -786,6 +796,23 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-05-28 (続き) — プログレスバー → 直近6ヶ月の異常値バー</h3>
+<p><span class="badge badge-major">major</span> サマリーのバーを「先月100%基準のプログレスバー / 最大カテゴリ比のバー」から、<strong>直近6ヶ月（表示月含む）の box stats を使った異常値バー</strong>に置き換え。当月閲覧時も表示する。</p>
+<h4>新規</h4>
+<ul>
+  <li><code>src/lib/anomaly.ts</code> — <code>calculateBoxStats(samples)</code>。median / Q1 / Q3 / lowerFence / upperFence を返す。サンプル&lt;2件 or IQR=0 で <code>null</code></li>
+</ul>
+<h4>変更</h4>
+<ul>
+  <li><code>GET /api/monthly-summary</code>: <code>boxStats: BoxStats | null</code> を合計・各カテゴリに追加。表示月含む過去6ヶ月の月別合計から算出</li>
+  <li>合計カードのプログレスバーとカテゴリ行の最大カテゴリ比バーを<strong>異常値バーに統一</strong>。100% = 上フェンス（Q3+1.5×IQR）、超過は 100% でクランプ</li>
+  <li>合計はニュートラル色（<code>bg-primary</code>）、カテゴリはカテゴリ色でフィル</li>
+  <li>初回マウント時も 0% → target へトランジションするよう <code>requestAnimationFrame</code> で1フレーム遅延（月切り替えで新規出現したカテゴリのバーもアニメーション）</li>
+  <li><code>prisma/seed.ts</code>: 12ヶ月分の支出を生成するロジックを追加（idempotent、現在月含む）。異常値検出の動作確認用に「食費がやたら少ない月」「特別費がやたら多い月」を仕込む</li>
+</ul>
+
+<hr>
 
 <h3>2026-05-28 — サマリー比較仕様の見直し（前月比 → 今月との差額）</h3>
 <p><span class="badge badge-major">major</span> 月次サマリーの比較表示を「前月比%」から「今月との差額（円）」に変更。</p>

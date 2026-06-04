@@ -23,12 +23,21 @@ export type CategoryExpense = {
   memo: string | null;
 };
 
+export type BoxStats = {
+  median: number;
+  q1: number;
+  q3: number;
+  lowerFence: number;
+  upperFence: number;
+};
+
 export type CategorySummary = {
   categoryId: string;
   name: string;
   sortOrder: number;
   total: number;
   compareTotal: number | null;
+  boxStats: BoxStats | null;
   expenses: CategoryExpense[];
 };
 
@@ -37,5 +46,6 @@ export type MonthlySummary = {
   month: number;
   total: number;
   compareTotal: number | null;
+  boxStats: BoxStats | null;
   categories: CategorySummary[];
 };
