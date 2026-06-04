@@ -206,18 +206,16 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
               </DonutChart>
             </div>
             {topCategories.length > 0 && (
-              <ul className="flex-1 min-w-0 space-y-1.5 pt-2 text-xs">
+              <ul className="flex-1 min-w-0 space-y-1 pt-1">
                 {topCategories.map((c) => {
                   const color = categoryColor(c.sortOrder);
                   return (
-                    <li
-                      key={c.categoryId}
-                      className="flex items-center gap-1.5 min-w-0"
-                    >
+                    <li key={c.categoryId} className="min-w-0">
                       <span
-                        className={`shrink-0 inline-block w-2 h-2 rounded-full ${color.bar}`}
-                      />
-                      <span className="truncate">{c.name}</span>
+                        className={`inline-block max-w-full truncate rounded-lg px-2 py-0.5 text-xs font-medium ${color.tag}`}
+                      >
+                        {c.name}
+                      </span>
                     </li>
                   );
                 })}
