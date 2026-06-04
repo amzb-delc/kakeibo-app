@@ -807,6 +807,13 @@ hr {
   <li>ロック中は <code>/</code> がロック画面（キャラ＋「ロックされています」＋「設定を開く」）。FAB はロック中は非表示。解錠は設定モーダルで行い、成功で自動的に閉じてデータ表示</li>
   <li><code>ExpenseModalProvider</code> のカテゴリ先読みを解錠後に行う（ロック中は 401 のため取得しない）</li>
 </ul>
+<h4>レビュー反映・追補</h4>
+<ul>
+  <li><code>/api/session</code> GET: cookie はあるが世帯が存在しない場合に<strong>無効 cookie を破棄</strong>して返す</li>
+  <li><code>/</code> の解錠判定待ち（<code>unlocked === null</code>）は<strong>中立のローディング</strong>を表示（サマリーのシェルもロック画面も出さずちらつき防止）</li>
+  <li>合言葉入力を <code>type="text"</code> にし<strong>日本語IMEで入力可能</strong>に。変換確定の Enter で誤送信しないよう composition 中は送信しない</li>
+  <li><strong>ロック中バッジ</strong>: フッタの設定アイコン（赤ドット＋ <code>aria-label</code>「設定（ロック中）」）と、設定モーダルの「合言葉」ラベル（「ロック中」バッジ）に表示</li>
+</ul>
 
 <hr>
 

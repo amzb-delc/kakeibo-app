@@ -24,11 +24,13 @@ export async function GET() {
     where: { id },
     select: { name: true },
   });
-  // cookie はあるが世帯が無い（合言葉変更後など）→ 未解錠扱い
-  return NextResponse.json({
-    unlocked: !!household,
-    householdName: household?.name ?? null,
-  });
+  if (!household) {
+    // cookie はあるが世帯が無い（合言葉変更・再seed 後など）→ 無効 cookie を破棄
+    const res = NextResponse.json({ unlocked: false });
+    res.cookies.set(HOUSEHOLD_COOKIE, "", cookieOptions(0));
+    return res;
+  }
+  return NextResponse.json({ unlocked: true, householdName: household.name });
 }
 
 // 解錠: 合言葉（= household.id）を照合し、一致すれば cookie を発行

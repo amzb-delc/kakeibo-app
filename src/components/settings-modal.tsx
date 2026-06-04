@@ -36,6 +36,8 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
   const [authError, setAuthError] = useState(false);
   const [busy, setBusy] = useState(false);
   const teardownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 日本語IMEの変換中フラグ。変換確定の Enter でフォーム送信されるのを防ぐ。
+  const composingRef = useRef(false);
 
   const openSettings = useCallback(() => {
     if (teardownTimer.current) clearTimeout(teardownTimer.current);
@@ -55,6 +57,7 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
   const handleUnlock = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      if (composingRef.current) return; // IME 変換確定の Enter では送信しない
       const value = passphrase.trim();
       if (!value || busy) return;
       setBusy(true);
@@ -153,7 +156,14 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
             >
               {/* 合言葉セクション: 解錠/ロック */}
               <section className="bg-muted/30 rounded-2xl border border-border/50 p-4">
-                <h3 className="text-sm font-semibold mb-2">合言葉</h3>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  合言葉
+                  {unlocked === false && (
+                    <span className="inline-flex items-center rounded-full bg-red-500 text-white text-[10px] font-bold px-2 py-0.5">
+                      ロック中
+                    </span>
+                  )}
+                </h3>
                 {unlocked ? (
                   <div className="space-y-3">
                     <p className="text-xs text-muted-foreground leading-relaxed">
@@ -173,17 +183,23 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       家計データを表示するには合言葉を入力してください。
                     </p>
+                    {/* 日本語の合言葉を入力できるよう type="text"（IME を妨げない）。
+                        入力中の確認のため伏せ字にはしない。 */}
                     <input
-                      type="password"
+                      type="text"
                       value={passphrase}
                       onChange={(e) => {
                         setPassphrase(e.target.value);
                         setAuthError(false);
                       }}
+                      onCompositionStart={() => {
+                        composingRef.current = true;
+                      }}
+                      onCompositionEnd={() => {
+                        composingRef.current = false;
+                      }}
                       placeholder="合言葉"
                       autoComplete="off"
-                      autoCapitalize="off"
-                      autoCorrect="off"
                       className={`w-full h-11 px-3 rounded-xl border bg-background text-base outline-none focus:ring-2 focus:ring-primary/30 ${
                         authError ? "border-destructive" : "border-border"
                       }`}

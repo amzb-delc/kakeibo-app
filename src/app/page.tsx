@@ -113,6 +113,19 @@ export default function SummaryPage() {
     </div>
   );
 
+  // 解錠判定の応答待ち（null）の間は中立のローディング。
+  // サマリーのシェルもロック画面も出さず、ちらつきを防ぐ。
+  if (unlocked === null) {
+    return (
+      <div className="min-h-screen bg-background">
+        <h1 className="sr-only">読み込み中</h1>
+        <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+          読み込み中…
+        </div>
+      </div>
+    );
+  }
+
   // ロック中: 合言葉を入力するまで家計データは出さない（API も 401）。
   // 解錠は設定モーダルで行う。
   if (unlocked === false) {
