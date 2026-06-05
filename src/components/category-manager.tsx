@@ -128,7 +128,8 @@ export function CategoryManager() {
                 type="text"
                 value={drafts[cat.id] ?? ""}
                 maxLength={CATEGORY_NAME_MAX}
-                disabled={busy}
+                // 無効カテゴリは名前編集不可（ONにしてからリネームする導線）。必須は常にON＝編集可。
+                disabled={busy || !cat.enabled}
                 onChange={(e) =>
                   setDrafts((p) => ({ ...p, [cat.id]: e.target.value }))
                 }
