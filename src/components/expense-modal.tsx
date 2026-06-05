@@ -70,8 +70,8 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   const dragStart = useRef<{ y: number; t: number } | null>(null);
   const composeRef = useRef<ComposeContext | null>(null);
 
-  // カテゴリは滅多に変わらず軽量なので、解錠後に先読みしておく。
-  // ロック中は /api/categories が 401 になるため取得しない（解錠で再取得）。
+  // カテゴリは滅多に変わらず軽量なので、保存後に先読みしておく。
+  // 未保存のときは /api/categories が 401 になるため取得しない（保存で再取得）。
   useEffect(() => {
     if (!unlocked) return;
     let alive = true;

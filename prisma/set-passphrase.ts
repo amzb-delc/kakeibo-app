@@ -1,14 +1,14 @@
 /**
- * 合言葉ロックのセットアップ用スクリプト（一度きり）。
+ * 世帯コードのセットアップ用スクリプト（一度きり）。
  *
- * 「合言葉 = household.id」方式のため、既存世帯の id を選んだ合言葉へ付け替える。
+ * 「世帯コード = household.id」方式のため、既存世帯の id を選んだ世帯コードへ付け替える。
  * id は各テーブルの FK なので、子レコード（Category / Expense / HouseholdMember）も
  * トランザクションで新 id に移行する。
  *
  * 使い方:
  *   npm run db:set-passphrase -- "うちのひみつ2026"
  *
- * 注意: アプリ側に合言葉の変更UIは無い（仕様）。変更はこのスクリプトで行う。
+ * 注意: アプリ側に世帯コードの変更UIは無い（仕様）。変更はこのスクリプトで行う。
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
 async function main() {
   const newId = process.argv[2]?.trim();
   if (!newId) {
-    console.error('使い方: npm run db:set-passphrase -- "合言葉"');
+    console.error('使い方: npm run db:set-passphrase -- "世帯コード"');
     process.exit(1);
   }
 
@@ -37,7 +37,7 @@ async function main() {
 
   const current = households[0];
   if (current.id === newId) {
-    console.log(`既に合言葉は "${newId}" です。変更は不要です。`);
+    console.log(`既に世帯コードは "${newId}" です。変更は不要です。`);
     return;
   }
 
@@ -46,7 +46,7 @@ async function main() {
     select: { id: true },
   });
   if (clash) {
-    console.error(`"${newId}" は既に使われています。別の合言葉にしてください。`);
+    console.error(`"${newId}" は既に使われています。別の世帯コードにしてください。`);
     process.exit(1);
   }
 
@@ -79,7 +79,7 @@ async function main() {
     prisma.expense.count({ where: { householdId: newId } }),
   ]);
   console.log(
-    `✓ 合言葉(=世帯id)を "${current.id}" → "${newId}" に変更しました（カテゴリ ${cats} 件 / 支出 ${exps} 件 を移行）。`
+    `✓ 世帯コード(=世帯id)を "${current.id}" → "${newId}" に変更しました（カテゴリ ${cats} 件 / 支出 ${exps} 件 を移行）。`
   );
 }
 

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { HOUSEHOLD_COOKIE, getHouseholdId } from "@/lib/auth";
 
-// 合言葉 = household.id。署名なし（合言葉を知っていること自体が認可）。
-// 解錠は端末で保持したいので長期 cookie（ブラウザ上限に合わせ 400 日）。
+// 世帯コード = household.id。署名なし（世帯コードを知っていること自体が認可）。
+// 保存は端末で保持したいので長期 cookie（ブラウザ上限に合わせ 400 日）。
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
 
 function cookieOptions(maxAge: number) {
@@ -16,7 +16,7 @@ function cookieOptions(maxAge: number) {
   };
 }
 
-// 現在の解錠状態（クライアントのロック表示用）
+// 現在の保存状態（クライアントの未保存表示用）
 export async function GET() {
   const id = await getHouseholdId();
   if (!id) return NextResponse.json({ unlocked: false });
@@ -25,7 +25,7 @@ export async function GET() {
     select: { name: true },
   });
   if (!household) {
-    // cookie はあるが世帯が無い（合言葉変更・再seed 後など）→ 無効 cookie を破棄
+    // cookie はあるが世帯が無い（世帯コード変更・再seed 後など）→ 無効 cookie を破棄
     const res = NextResponse.json({ unlocked: false });
     res.cookies.set(HOUSEHOLD_COOKIE, "", cookieOptions(0));
     return res;
@@ -33,7 +33,7 @@ export async function GET() {
   return NextResponse.json({ unlocked: true, householdName: household.name });
 }
 
-// 解錠: 合言葉（= household.id）を照合し、一致すれば cookie を発行
+// 保存: 世帯コード（= household.id）を照合し、一致すれば cookie を発行
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const passphrase =
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   return res;
 }
 
-// ロック: cookie を破棄
+// クリア: cookie を破棄
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
   res.cookies.set(HOUSEHOLD_COOKIE, "", cookieOptions(0));

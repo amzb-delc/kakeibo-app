@@ -8,15 +8,15 @@ import {
   useState,
 } from "react";
 
-// 合言葉ロックの状態をアプリ全体で共有する。
+// 世帯コードの保存状態をアプリ全体で共有する。
 // 実際のデータ保護はサーバー（cookie + API の 401）が担い、ここはUX用の状態。
 type ContextValue = {
-  /** null=判定中, true=解錠済み, false=ロック中 */
+  /** null=判定中, true=保存済み, false=未保存 */
   unlocked: boolean | null;
   householdName: string | null;
-  /** 合言葉で解錠。成功で true */
+  /** 世帯コードを保存。成功で true */
   unlock: (passphrase: string) => Promise<boolean>;
-  /** ロック（cookie 破棄） */
+  /** クリア（cookie 破棄） */
   lock: () => Promise<void>;
 };
 
@@ -34,7 +34,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [unlocked, setUnlocked] = useState<boolean | null>(null);
   const [householdName, setHouseholdName] = useState<string | null>(null);
 
-  // 起動時に現在の解錠状態を取得
+  // 起動時に現在の保存状態を取得
   useEffect(() => {
     let alive = true;
     fetch("/api/session")
