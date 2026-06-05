@@ -35,8 +35,12 @@ type ContextValue = {
   setComposeContext: (ctx: ComposeContext | null) => void;
   /** 登録・更新・削除のたびに増える。一覧側はこれを購読して再取得する。 */
   mutationVersion: number;
-  /** 先読みした全カテゴリ。当月に明細が無いカテゴリ名の解決などに使う */
+  /** 先読みした全カテゴリ（無効含む）。名前解決やフォームの選択肢生成に使う */
   categories: Category[];
+  /** カテゴリ管理で名前変更/有効無効を変えた後に呼ぶ。先読み一覧を再取得する。 */
+  refreshCategories: () => void;
+  /** カテゴリ編集のたびに増える。サマリー等はこれを購読して再取得する（名前の即時反映）。 */
+  categoriesVersion: number;
 };
 
 const ExpenseModalContext = createContext<ContextValue | null>(null);
@@ -63,6 +67,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   const [deleting, setDeleting] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [categoriesVersion, setCategoriesVersion] = useState(0);
   const [mutationVersion, setMutationVersion] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,12 +75,14 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   const dragStart = useRef<{ y: number; t: number } | null>(null);
   const composeRef = useRef<ComposeContext | null>(null);
 
-  // カテゴリは滅多に変わらず軽量なので、保存後に先読みしておく。
+  // カテゴリは軽量なので保存後に先読みしておく。無効も含めた全件（scope=all）を持ち、
+  // フォームの選択肢生成（編集時は無効でも現カテゴリを残す）や名前解決に使う。
   // 未保存のときは /api/categories が 401 になるため取得しない（保存で再取得）。
+  // categoriesVersion はカテゴリ管理での編集後の再取得トリガ。
   useEffect(() => {
     if (!unlocked) return;
     let alive = true;
-    fetch("/api/categories")
+    fetch("/api/categories?scope=all")
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Category[]) => {
         if (alive) {
@@ -87,7 +94,12 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     return () => {
       alive = false;
     };
-  }, [unlocked]);
+  }, [unlocked, categoriesVersion]);
+
+  const refreshCategories = useCallback(
+    () => setCategoriesVersion((v) => v + 1),
+    []
+  );
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -260,9 +272,30 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     };
   }
 
+  // フォームの選択肢: 新規は有効カテゴリのみ。編集は現カテゴリが無効化済みでも
+  // 選択肢に残す（過去の支出を編集してもカテゴリが消えない＝表示を変えないため）。
+  const enabledCategories = categories.filter((c) => c.enabled);
+  let formCategories = enabledCategories;
+  if (active?.mode === "edit") {
+    const current = categories.find((c) => c.id === active.expense.categoryId);
+    if (current && !current.enabled) {
+      formCategories = [...enabledCategories, current].sort(
+        (a, b) => a.sortOrder - b.sortOrder
+      );
+    }
+  }
+
   return (
     <ExpenseModalContext.Provider
-      value={{ openCreate, openEdit, setComposeContext, mutationVersion, categories }}
+      value={{
+        openCreate,
+        openEdit,
+        setComposeContext,
+        mutationVersion,
+        categories,
+        refreshCategories,
+        categoriesVersion,
+      }}
     >
       {children}
 
@@ -328,7 +361,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
               ) : (
                 <ExpenseForm
                   key={active.mode === "edit" ? active.expense.id : "create"}
-                  categories={categories}
+                  categories={formCategories}
                   initial={initial}
                   onSuccess={handleSuccess}
                 />

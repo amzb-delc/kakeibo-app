@@ -18,7 +18,7 @@ export default function SummaryPage() {
   const [fade, setFade] = useState(false);
   const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
   const isInitial = useRef(true);
-  const { mutationVersion, setComposeContext } = useExpenseModal();
+  const { mutationVersion, categoriesVersion, setComposeContext } = useExpenseModal();
   const { openSettings } = useSettingsModal();
   const { unlocked } = useSession();
 
@@ -53,11 +53,11 @@ export default function SummaryPage() {
     }
   }, [year, month]);
 
-  // 保存済みのときだけ取得。year/month・mutationVersion の変化に加え、
-  // 保存された瞬間（unlocked が true へ）にも取得する。
+  // 保存済みのときだけ取得。year/month・mutationVersion（支出CRUD）・
+  // categoriesVersion（カテゴリ名変更等）の変化に加え、保存された瞬間（unlocked→true）にも取得する。
   useEffect(() => {
     if (unlocked) fetchSummary();
-  }, [fetchSummary, mutationVersion, unlocked]);
+  }, [fetchSummary, mutationVersion, categoriesVersion, unlocked]);
 
   // 「解除なし」設計の初期選択: まだ何も選んでいない（null）ときだけ最大カテゴリを自動選択する。
   // 一度ユーザーが選んだ後は補正しない → 月跨ぎで選択を維持し、当月に無ければ「キロクナシ」表示にする。

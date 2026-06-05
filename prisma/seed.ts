@@ -12,17 +12,37 @@ function mulberry32(seed: number) {
   };
 }
 
-const INITIAL_CATEGORIES = [
-  "食費",
-  "日用品",
-  "交通費",
-  "娯楽",
-  "医療",
-  "特別費",
-  "美容",
-  "教育",
-  "その他",
+// カテゴリは 16 個固定。プリセット名は「ヒヨウ」+ 2桁連番（1始まり: ヒヨウ01〜ヒヨウ16）。
+// 先頭 9 個（sortOrder 0-8）を有効、残り 7 個を無効とする。
+// 実機確認時は、下記 DEMO_LABELS の意味のある名前へ手動でリネームする想定。
+const CATEGORY_SLOTS = 16;
+const ENABLED_SLOTS = 9;
+// src/lib/category-constants.ts の slotName と同一規則（seed は自己完結のため再掲）
+const slotName = (sortOrder: number) =>
+  `ヒヨウ${String(sortOrder + 1).padStart(2, "0")}`;
+
+// デモ支出を割り当てる論理カテゴリ（slot 0..8 に対応）。
+// 実機ではこの名前へ手動リネームすることで「食費」等として確認できる。
+const DEMO_LABELS = [
+  "食費", // slot 0 / ヒヨウ01
+  "日用品", // slot 1 / ヒヨウ02
+  "交通費", // slot 2 / ヒヨウ03
+  "娯楽", // slot 3 / ヒヨウ04
+  "医療", // slot 4 / ヒヨウ05
+  "特別費", // slot 5 / ヒヨウ06
+  "美容", // slot 6 / ヒヨウ07
+  "教育", // slot 7 / ヒヨウ08
+  "その他", // slot 8 / ヒヨウ09
 ];
+
+// 16 スロットぶんの create データ
+const categorySlotData = (householdId: string) =>
+  Array.from({ length: CATEGORY_SLOTS }, (_, i) => ({
+    householdId,
+    name: slotName(i),
+    sortOrder: i,
+    enabled: i < ENABLED_SLOTS,
+  }));
 
 async function main() {
   // デモ用ユーザー
@@ -63,23 +83,12 @@ async function main() {
     },
   });
 
-  // 初期カテゴリ投入
-  for (let i = 0; i < INITIAL_CATEGORIES.length; i++) {
-    await prisma.category.upsert({
-      where: {
-        householdId_name: {
-          householdId: household.id,
-          name: INITIAL_CATEGORIES[i],
-        },
-      },
-      update: {},
-      create: {
-        householdId: household.id,
-        name: INITIAL_CATEGORIES[i],
-        sortOrder: i,
-      },
-    });
-  }
+  // 初期カテゴリを 16 スロット用意（既存の ヒヨウNN は skipDuplicates でそのまま）。
+  // 本番でも 16 枠だけは確実に存在させる。既存データの削除はしない。
+  await prisma.category.createMany({
+    data: categorySlotData(household.id),
+    skipDuplicates: true,
+  });
 
   // ここから下はデモ用支出データの生成（破壊的）。
   // 本番DBで誤って実行されないよう、NODE_ENV=production の時は SEED_DEMO=1 を要求する。
@@ -94,12 +103,19 @@ async function main() {
   // サンプル支出（12ヶ月分）を再生成。既存はクリアして再実行可能に。
   await prisma.expense.deleteMany({ where: { householdId: household.id } });
 
+  // 旧シードの名前付きカテゴリ等が残っていても、デモ路線ではカテゴリを 16 スロットに作り直す。
+  // 支出を消した後なので FK(Restrict) に阻まれず削除できる。
+  await prisma.category.deleteMany({ where: { householdId: household.id } });
+  await prisma.category.createMany({ data: categorySlotData(household.id) });
+
   const allCategories = await prisma.category.findMany({
     where: { householdId: household.id },
   });
-  const catId = (name: string) => {
-    const c = allCategories.find((x) => x.name === name);
-    if (!c) throw new Error(`Category not found: ${name}`);
+  // デモ支出は論理名（DEMO_LABELS）→ slot index（sortOrder）で引く
+  const catId = (label: string) => {
+    const idx = DEMO_LABELS.indexOf(label);
+    const c = allCategories.find((x) => x.sortOrder === idx);
+    if (!c) throw new Error(`Demo category slot not found: ${label}`);
     return c.id;
   };
 
@@ -226,7 +242,9 @@ async function main() {
   console.log("Seed completed.");
   console.log(`  User: ${user.email}`);
   console.log(`  Household: ${household.name}`);
-  console.log(`  Categories: ${INITIAL_CATEGORIES.join(", ")}`);
+  console.log(
+    `  Categories: ${CATEGORY_SLOTS} slots (${slotName(0)}..${slotName(CATEGORY_SLOTS - 1)}, ${ENABLED_SLOTS} enabled)`
+  );
   console.log(`  Expenses: ${data.length} (12 months)`);
 }
 

@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useSession } from "@/components/session-provider";
+import { CategoryManager } from "@/components/category-manager";
 
 // 支出モーダル（expense-modal.tsx）と同じボトムシートの流儀に揃える。
 const ANIM_MS = 320;
@@ -217,6 +218,17 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
                   </form>
                 )}
               </section>
+
+              {/* カテゴリ管理: 保存済み（cookie あり）のときのみ。名前変更＋有効/無効。 */}
+              {unlocked && (
+                <section className="bg-muted/30 rounded-2xl border border-border/50 p-4">
+                  <h3 className="text-sm font-semibold mb-1">カテゴリ</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                    名前の変更と、登録時の選択肢に出すかどうかを切り替えられます。無効にしても過去の支出や集計はそのまま残ります。
+                  </p>
+                  <CategoryManager />
+                </section>
+              )}
             </div>
           </div>
         </div>
