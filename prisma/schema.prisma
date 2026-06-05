@@ -67,8 +67,9 @@ model Expense {
   spentAt         DateTime
   storeName       String?
   memo            String?
-  receiptImageUrl String?
-  ocrRawText      String?
+  // OCR は POST /api/ocr で実装済みだが「画像は保存しない」方針のため以下2列は現在未使用。
+  receiptImageUrl String? // 予約: 将来レシート画像を保存する場合に使う
+  ocrRawText      String? // 予約: 抽出元の生テキストを残す案（現状は書き込まない）
   createdByUserId String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
