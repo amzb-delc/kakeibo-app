@@ -39,6 +39,8 @@ type ContextValue = {
   categories: Category[];
   /** カテゴリ管理で名前変更/有効無効を変えた後に呼ぶ。先読み一覧を再取得する。 */
   refreshCategories: () => void;
+  /** カテゴリ編集のたびに増える。サマリー等はこれを購読して再取得する（名前の即時反映）。 */
+  categoriesVersion: number;
 };
 
 const ExpenseModalContext = createContext<ContextValue | null>(null);
@@ -292,6 +294,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
         mutationVersion,
         categories,
         refreshCategories,
+        categoriesVersion,
       }}
     >
       {children}
