@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getHouseholdId } from "@/lib/auth";
 import { ensureCategorySlots } from "@/lib/categories";
+import { requireHouseholdId } from "@/lib/api";
 
 export async function GET(req: NextRequest) {
-  const householdId = await getHouseholdId();
-  if (!householdId) {
-    return NextResponse.json({ error: "locked" }, { status: 401 });
-  }
+  const householdId = await requireHouseholdId();
+  if (householdId instanceof NextResponse) return householdId;
 
   // scope=all: 管理用に全16スロット（無効含む）を返す。既定はフォーム用に有効のみ。
   const scope = new URL(req.url).searchParams.get("scope");

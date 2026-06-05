@@ -1,12 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CATEGORY_SLOTS, CATEGORY_NAME_MAX, slotName } from "@/lib/category-constants";
-
-export type CategoryRow = {
-  id: string;
-  name: string;
-  sortOrder: number;
-  enabled: boolean;
-};
+import type { ValidationError } from "@/lib/validation";
 
 // 世帯のカテゴリ sortOrder 0..15 のうち欠けている枠を、無効の空きスロットで補充する。
 // 世帯コード変更で id が付け替わった世帯でも、seed を待たずに 16 枠を揃えるための遅延生成。
@@ -39,12 +33,10 @@ export type CategoryPatchInput = {
   enabled?: boolean;
 };
 
-export type CategoryValidationError = { field: string; message: string };
-
 // PATCH 入力の検証。name は trim 済みを返す。
 export function validateCategoryPatch(body: Record<string, unknown>): {
   data: CategoryPatchInput;
-  error?: CategoryValidationError;
+  error?: ValidationError;
 } {
   const data: CategoryPatchInput = {};
 

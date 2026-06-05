@@ -1,43 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getHouseholdId } from "@/lib/auth";
 import { validateCategoryPatch } from "@/lib/categories";
 import { isRequiredSlot } from "@/lib/category-constants";
+import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const householdId = await getHouseholdId();
-  if (!householdId) {
-    return NextResponse.json({ error: "locked" }, { status: 401 });
-  }
-  const { id } = await params;
-  const body = await req.json().catch(() => null);
-  if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "invalid body" }, { status: 400 });
-  }
+  const householdId = await requireHouseholdId();
+  if (householdId instanceof NextResponse) return householdId;
 
-  const { data, error } = validateCategoryPatch(body as Record<string, unknown>);
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
+  const { id } = await params;
+  const body = await parseJsonBody(req);
+  if (body instanceof NextResponse) return body;
+
+  const { data, error } = validateCategoryPatch(body);
+  if (error) return jsonError(error.message, 400);
 
   // 対象が自世帯に存在するか確認（cross-household の改竄防止）
   const target = await prisma.category.findFirst({
     where: { id, householdId },
     select: { id: true, sortOrder: true },
   });
-  if (!target) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
-  }
+  if (!target) return jsonError("not found", 404);
 
   // 必須スロット（先頭4個）は無効化できない
   if (data.enabled === false && isRequiredSlot(target.sortOrder)) {
-    return NextResponse.json(
-      { error: "このカテゴリは無効にできません" },
-      { status: 400 }
-    );
+    return jsonError("このカテゴリは無効にできません", 400);
   }
 
   try {
@@ -50,10 +40,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   } catch (e) {
     // @@unique([householdId, name]) 違反 → 同名カテゴリが既にある
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return NextResponse.json(
-        { error: "同じ名前のカテゴリが既にあります" },
-        { status: 409 }
-      );
+      return jsonError("同じ名前のカテゴリが既にあります", 409);
     }
     throw e;
   }
