@@ -4,21 +4,12 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { getTrendLevel, TREND_TEXT_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
+import { formatYen, formatDiff } from "@/lib/format";
 import { categoryColor, OTHERS_COLOR } from "@/lib/category-color";
 import { OTHERS_CATEGORY_ID } from "@/lib/category-constants";
 import { useExpenseModal } from "@/components/expense-modal";
 import { DonutChart } from "@/components/donut-chart";
 import type { MonthlySummary, CategorySummary, BoxStats } from "@/types";
-
-function formatYen(amount: number) {
-  return `¥${amount.toLocaleString("ja-JP")}`;
-}
-
-function formatDiff(diff: number) {
-  if (diff === 0) return "±¥0";
-  const abs = Math.abs(diff).toLocaleString("ja-JP");
-  return diff > 0 ? `+¥${abs}` : `-¥${abs}`;
-}
 
 // 過去6ヶ月の異常値検出バー（フィル方式）。
 // 100% = 上フェンス(Q3+1.5*IQR)、超過時は 100% でクランプ。

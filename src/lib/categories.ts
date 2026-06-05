@@ -1,13 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CATEGORY_SLOTS, CATEGORY_NAME_MAX, slotName } from "@/lib/category-constants";
 
-export type CategoryRow = {
-  id: string;
-  name: string;
-  sortOrder: number;
-  enabled: boolean;
-};
-
 // 世帯のカテゴリ sortOrder 0..15 のうち欠けている枠を、無効の空きスロットで補充する。
 // 世帯コード変更で id が付け替わった世帯でも、seed を待たずに 16 枠を揃えるための遅延生成。
 // 歯抜け（途中の欠番）があっても確実に 0..15 を埋め、範囲外の sortOrder は作らない。

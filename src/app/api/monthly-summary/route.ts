@@ -1,26 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getHouseholdId } from "@/lib/auth";
-import { jstMonthRange, formatJstDate } from "@/lib/date";
+import { jstMonthRange, formatJstDate, shiftMonth, ymKey } from "@/lib/date";
 import { calculateBoxStats } from "@/lib/anomaly";
-
-function shiftMonth(year: number, month: number, delta: number) {
-  let y = year;
-  let m = month + delta;
-  while (m <= 0) {
-    m += 12;
-    y -= 1;
-  }
-  while (m > 12) {
-    m -= 12;
-    y += 1;
-  }
-  return { year: y, month: m };
-}
-
-function ymKey(year: number, month: number) {
-  return `${year}-${String(month).padStart(2, "0")}`;
-}
 
 export async function GET(req: NextRequest) {
   const householdId = await getHouseholdId();
