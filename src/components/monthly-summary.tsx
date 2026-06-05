@@ -5,8 +5,9 @@ import Image from "next/image";
 import { getTrendLevel, TREND_TEXT_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
 import { formatYen, formatDiff } from "@/lib/format";
-import { categoryColor, OTHERS_COLOR } from "@/lib/category-color";
+import { categoryColor } from "@/lib/category-color";
 import { OTHERS_CATEGORY_ID } from "@/lib/category-constants";
+import { resolveSummaryView } from "@/lib/summary-view";
 import { useExpenseModal } from "@/components/expense-modal";
 import { DonutChart } from "@/components/donut-chart";
 import type { MonthlySummary, CategorySummary, BoxStats } from "@/types";
@@ -159,96 +160,21 @@ type Props = {
   onToggleCategory: (categoryId: string) => void;
 };
 
-// 全体カードのレジェンド／ドーナツの表示ルール:
-//   - 7件以下: 全カテゴリを個別表示（「その他」は出さない）
-//   - 8件以上: 上位 TOP_N 件＋「その他」(残り合算)。＝「その他」は必ず2件以上を束ねる
-// （残り1件だけを「その他」にするのは無駄なので、7件ちょうどはそのまま7件出す）
-const TOP_N = 6;
-const OTHERS_THRESHOLD = 7; // これを超える件数のときだけ「その他」に集約する
-
 export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }: Props) {
   const { categories: allCategories } = useExpenseModal();
   const compareTotal = summary.compareTotal;
   const totalLevel = compareTotal !== null ? getTrendLevel(compareTotal, summary.total) : null;
   const totalDiff = compareTotal !== null ? formatDiff(compareTotal - summary.total) : null;
 
-  // 金額の大きい順に並べる。8件以上のときだけ上位 TOP_N 件＋「その他」に分け、
-  // 7件以下は全件を個別表示する。レジェンドとドーナツはこの並びで 1:1 に対応する。
-  const sortedByTotal = [...summary.categories].sort((a, b) => b.total - a.total);
-  const useOthers = sortedByTotal.length > OTHERS_THRESHOLD;
-  const topCategories = useOthers ? sortedByTotal.slice(0, TOP_N) : sortedByTotal;
-  const otherCategories = useOthers ? sortedByTotal.slice(TOP_N) : []; // すでに金額降順
-  const othersTotal = otherCategories.reduce((sum, c) => sum + c.total, 0);
-  const hasOthers = otherCategories.length > 0;
-
-  // レジェンド項目＝ドーナツのセグメント（同じ並び・同じ色）。
-  const legendItems = topCategories.map((c) => ({
-    id: c.categoryId,
-    name: c.name,
-    total: c.total,
-    color: categoryColor(c.sortOrder),
-  }));
-  if (hasOthers) {
-    legendItems.push({
-      id: OTHERS_CATEGORY_ID,
-      name: "その他",
-      total: othersTotal,
-      color: OTHERS_COLOR,
-    });
-  }
-
-  // 選択解決: openCategoryId は実カテゴリID / OTHERS_CATEGORY_ID / null のいずれか。
-  // 「解除なし」設計: 未選択(null)のときだけ最大カテゴリにフォールバック（初回描画フリッカ防止）。
-  //   - 「その他」明示 → その他
-  //   - 上位6件のid → その個別カテゴリ
-  //   - 当月に支出はあるが圏外のid（その他バケツ内）→ 「その他」に集約
-  //   - 当月に支出が無い（＝存在しない）id → 個別のまま維持し下の「キロクナシ」へ
-  //     （月送りで (a) の無い月に来ても (a) の選択を保つ。その他へは吸収しない）
-  const topIds = new Set(topCategories.map((c) => c.categoryId));
-  const presentIds = new Set(summary.categories.map((c) => c.categoryId));
-  const rawSelected = openCategoryId ?? sortedByTotal[0]?.categoryId ?? null;
-  let selectedId: string | null;
-  if (rawSelected === OTHERS_CATEGORY_ID) {
-    selectedId = hasOthers ? OTHERS_CATEGORY_ID : null;
-  } else if (rawSelected && topIds.has(rawSelected)) {
-    selectedId = rawSelected;
-  } else if (rawSelected && presentIds.has(rawSelected)) {
-    selectedId = OTHERS_CATEGORY_ID;
-  } else {
-    selectedId = rawSelected;
-  }
-
-  // ドーナツ／レジェンドのハイライト対象。描画セグメントに無いid（キロクナシ等）は
-  // null 扱いにして「全セグメント減光・ハイライト無し」になるのを防ぐ。
-  const highlightId = legendItems.some((it) => it.id === selectedId) ? selectedId : null;
-
-  // 明細: 「その他」選択時はバケツ内の全カテゴリを金額順で並べる。個別選択時はその1件。
-  const visibleCategories =
-    selectedId === OTHERS_CATEGORY_ID
-      ? otherCategories
-      : selectedId
-        ? summary.categories.filter((c) => c.categoryId === selectedId)
-        : [];
-
-  // 明細見出し横のラベル。「その他」はグレーのまとめラベル。
-  // 個別は当月明細→全カテゴリの順に名前/色を解決（キロクナシ時も名前を出す）。
-  let selectedLabel: { name: string; sortOrder: number } | null = null;
-  let selectedLabelColor = OTHERS_COLOR;
-  if (selectedId === OTHERS_CATEGORY_ID) {
-    selectedLabel = { name: "その他", sortOrder: -1 };
-    selectedLabelColor = OTHERS_COLOR;
-  } else if (selectedId) {
-    const resolved =
-      summary.categories.find((c) => c.categoryId === selectedId) ??
-      (() => {
-        const c = allCategories.find((x) => x.id === selectedId);
-        return c ? { name: c.name, sortOrder: c.sortOrder } : null;
-      })();
-    if (resolved) {
-      selectedLabel = { name: resolved.name, sortOrder: resolved.sortOrder };
-      selectedLabelColor = categoryColor(resolved.sortOrder);
-    }
-  }
+  // レジェンド/ドーナツ/選択解決/明細表示の導出は純関数に集約（テスト可能）。
+  const {
+    legendItems,
+    selectedId,
+    highlightId,
+    visibleCategories,
+    selectedLabel,
+    selectedLabelColor,
+  } = resolveSummaryView(summary.categories, openCategoryId, allCategories);
 
   return (
     <main className="px-4 py-6 space-y-6">
