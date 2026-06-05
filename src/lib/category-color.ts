@@ -37,3 +37,11 @@ export function categoryColor(sortOrder: number): CategoryColor {
   const i = ((sortOrder % PALETTE.length) + PALETTE.length) % PALETTE.length;
   return PALETTE[i];
 }
+
+// 「その他」(上位N件以外の合算) 用のニュートラルな灰色。
+// 個別カテゴリのどのパレット色とも被らないグレーで「集約」を表す。
+export const OTHERS_COLOR: CategoryColor = {
+  tag: "bg-gray-100 text-gray-600",
+  bar: "bg-gray-400",
+  hex: "#9ca3af", // gray-400（空リングの gray-200 より濃く、セグメントとして視認できる）
+};
