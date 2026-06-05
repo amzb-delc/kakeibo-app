@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { jstMonthRange, formatJstDate, shiftMonth, ymKey } from "@/lib/date";
-import { calculateBoxStats } from "@/lib/anomaly";
 import { requireHouseholdId } from "@/lib/api";
+import { buildMonthlySummary } from "@/lib/monthly-summary";
 
 export async function GET(req: NextRequest) {
   const householdId = await requireHouseholdId();
@@ -67,97 +67,16 @@ export async function GET(req: NextRequest) {
     select: { amount: true, spentAt: true, categoryId: true },
   });
 
-  // カテゴリ別集計
-  type CategoryExpense = {
-    id: string;
-    amount: number;
-    spentAt: Date;
-    storeName: string | null;
-    memo: string | null;
-  };
-  const categoryMap = new Map<
-    string,
-    { name: string; sortOrder: number; total: number; expenses: CategoryExpense[] }
-  >();
-  for (const expense of expenses) {
-    const key = expense.categoryId;
-    const item: CategoryExpense = {
-      id: expense.id,
-      amount: expense.amount,
-      spentAt: expense.spentAt,
-      storeName: expense.storeName,
-      memo: expense.memo,
-    };
-    const existing = categoryMap.get(key);
-    if (existing) {
-      existing.total += expense.amount;
-      existing.expenses.push(item);
-    } else {
-      categoryMap.set(key, {
-        name: expense.category.name,
-        sortOrder: expense.category.sortOrder,
-        total: expense.amount,
-        expenses: [item],
-      });
-    }
-  }
-
-  const compareCategoryMap = new Map<string, number>();
-  for (const expense of compareExpenses) {
-    compareCategoryMap.set(
-      expense.categoryId,
-      (compareCategoryMap.get(expense.categoryId) ?? 0) + expense.amount
-    );
-  }
-
-  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const compareTotal = compareRange
-    ? compareExpenses.reduce((sum, e) => sum + e.amount, 0)
-    : null;
-
-  // 過去6ヶ月の月別合計 / 月別カテゴリ合計を JST 月キーで集計
-  const monthlyTotals = new Map<string, number>();
-  const monthlyCategoryTotals = new Map<string, Map<string, number>>();
-  for (const e of sixMonthExpenses) {
-    const ym = formatJstDate(e.spentAt).slice(0, 7);
-    monthlyTotals.set(ym, (monthlyTotals.get(ym) ?? 0) + e.amount);
-    let inner = monthlyCategoryTotals.get(ym);
-    if (!inner) {
-      inner = new Map();
-      monthlyCategoryTotals.set(ym, inner);
-    }
-    inner.set(e.categoryId, (inner.get(e.categoryId) ?? 0) + e.amount);
-  }
-  // 「データのある月」のみサンプルに使う（家計簿開始前の月をゼロ埋めしない）
-  const availableMonths = sixMonthKeys.filter((k) => monthlyTotals.has(k));
-  const totalSamples = availableMonths.map((k) => monthlyTotals.get(k)!);
-  const boxStats = calculateBoxStats(totalSamples);
-
-  const categories = Array.from(categoryMap.entries())
-    .map(([categoryId, { name, sortOrder, total: categoryTotal, expenses: categoryExpenses }]) => {
-      // カテゴリの異常値は「そのカテゴリの支出があった月」のみをサンプルに採る。
-      // 0埋めすると、たまにしか使わないカテゴリで IQR=0 になり判定不能になるため。
-      const categorySamples = availableMonths
-        .map((k) => monthlyCategoryTotals.get(k)?.get(categoryId))
-        .filter((v): v is number => typeof v === "number" && v > 0);
-      return {
-        categoryId,
-        name,
-        sortOrder,
-        total: categoryTotal,
-        compareTotal: compareRange ? compareCategoryMap.get(categoryId) ?? 0 : null,
-        boxStats: calculateBoxStats(categorySamples),
-        expenses: categoryExpenses,
-      };
-    })
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  return NextResponse.json({
+  // 集計は純粋関数に委譲（テスト可能にするため）。
+  const summary = buildMonthlySummary({
     year,
     month,
-    total,
-    compareTotal,
-    boxStats,
-    categories,
+    expenses,
+    compareExpenses,
+    sixMonthExpenses,
+    sixMonthKeys,
+    hasCompare: compareRange !== null,
   });
+
+  return NextResponse.json(summary);
 }
