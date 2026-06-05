@@ -303,17 +303,20 @@ hr {
   <ul>
     <li><a href="#screen-summary">/ 月次サマリー（ホーム）</a></li>
     <li><a href="#screen-modal">支出モーダル（登録・編集）</a></li>
+    <li><a href="#screen-settings">設定モーダル（世帯コード・カテゴリ管理）</a></li>
   </ul>
   <h2>API</h2>
   <ul>
     <li><a href="#api-session">GET/POST/DELETE /api/session</a></li>
     <li><a href="#api-categories">GET /api/categories</a></li>
+    <li><a href="#api-categories-patch">PATCH /api/categories/[id]</a></li>
     <li><a href="#api-expenses-list">GET /api/expenses</a></li>
     <li><a href="#api-expenses-create">POST /api/expenses</a></li>
     <li><a href="#api-expenses-get">GET /api/expenses/[id]</a></li>
     <li><a href="#api-expenses-patch">PATCH /api/expenses/[id]</a></li>
     <li><a href="#api-expenses-delete">DELETE /api/expenses/[id]</a></li>
     <li><a href="#api-monthly-summary">GET /api/monthly-summary</a></li>
+    <li><a href="#api-ocr">POST /api/ocr</a></li>
   </ul>
 </nav>
 
@@ -321,7 +324,7 @@ hr {
 
 <header class="title">
   <h1>家計簿アプリ — MVP仕様書</h1>
-  <div class="meta">最終更新: 2026-05-21（モーダル化 + 開閉アニメ/下スワイプ + フォーム刷新・カテゴリ色分け反映）</div>
+  <div class="meta">最終更新: 2026-06-05（レシートOCR〈Claude ビジョン〉 + リファクタ〈型一本化・API共通化・ボトムシート共通化〉 + ユニットテスト導入〈Vitest/jsdom〉。先行: 世帯コード保護・カテゴリ管理・ホーム全体カード改善）</div>
 </header>
 
 <section id="overview">
@@ -332,7 +335,7 @@ hr {
 <tr><td>利用者</td><td>夫婦2人（1世帯）</td></tr>
 <tr><td>主要デバイス</td><td>iPhone（Safari、PWAインストール想定）</td></tr>
 <tr><td>目的</td><td>支出の即時記録 + 月次の使い方の可視化</td></tr>
-<tr><td>認証</td><td>ユーザー管理なし。<strong>世帯共有の「合言葉」＝ <code>household.id</code></strong> でロック。解錠 cookie（httpOnly・署名なし）を <code>household</code> に保持し、各 API は cookie 無しなら 401</td></tr>
+<tr><td>認証</td><td>ユーザー管理なし。<strong>夫婦で共有する「世帯コード」＝ <code>household.id</code></strong> を入力・保存した端末だけがデータを見られる方式。保存すると <code>household</code> cookie（httpOnly・署名なし・長期）を発行し、各 API は cookie 無し（未保存）なら 401。UI 表現は「保存／この端末からクリア」（識別子・cookie名・API は <code>unlock/lock/passphrase</code> のまま）</td></tr>
 <tr><td>タイムゾーン</td><td>JST（Asia/Tokyo）固定</td></tr>
 </table>
 </section>
@@ -356,29 +359,42 @@ hr {
 │   ├── page.tsx              # / 月次サマリー（ホーム・アプリの起点。登録・編集の起点）
 │   └── api/
 │       ├── categories/route.ts
+│       ├── categories/[id]/route.ts
 │       ├── expenses/route.ts
 │       ├── expenses/[id]/route.ts
-│       └── monthly-summary/route.ts
+│       ├── monthly-summary/route.ts
+│       └── ocr/route.ts          # レシート画像 → 構造化抽出（Claude ビジョン）
 ├── components/
 │   ├── page-header.tsx       # 共通ヘッダ（全ページに sticky）
 │   ├── footer-nav.tsx        # 共通フッタ（サマリー / ＋FAB / 設定）
+│   ├── bottom-sheet.tsx      # useBottomSheet + BottomSheet（シート共通基盤）
 │   ├── expense-modal.tsx     # ExpenseModalProvider（全画面共通のボトムシート）
-│   ├── settings-modal.tsx    # SettingsModalProvider（設定のボトムシート / 解錠・ロックUI）
-│   ├── session-provider.tsx  # SessionProvider（合言葉ロック状態。unlock/lock）
+│   ├── settings-modal.tsx    # SettingsModalProvider（設定のボトムシート / 世帯コード保存・カテゴリ管理）
+│   ├── session-provider.tsx  # SessionProvider（世帯コードの保存状態。unlock/lock）
+│   ├── category-manager.tsx  # 設定モーダル内のカテゴリ管理（名前変更 / 有効・無効トグル）
+│   ├── header-character.tsx  # 当月表示時のヘッダ小キャラ（タップで揺れる）
 │   ├── expense-form.tsx      # 登録 + 編集フォーム（モーダル内で使用）
 │   ├── day-wheel.tsx         # 日のみの縦ホイール（ドラム）
+│   ├── donut-chart.tsx       # 自前 SVG ドーナツ（選択強調 / 全体減光対応）
 │   ├── monthly-summary.tsx
 │   └── ui/                   # shadcn / Base UI コンポーネント
 ├── lib/
 │   ├── auth.ts               # getHouseholdId(cookie) / HOUSEHOLD_COOKIE / getDemoUserId
+│   ├── api.ts                # requireHouseholdId(401) / parseJsonBody / jsonError（ルート共通）
+│   ├── validation.ts         # ValidationError 型（expenses/categories 共通）
 │   ├── app-meta.ts           # HOUSEHOLD_NAME / APP_VERSION / APP_LABEL
-│   ├── date.ts               # JSTヘルパ
+│   ├── date.ts               # JSTヘルパ + pad2 / lastDayOfMonth / shiftMonth / ymKey
+│   ├── format.ts             # formatYen / formatDiff（金額表示）
+│   ├── ocr.ts                # extractReceipt（Claude ビジョンで構造化抽出）
 │   ├── expenses.ts           # listExpenses + validateExpenseInput
-│   ├── category-color.ts     # カテゴリ色（タグ風）の集約
+│   ├── categories.ts         # ensureCategorySlots + validateCategoryPatch
+│   ├── category-constants.ts # 16スロット定数（CATEGORY_SLOTS / slotName / 必須判定 / その他ID）
+│   ├── category-color.ts     # カテゴリ色（16色パレット + その他のグレー）の集約
 │   ├── prisma.ts             # PrismaClient シングルトン
 │   ├── trend.ts              # トレンドレベル判定（差額の色付け用）
 │   └── anomaly.ts            # 直近6ヶ月の box stats（IQR）算出
-├── types/index.ts            # Expense / Category / MonthlySummary
+├── types/index.ts            # Expense / Category / BoxStats / MonthlySummary（型の単一ソース）
+├── *.test.ts(x)              # Vitest ユニットテスト（lib/* と components/bottom-sheet）
 └── ...
 </code></pre>
 
@@ -388,6 +404,7 @@ hr {
 <tr><td><code>npm run dev</code></td><td>開発サーバ（localhost:3000）</td></tr>
 <tr><td><code>npm run build</code></td><td>プロダクションビルド</td></tr>
 <tr><td><code>npm run lint</code></td><td>ESLint</td></tr>
+<tr><td><code>npm test</code></td><td>Vitest（ユニットテスト一括実行）</td></tr>
 <tr><td><code>npx prisma migrate dev</code></td><td>マイグレーション</td></tr>
 <tr><td><code>npx prisma db seed</code></td><td>シードデータ投入</td></tr>
 <tr><td><code>npx prisma studio</code></td><td>DB GUI</td></tr>
@@ -428,13 +445,16 @@ hr {
 <tr><th>カラム</th><th>型</th><th>備考</th></tr>
 <tr><td>id</td><td>String (cuid)</td><td>PK</td></tr>
 <tr><td>householdId</td><td>String</td><td>FK → Household</td></tr>
-<tr><td>name</td><td>String</td><td>世帯内ユニーク</td></tr>
-<tr><td>sortOrder</td><td>Int</td><td>表示順</td></tr>
+<tr><td>name</td><td>String</td><td>世帯内ユニーク（<code>@@unique([householdId, name])</code>）。最大20文字</td></tr>
+<tr><td>sortOrder</td><td>Int</td><td>表示順。<strong>世帯ごとに 0〜15 の16スロット固定</strong></td></tr>
+<tr><td>enabled</td><td>Boolean</td><td><code>@default(true)</code>。無効カテゴリは登録/編集フォームの選択肢から除外（集計には影響しない）</td></tr>
 </table>
-<p><strong>初期カテゴリ:</strong> 食費 / 日用品 / 交通費 / 娯楽 / 医療 / 特別費 / 美容 / 教育 / その他</p>
+<p><strong>16スロット固定:</strong> カテゴリは世帯ごとに <strong>16個固定</strong>（追加・削除なし、名前変更と有効/無効の切替のみ）。プリセット名は <strong>「ヒヨウ01〜ヒヨウ16」</strong>（<code>slotName(sortOrder)</code> = <code>ヒヨウ + (sortOrder+1) を2桁ゼロ詰め</code>。世帯内一意・非空を保証）。</p>
+<p><strong>必須スロット:</strong> 先頭4個（<code>sortOrder 0..3</code>、<code>isRequiredSlot</code>）は<strong>無効化できない</strong>（常に ON）。スロット定数は <code>src/lib/category-constants.ts</code>（prisma 非依存・副作用なしで両側から import 可）に集約。</p>
+<p><strong>遅延生成:</strong> 不足スロットは管理画面を開いた時（<code>GET /api/categories?scope=all</code>）に <code>ensureCategorySlots()</code> が <code>sortOrder 0..15</code> の欠番を無効スロットで埋めて16枠へ収束（並行リクエストは <code>@@unique</code> + <code>skipDuplicates</code> で握り潰し）。世帯コード変更で id を付け替えた世帯でも seed を待たず揃う。</p>
 
 <h3>Household / User / HouseholdMember</h3>
-<p>Householdは <code>notificationDay</code> / <code>notificationTime</code> を持つが、通知機能は未実装。HouseholdMember の <code>role</code> は <code>"owner"</code> | <code>"member"</code> を想定。ユーザー管理は持たず、世帯共有の合言葉ロック（<code>household.id</code>）で保護する。</p>
+<p>Householdは <code>notificationDay</code> / <code>notificationTime</code> を持つが、通知機能は未実装。HouseholdMember の <code>role</code> は <code>"owner"</code> | <code>"member"</code> を想定。ユーザー管理は持たず、世帯共有の<strong>世帯コード</strong>（<code>household.id</code>）を保存した端末のみ保護対象にする。</p>
 </section>
 
 <section id="layout">
@@ -502,14 +522,16 @@ hr {
 <p><strong>アプリの起点（ホーム）。開くとこの画面。</strong>月切り替え（◀▶）と、カテゴリ別の支出可視化。<strong>当月閲覧時は比較表示なし</strong>、<strong>過去月閲覧時は「今月」との差額</strong>を表示する（今月視点：今月が表示月より多ければ赤、少なければ緑）。</p>
 <table>
 <tr><th>項目</th><th>仕様</th></tr>
-<tr><td>月切り替え</td><td>クライアント側 useState で year/month を保持、API再取得</td></tr>
-<tr><td>翌月ボタン</td><td>当月なら disabled</td></tr>
-<tr><td>合計カード</td><td>flex 横並びレイアウト: <strong>左にドーナツチャート</strong>（<code>src/components/donut-chart.tsx</code>、自前 SVG、外側コンテナ <code>w-[160px]</code> 固定 / ringWidth 22）、<strong>右に上位7カテゴリのレジェンド（＝カテゴリ選択UI）</strong>（<code>flex-1 min-w-0</code>、カテゴリ色のタグ風表示 <code>category-color.ts</code> の <code>tag</code>、長いカテゴリ名は <code>truncate</code>、タグ右に金額を <code>text-xs</code> muted で表示）。<strong>各タグはタップ可能</strong>で、タップしたカテゴリを下の「明細」に表示する。<strong>「解除なし」設計</strong>: 選択は常に切替のみで再タップでも解除せず（<code>aria-pressed</code>、選択中は <code>ring-2 ring-current</code>）。ドーナツ中央に「合計」ラベル → 表示月合計（<code>text-xl whitespace-nowrap</code>）→ 差額（過去月閲覧時のみ、トレンド色）を配置。ドーナツのセグメントは<strong>金額の大きい順（降順）</strong>、カテゴリ色で塗り。合計カードの異常値バーは廃止（カテゴリ行のバーは継続）</td></tr>
-<tr><td>明細セクション</td><td>見出しは<strong>「明細」</strong>で、その右に<strong>選択中カテゴリのラベル</strong>（カテゴリ色タグ）を表示。当月にそのカテゴリの記録が無い（キロクナシ）場合も <code>useExpenseModal().categories</code>（先読み全カテゴリ）から名前を解決し<strong>ラベルは出し続ける</strong>。明細カードは合計カードのレジェンドで<strong>選択中の1カテゴリのみ</strong>を表示（<code>visibleCategories</code>）。<strong>カード内のカテゴリ名タグは廃止</strong>し、右側に金額＋差額（過去月閲覧時のみ、トレンド色）の縦並び、下に異常値バー（フィル長＝支出量、バー色はカテゴリ色）。<strong>開閉トグルは持たず常時展開</strong>（単一選択表示のため）。選択状態はサマリーページが保持（制御コンポーネント）。未選択(null)時のみ最大カテゴリへ自動フォールバック</td></tr>
+<tr><td>月切り替え</td><td>◀▶ ボタンに加え、<strong>左右スワイプで前月/翌月</strong>。クライアント側 useState で year/month を保持し API 再取得</td></tr>
+<tr><td>翌月ボタン</td><td>当月なら disabled（スワイプでも当月より先には進めない）</td></tr>
+<tr><td>スワイプ月送り</td><td>検知レイヤー（<code>swipeRef</code>）を<strong>画面全体に張る</strong>。横移動が縦より優位かつ <strong><code>SWIPE_MIN=36px</code> 超</strong>で発火（PWA 想定で感度高め、<code>touchmove</code> は <code>passive:false</code>）。演出は<strong>方向付きスライド＋クロスフェード</strong>: 不透明 0 の間にデータを差し替え、反対側（<code>SLIDE_OFFSET=48px</code>）からスライドイン</td></tr>
+<tr><td>ヘッダキャラ</td><td><strong>当月表示時のみ</strong>ヘッダに小さなキャラ（<code>header-character.tsx</code>、28px、<code>aria-hidden</code>）。タップで一度だけ「ぴょこっ」と揺れる（<code>animate-character-wiggle</code>）。過去月では出さない</td></tr>
+<tr><td>合計カード</td><td>flex 横並びレイアウト: <strong>左にドーナツチャート</strong>（<code>src/components/donut-chart.tsx</code>、自前 SVG、外側コンテナ <code>w-[160px]</code> 固定 / ringWidth 22）、<strong>右にレジェンド（＝カテゴリ選択UI）</strong>（<code>flex-1 min-w-0</code>、カテゴリ色のタグ風表示 <code>category-color.ts</code> の <code>tag</code>、長いカテゴリ名は <code>truncate</code>、タグ右に金額を <code>text-xs</code> muted で表示）。<strong>各タグはタップ可能</strong>で、タップしたカテゴリを下の「明細」に表示する。<strong>「解除なし」設計</strong>: 選択は常に切替のみで再タップでも解除せず（<code>aria-pressed</code>、選択中は <code>ring-2 ring-current</code>）。<strong>レジェンド／ドーナツは「上位6件＋その他」</strong>（<code>TOP_N=6</code>）: カテゴリが<strong>8件以上のときだけ</strong>残りを「その他」（グレー <code>OTHERS_COLOR</code>、擬似ID <code>__others__</code>）に集約し、<strong>7件以下は全件を個別表示</strong>（「その他」が必ず2件以上を束ねるよう <code>OTHERS_THRESHOLD=7</code>）。「その他」もタップで選択でき、明細はバケツ内の全カテゴリを名前タグ付きで表示する。ドーナツ中央に「合計」ラベル → 表示月合計（<code>text-xl whitespace-nowrap</code>）→ 差額（過去月閲覧時のみ、トレンド色）を配置。ドーナツのセグメントは<strong>金額の大きい順（降順）</strong>、カテゴリ色で塗り、レジェンドと 1:1 対応。<strong>選択中セグメントは強調</strong>（該当を僅かに太く <code>SELECTED_BUMP</code> ＋他を <code>strokeOpacity 0.28</code> で減光、未選択時は <code>dimAll</code> で全体減光）。合計カードの異常値バーは廃止（カテゴリ行のバーは継続）</td></tr>
+<tr><td>明細セクション</td><td>見出しは<strong>「明細」</strong>で、その右に<strong>選択中カテゴリのラベル</strong>（カテゴリ色タグ）を表示。当月にそのカテゴリの記録が無い（キロクナシ）場合も <code>useExpenseModal().categories</code>（先読み全カテゴリ）から名前を解決し<strong>ラベルは出し続ける</strong>。明細カードは合計カードのレジェンドで<strong>選択中の1カテゴリのみ</strong>を表示（<code>visibleCategories</code>）。<strong>「その他」選択時はバケツ内の全カテゴリ</strong>を表示し、各カードに<strong>カテゴリ名タグを付ける</strong>（<code>showName</code>。どのカテゴリか区別するため）。個別カテゴリ選択時は<strong>カード内のカテゴリ名タグを廃止</strong>し、右側に金額＋差額（過去月閲覧時のみ、トレンド色）の縦並び、下に異常値バー（フィル長＝支出量、バー色はカテゴリ色）。<strong>開閉トグルは持たず常時展開</strong>（単一選択表示のため）。選択状態はサマリーページが保持（制御コンポーネント）。未選択(null)時のみ最大カテゴリへ自動フォールバック</td></tr>
 <tr><td>異常値バー</td><td>過去6ヶ月（表示月含む）の box stats から「いつもの幅」を算出し、<strong>上フェンス（Q3+1.5×IQR）を 100%</strong> としてフィル長で支出量を可視化。やたら使った月＝バーが長い、やたら使わなかった月＝バーが短い。サンプル不足（N&lt;2 or IQR=0）の月は<strong>斜めストライプ表示</strong>（「判定なし」を視覚的に区別、<code>aria-label</code> に明示）。値ありの月は <code>role="progressbar"</code> + <code>aria-valuenow</code> を付与。カテゴリの異常値サンプルは<strong>そのカテゴリの支出があった月のみ</strong>から採る（ゼロ埋めしない）。初回マウントでも 0%→target にトランジションするよう <code>requestAnimationFrame</code> で1フレーム遅延</td></tr>
 <tr><td>展開時</td><td><strong>そのカテゴリの支出明細を日付降順で一行表示</strong>（日付 <code>M/D(曜)</code> ／ 店名 or メモ ／ 金額）。明細は <code>monthly-summary</code> API が各カテゴリに同梱するため追加通信なし</td></tr>
 <tr><td>明細タップ</td><td>編集用ボトムシートを開く（<code>useExpenseModal().openEdit(...)</code>）</td></tr>
-<tr><td>更新反映</td><td>登録・編集・削除の成功で <code>ExpenseModalProvider</code> の <code>mutationVersion</code> が増分し、サマリーを自動再取得。画面遷移しないため<strong>選択月・選択カテゴリは保持</strong>される。選択カテゴリは<strong>月切り替えをまたいでも維持</strong>し、切替先の月にそのカテゴリの記録が無ければ「キロクナシ」を表示（記録のある月に戻れば再表示）</td></tr>
+<tr><td>更新反映</td><td>登録・編集・削除の成功で <code>ExpenseModalProvider</code> の <code>mutationVersion</code> が増分し、サマリーを自動再取得。画面遷移しないため<strong>選択月・選択カテゴリは保持</strong>される。選択カテゴリは<strong>月切り替えをまたいでも維持</strong>し、切替先の月にそのカテゴリの記録が無ければ「キロクナシ」を表示（記録のある月に戻れば再表示）。<strong>登録/更新後は確定したカテゴリを選択状態に同期</strong>し、<strong>CRUD 後はトップへスムーズスクロール</strong>。カテゴリ名変更も即時反映する（Provider の <code>categoriesVersion</code> をホームの取得 deps に含め、<code>refreshCategories</code> 時にサマリーも再取得）</td></tr>
 <tr><td>空状態</td><td><strong>選択カテゴリが当月に無い（<code>visibleCategories</code> が空）</strong>ときはキャラクター（<code>public/character.png</code>、112px）を中央に置き、「キロクナシ」を表示（当月にデータが1件も無いケースも含む。ワレワレ宇宙人のカタコト感に合わせたコピー）</td></tr>
 </table>
 
@@ -543,8 +565,10 @@ hr {
 <table>
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>表示</td><td><code>fixed inset-0 z-50</code>、下端 anchor（<code>items-end</code>）、最大高 <code>90vh</code> でスクロール、ヘッダは sticky</td></tr>
+<tr><td>共通基盤</td><td>シートの開閉アニメ・Esc・スクロールロック・<code>translateY</code>駆動・バックドロップ・グラバーヘッダ・下スワイプ閉じ（opt-in）は <code>src/components/bottom-sheet.tsx</code> の <strong><code>useBottomSheet</code> フック＋<code>BottomSheet</code> コンポーネント</strong>に集約。支出モーダルと設定モーダルが共有する（定数 <code>ANIM_MS=320</code> 等も一本化）</td></tr>
 <tr><td>開閉アニメ</td><td>バックドロップ（dim）はパネルと<strong>別レイヤー</strong>。パネルは <code>translateY(0 ⇄ 100%)</code> を <code>transition</code> で駆動（<code>cubic-bezier(0.32,0.72,0,1)</code> / 320ms）、dim は opacity を独立フェード。開く時は2フレーム後に表示状態へ切替えて transition を発火。閉じ切ったら DOM から除去（reduced-motion でも timeout で確実に teardown）</td></tr>
-<tr><td>フォーム構成</td><td>並び順は <strong>日付 → カテゴリ → 金額 → 店名 → メモ</strong>。<strong>全項目ラベルなし</strong>（プレースホルダで補助、文字色は <code>text-muted-foreground/60</code> と薄め）</td></tr>
+<tr><td>フォーム構成</td><td>並び順は <strong>日付 → カテゴリ → 金額 → 店名 → メモ</strong>。<strong>全項目ラベルなし</strong>（プレースホルダで補助、文字色は <code>text-muted-foreground/60</code> と薄め）。フォーム最上部に<strong>「レシートを読み取る」ボタン</strong></td></tr>
+<tr><td>レシート読み取り（OCR）</td><td>ボタンタップで<strong>カメラ起動</strong>（<code>&lt;input type="file" accept="image/*" capture="environment"&gt;</code>）。選んだ画像を<strong>クライアントで縮小</strong>（長辺1568px、<code>createImageBitmap</code> で EXIF 回転補正、JPEG化）して <code>POST /api/ocr</code> へ。返った<strong>金額・店名・カテゴリ</strong>を各項目へ自動入力、<strong>日付は表示月と年月が一致するときのみ「日」を反映</strong>。読み取り中はボタンがスピナー＋無効化、失敗時は原因をボタン下に表示。<strong>画像は保存しない</strong></td></tr>
 <tr><td>未入力の強調</td><td>必須（カテゴリ・金額）が<strong>空のとき枠を強調</strong>（<code>border-primary/70 ring-1 ring-primary/25</code>）。入力すると解除</td></tr>
 <tr><td>日付</td><td>年月は固定表示（登録=元ページの選択月／編集=対象支出の月）。日のみ<strong>縦ホイール</strong>（<code>day-wheel.tsx</code>）で選択し、「<code>YYYY年M月 d 日</code>」の d にインライン埋め込み。<code>spentAt</code> は <code>YYYY-MM-DD</code> に組み立て</td></tr>
 <tr><td>カテゴリ</td><td><strong>Select（プルダウン）</strong>。画面外要素の誤選択を防ぐためチップ横スクロールから変更。色分けタグで表示。起動時に <code>GET /api/categories</code> を先読みキャッシュ。初期値は <code>setComposeContext</code> の展開カテゴリ</td></tr>
@@ -556,30 +580,56 @@ hr {
 <tr><td>閉じる</td><td>暗幕タップ / ✕ボタン / Esc / <strong>下スワイプ</strong>。開いている間は背面スクロールをロック</td></tr>
 <tr><td>下スワイプ</td><td>ヘッダ（グラバー）起点の pointer ドラッグでパネルが指追従。<strong>110px 超</strong>または<strong>速い下フリック</strong>（&gt;0.5px/ms）で閉じ、未満は 0 へスナップバック。本文スクロールと混線しないようハンドルは <code>touch-none</code>、✕ 上では発火しない</td></tr>
 </table>
+
+<h3 id="screen-settings">設定モーダル（世帯コード・カテゴリ管理）</h3>
+<p>フッタ「設定」（<code>useSettingsModal().openSettings()</code>）で開くボトムシート（<code>src/components/settings-modal.tsx</code>）。支出モーダルと同じスライド/フェード演出・背面スクロールロック・Esc クローズ。中身は<strong>「世帯コード」</strong>と<strong>「カテゴリ」</strong>の2セクション。</p>
+<table>
+<tr><th>セクション</th><th>仕様</th></tr>
+<tr><td>世帯コード</td><td><strong>未保存</strong>＝世帯コード入力＋「保存する」（誤りは「世帯コードが違います。」を表示）。<strong>保存済み</strong>＝状態表示（世帯名つき）＋「この端末からクリア」。入力は <code>type="text"</code>（日本語IMEを妨げない）、composition 中は Enter で誤送信しない。保存成功でモーダルを自動クローズしてデータ表示</td></tr>
+<tr><td>カテゴリ</td><td><strong>保存済み（cookie あり）のときのみ表示</strong>。<code>CategoryManager</code> が <code>GET /api/categories?scope=all</code> で全16スロットを取得し、各行に<strong>色ドット＋名前入力＋有効/無効トグル</strong>を表示</td></tr>
+</table>
+<h4>カテゴリ管理（CategoryManager）</h4>
+<table>
+<tr><th>項目</th><th>仕様</th></tr>
+<tr><td>名前変更</td><td>各行の <code>&lt;input&gt;</code>（最大20文字）。<strong>フォーカスを外した時（blur）に差分があれば保存</strong>（<code>PATCH</code>）。空は確定させず元に戻す。日本語IME変換中の Enter では送信しない（確定 Enter は <code>blur()</code>）。<code>text-base</code>（16px）で iOS の自動ズーム回避。失敗時は行下にエラー（重複は「同じ名前のカテゴリが既にあります」）</td></tr>
+<tr><td>有効/無効トグル</td><td><code>role="switch"</code>。OFF（無効）にすると登録/編集フォームの選択肢から除外（集計は不変）。<strong>必須スロット（先頭4個）は「ON固定・グレーアウト」でロック</strong>表示（無効化不可）。ノブは <code>inline-flex</code>＋標準ユーティリティ（<code>translate-x-1 / translate-x-6</code>）で位置を安定化</td></tr>
+<tr><td>無効時の入力ロック</td><td><strong>無効カテゴリは名前入力も編集不可</strong>（ON にしてからリネームする導線）。必須は常時 ON＝編集可</td></tr>
+<tr><td>即時反映</td><td>編集成功で <code>useExpenseModal().refreshCategories()</code> を呼び、登録/編集モーダルの先読みカテゴリとホームのサマリー（<code>categoriesVersion</code>）に反映</td></tr>
+</table>
 </section>
 
 <section id="api">
 <h2>API仕様</h2>
-<p>データ系エンドポイントは <code>getHouseholdId()</code>（<code>household</code> cookie）で世帯にスコープされる。<strong>cookie 無し（未解錠）は 401</strong>。<code>/api/session</code> のみ解錠前でも叩ける。</p>
+<p>データ系エンドポイントは世帯（<code>household</code> cookie）にスコープされる。<strong>cookie 無し（未保存）は 401</strong>。<code>/api/session</code> のみ保存前でも叩ける。各ルートの定型処理（<code>requireHouseholdId</code> の 401 ガード・<code>parseJsonBody</code>・<code>jsonError</code>）は <code>src/lib/api.ts</code> に集約し、全ルートで共通化している。</p>
 
 <div class="endpoint" id="api-session">
 <h4><span class="method method-get">GET</span> / <span class="method method-post">POST</span> / <span class="method method-delete">DELETE</span> /api/session</h4>
-<p>合言葉ロックの解錠・ロック・状態取得。合言葉 = <code>household.id</code>、cookie は<strong>署名なし</strong>（合言葉を知っていること自体が認可）。</p>
+<p>世帯コードの保存・クリア・状態取得。世帯コード = <code>household.id</code>、cookie は<strong>署名なし</strong>（世帯コードを知っていること自体が認可）。コード識別子は <code>unlock/lock/passphrase</code> のまま（UI 表現のみ「保存／クリア」）。</p>
 <ul>
-  <li><strong>GET</strong> — 現在の解錠状態。<code>{ unlocked: boolean, householdName: string | null }</code></li>
-  <li><strong>POST</strong> <code>{ passphrase }</code> — 合言葉に一致する世帯があれば <code>household</code> cookie（httpOnly / SameSite=lax / 約400日 / 本番のみ secure）を発行して <code>{ ok: true }</code>。無ければ 401</li>
-  <li><strong>DELETE</strong> — cookie を破棄（ロック）</li>
+  <li><strong>GET</strong> — 現在の保存状態。<code>{ unlocked: boolean, householdName: string | null }</code>。cookie はあるが世帯が存在しない場合は<strong>無効 cookie を破棄</strong>して返す</li>
+  <li><strong>POST</strong> <code>{ passphrase }</code> — 世帯コードに一致する世帯があれば <code>household</code> cookie（httpOnly / SameSite=lax / 約400日 / 本番のみ secure）を発行して <code>{ ok: true }</code>。無ければ 401</li>
+  <li><strong>DELETE</strong> — cookie を破棄（この端末からクリア）</li>
 </ul>
 </div>
 
 <div class="endpoint" id="api-categories">
 <h4><span class="method method-get">GET</span> /api/categories</h4>
-<p>世帯のカテゴリ一覧を <code>sortOrder</code> 昇順で返す。</p>
-<p><strong>レスポンス:</strong> <code>Category[]</code></p>
+<p>世帯のカテゴリ一覧を <code>sortOrder</code> 昇順で返す。<strong>既定は有効（<code>enabled: true</code>）のみ</strong>＝フォームの選択肢用。</p>
+<p><strong>クエリ:</strong> <code>scope=all</code> — 管理用に<strong>全16スロット（無効含む）</strong>を返す。この時 <code>ensureCategorySlots()</code> で不足枠を遅延生成してから返す。</p>
+<p><strong>レスポンス:</strong> <code>Category[]</code>（<code>id / name / sortOrder / enabled</code>）</p>
 <pre><code>[
-  { "id": "...", "name": "食費", "sortOrder": 0 },
+  { "id": "...", "name": "ヒヨウ01", "sortOrder": 0, "enabled": true },
   ...
 ]</code></pre>
+</div>
+
+<div class="endpoint" id="api-categories-patch">
+<h4><span class="method method-patch">PATCH</span> /api/categories/[id]</h4>
+<p>カテゴリの<strong>リネーム</strong>・<strong>有効/無効</strong>切替（部分更新）。<code>validateCategoryPatch</code> で検証。</p>
+<p><strong>ボディ:</strong> <code>name?</code>（trim 後 1〜20文字・非空）、<code>enabled?</code>（boolean）。両方 <code>undefined</code> なら 400。</p>
+<p><strong>世帯スコープ:</strong> 対象が自世帯に存在するか <code>findFirst({ where: { id, householdId } })</code> で確認（無ければ 404、cross-household 改竄防止）。</p>
+<p><strong>ガード:</strong> 必須スロット（<code>sortOrder 0..3</code>）を <code>enabled:false</code> にしようとすると 400「このカテゴリは無効にできません」。名前重複（<code>@@unique</code> P2002）は 409「同じ名前のカテゴリが既にあります」。</p>
+<p><strong>レスポンス:</strong> 更新後の <code>Category</code> / エラーは <code>{ error }</code>。</p>
 </div>
 
 <div class="endpoint" id="api-expenses-list">
@@ -669,6 +719,16 @@ hr {
 }</code></pre>
 <p><code>compareTotal</code> は当月閲覧時に <code>null</code>。<code>boxStats</code> はサンプル&lt;2件 or IQR=0 のときに <code>null</code>。box stats のサンプルは「過去6ヶ月のうち合計支出があった月」を使い、カテゴリ別はその月の該当カテゴリ合計を 0 埋めで取る。当月判定はサーバ TZ に依存せず JST で行う（<code>formatJstDate(new Date())</code> から年月を抽出）。<code>spentAt</code> は ISO 文字列で返り、クライアントで JST 整形する。</p>
 </div>
+
+<div class="endpoint" id="api-ocr">
+<h4><span class="method method-post">POST</span> /api/ocr</h4>
+<p>レシート画像から金額・店名・日付・カテゴリ候補を<strong>構造化抽出</strong>（Claude ビジョン）。<strong>画像は保存しない</strong>（抽出のみ）。<code>src/lib/ocr.ts</code> の <code>extractReceipt()</code> が <strong>structured outputs</strong>（JSONスキーマ）で型に一致した結果を返す。</p>
+<p><strong>必須環境変数:</strong> <code>ANTHROPIC_API_KEY</code>（未設定は <code>503</code>）。モデルは <code>OCR_MODEL</code>（既定 <code>claude-haiku-4-5</code>。精度優先なら <code>claude-opus-4-8</code> に上げられる）。</p>
+<p><strong>ボディ:</strong> <code>{ imageBase64, mediaType }</code>（<code>mediaType</code> は jpeg/png/webp。画像はクライアントで長辺1568pxに縮小済み前提、上限あり）</p>
+<p><strong>処理:</strong> 自世帯の<strong>有効カテゴリ名</strong>を Claude に渡し、返った <code>categoryName</code> を完全一致で id に解決。</p>
+<p><strong>レスポンス:</strong> <code>{ amount: number|null, storeName: string|null, spentAt: "YYYY-MM-DD"|null, categoryId: string|null }</code></p>
+<p><strong>エラー:</strong> 残高不足/認証/混雑(429)を切り分けて <code>502</code> + <code>{ error }</code>（クライアントに原因を表示）。</p>
+</div>
 </section>
 
 <section id="business-rules">
@@ -692,7 +752,7 @@ hr {
 <tr><th>フィールド</th><th>ルール</th></tr>
 <tr><td>amount</td><td>整数 / 0以上 / 100,000,000以下 / 有限値（0円可）</td></tr>
 <tr><td>spentAt</td><td>正規表現 <code>/^\d{4}-\d{2}-\d{2}$/</code></td></tr>
-<tr><td>categoryId</td><td>非空文字列、かつ DB で解錠世帯（cookie の <code>householdId</code>）の Category に存在</td></tr>
+<tr><td>categoryId</td><td>非空文字列、かつ DB で当該世帯（cookie の <code>householdId</code>）の Category に存在</td></tr>
 <tr><td>storeName</td><td>≤100文字、空文字は null</td></tr>
 <tr><td>memo</td><td>≤500文字、空文字は null</td></tr>
 <tr><td>receiptImageUrl</td><td>文字列、空文字は null</td></tr>
@@ -700,10 +760,20 @@ hr {
 
 <h3>世帯スコープ（権限）</h3>
 <ul>
-  <li>全クエリの <code>where</code> に <code>householdId</code>（<code>getHouseholdId()</code> = cookie 由来）を含める。未解錠なら 401 で早期 return</li>
+  <li>全クエリの <code>where</code> に <code>householdId</code>（<code>getHouseholdId()</code> = cookie 由来）を含める。未保存なら 401 で早期 return</li>
   <li>POST/PATCH では <code>categoryId</code> の世帯所属を DB レベルで検証する（IDOR防止）</li>
   <li>UPDATE/DELETE は <code>updateMany</code> / <code>deleteMany</code> で <code>where</code> に <code>householdId</code> を入れる</li>
+  <li>カテゴリ PATCH は <code>findFirst({ where: { id, householdId } })</code> で対象の世帯所属を確認してから <code>update</code></li>
 </ul>
+
+<h3>カテゴリ管理</h3>
+<table>
+<tr><th>ルール</th><th>内容</th></tr>
+<tr><td>16スロット固定</td><td>世帯ごとに <code>sortOrder 0..15</code> の16個固定。追加・削除はなく、<strong>名前変更</strong>と<strong>有効/無効</strong>のみ。不足枠は <code>scope=all</code> 取得時に <code>ensureCategorySlots()</code> が無効スロットで遅延生成</td></tr>
+<tr><td>必須スロット</td><td>先頭4個（<code>sortOrder 0..3</code> / <code>isRequiredSlot</code>）は無効化不可（常に ON）。API・UI 両方でガード</td></tr>
+<tr><td>name</td><td>trim 後 1〜20文字（<code>CATEGORY_NAME_MAX</code>）・非空。世帯内ユニーク（<code>@@unique([householdId, name])</code>、重複は 409）。プリセットは <code>slotName</code>＝「ヒヨウNN」</td></tr>
+<tr><td>無効カテゴリ</td><td>登録/編集フォームの選択肢から除外するだけ（過去支出・月次集計は<strong>不変</strong>）。ただし<strong>編集時のみ現カテゴリを選択肢に残す</strong>（無効化済みカテゴリが付いた過去支出を編集しても消えないよう、<code>expense-modal</code> は <code>scope=all</code> 取得）</td></tr>
+</table>
 
 <h3>トレンドレベル</h3>
 <p><code>src/lib/trend.ts</code> の <code>getTrendLevel(current, prev)</code>。</p>
@@ -751,9 +821,10 @@ hr {
 <h3>カテゴリの色分け</h3>
 <p>カテゴリは固有色で識別する。配色は <code>src/lib/category-color.ts</code> に集約し、<strong>サマリー（タグ＋棒グラフ）とモーダル（Select のトリガー / ドロップダウン）で同一色</strong>を使う。</p>
 <ul>
-  <li>割り当ては seed の <code>sortOrder</code> 基準（10色パレットを <code>sortOrder % 10</code>）で安定。同じカテゴリは常に同じ色</li>
-  <li>タグは <code>bg-{hue}-100 / text-{hue}-700</code>、棒グラフは <code>bg-{hue}-500</code>。角丸は <code>rounded-lg</code>（フォーム欄の <code>rounded-xl</code> より1段小さく）</li>
-  <li>将来カテゴリ管理（追加・並べ替え）を入れる場合は色がずれるため、<code>Category</code> に <code>color</code> 列を持たせる方式へ移行する</li>
+  <li>割り当ては <code>sortOrder</code> 基準（<strong>16色パレット</strong>を <code>sortOrder % 16</code>）で安定。同じスロットは常に同じ色。スロットは固定（並べ替え無し）なので名前変更しても色はずれない</li>
+  <li>16色は<strong>隣り合う <code>sortOrder</code>（＝ドーナツの隣接セグメント）の色相が離れる</strong >よう並べてある（色相環の連続並びにステップ7の置換。7と16は互いに素で全色を一巡）</li>
+  <li>タグは <code>bg-{hue}-100 / text-{hue}-700</code>、棒グラフは <code>bg-{hue}-500</code>、SVG 用に実 <code>hex</code>（Tailwind v3 -500 相当）も保持。角丸は <code>rounded-lg</code>（フォーム欄の <code>rounded-xl</code> より1段小さく）</li>
+  <li><strong>「その他」（上位6件以外の合算）はニュートラルなグレー</strong>（<code>OTHERS_COLOR</code>＝<code>bg-gray-100 / text-gray-600</code> / bar <code>bg-gray-400</code>）。どのパレット色とも被らない</li>
 </ul>
 
 <h3>タッチターゲット</h3>
@@ -778,10 +849,11 @@ hr {
 <h2>MVPスコープ外</h2>
 <ul>
   <li><strong>認証・複数ユーザー</strong>:
-    <code>demo-household</code> 固定。<code>src/lib/auth.ts</code> を差し替える前提で各 API に集約済み。</li>
-  <li><strong>OCR レシート読み取り</strong>: <code>handleOcr()</code> のスタブのみ。<code>Expense.receiptImageUrl</code> / <code>ocrRawText</code> は将来用に存在。</li>
+    個人アカウントは持たず、保護は<strong>世帯共有の世帯コード</strong>のみ（<code>src/lib/auth.ts</code> の <code>getHouseholdId()</code> に集約）。</li>
+  <li><strong>OCR レシート読み取り</strong>: <strong>実装済み</strong>（<code>POST /api/ocr</code> + <code>src/lib/ocr.ts</code>、Claude ビジョン）。<strong>画像は保存しない</strong>方針のため <code>Expense.receiptImageUrl</code> / <code>ocrRawText</code> は引き続き未使用。</li>
+  <li><strong>クレカ明細の一括取り込み</strong>: 未実装（Phase2 予定）。iPhone での CSV/PDF 取り回しが課題のため後回し。抽出土台（<code>lib/ocr.ts</code>）は再利用可能。</li>
   <li><strong>通知</strong>: <code>Household.notificationDay</code> / <code>notificationTime</code> はフィールドのみ。送信ロジックなし。</li>
-  <li><strong>カテゴリ管理 UI</strong>: seed 固定、追加・並び替え・リネーム未対応。</li>
+  <li><strong>カテゴリの追加・削除・並び替え</strong>: <strong>16スロット固定</strong>のため不可。名前変更・有効/無効の切替は実装済み（設定モーダル）。</li>
   <li><strong>予算機能</strong>: 未実装。</li>
   <li><strong>ダークモード</strong>: 常にライト固定。</li>
   <li><strong>多通貨</strong>: 円固定。</li>
@@ -790,6 +862,95 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-06-05 (リファクタ Tier 2 #6) — ボトムシート共通化 + UIテスト導入</h3>
+<p><span class="badge badge-minor">minor</span> 支出/設定モーダルで重複していたシート機構を共通基盤へ。PR #19。</p>
+<ul>
+  <li><code>src/components/bottom-sheet.tsx</code> 新設: <code>useBottomSheet</code>（開閉アニメ・Esc・スクロールロック・<code>translateY</code>駆動・ドラッグ閉じ opt-in・退場後 <code>onClosed</code>）＋ <code>BottomSheet</code>（dialog枠・バックドロップ・パネル・グラバーヘッダ）。<code>ANIM_MS</code> 等の定数も一本化</li>
+  <li><code>expense-modal</code> / <code>settings-modal</code> の重複機構を撤去して共通基盤に置換（挙動は同一。settings 側に無かったドラッグ閉じ等の乖離も解消）</li>
+  <li><strong>UIテスト基盤</strong>: <code>jsdom</code>（Node 20.11 互換のため v25）＋ <code>@testing-library/react</code> + <code>jest-dom</code>。<code>.tsx</code> テストはファイル先頭 <code>// @vitest-environment jsdom</code> で個別に jsdom 化（純粋関数は node のまま）。<code>bottom-sheet.test.tsx</code> 11件（open/close/Esc/ドラッグ閾値110px/✕・バックドロップで onClose 等）</li>
+</ul>
+
+<hr>
+
+<h3>2026-06-05 (リファクタ Tier 1 + Tier 2 #5) — 型一本化・API共通化・ユニットテスト導入</h3>
+<p><span class="badge badge-minor">minor</span> リファクタ調査の費用対効果上位を実施し、<strong>このリポジトリ初のユニットテスト</strong>を導入。PR #18。</p>
+<h4>Tier 1（単一ソース化）</h4>
+<ul>
+  <li>型の一本化: <code>Category</code>（重複定義→<code>@/types</code>）・<code>BoxStats</code>（<code>lib/anomaly</code> と <code>types</code> の二重定義を解消）・デッドな <code>CategoryRow</code> 削除</li>
+  <li><code>lib/format.ts</code> 新設（<code>formatYen</code>/<code>formatDiff</code>）、<code>lib/date.ts</code> に <code>pad2</code>/<code>lastDayOfMonth</code>/<code>shiftMonth</code>/<code>ymKey</code> を集約（3箇所の月末計算重複などを解消）</li>
+  <li>※ <code>shadcn</code> は <code>globals.css</code> の <code>@import</code> で実使用中のため依存維持</li>
+</ul>
+<h4>Tier 2 #5（API共通化）</h4>
+<ul>
+  <li><code>lib/api.ts</code>（<code>requireHouseholdId</code> の 401 ガード / <code>parseJsonBody</code> / <code>jsonError</code>）・<code>lib/validation.ts</code>（<code>ValidationError</code> 一本化）</li>
+  <li>全6ルートのガード・パース・エラー整形を共通化（コピペとガード漏れリスクを解消）</li>
+</ul>
+<h4>テスト（Vitest）</h4>
+<ul>
+  <li>Vitest（Node 20.11 互換のため v2 系）+ <code>@/</code> エイリアス、<code>npm test</code>。lib の純粋関数 50件（date/format/anomaly/trend/api/validateCategoryPatch/validateExpenseInput〈IDOR検証含む〉）</li>
+  <li>🐛 テスト導入で<strong>既存バグを発見・修正</strong>: <code>formatJstDateLabel</code> の曜日が1日ずれていた（JST深夜をUTC換算すると前日になり <code>getUTCDay</code> が前日を返していた。サマリー明細「M/D(曜)」表示）</li>
+</ul>
+
+<hr>
+
+<h3>2026-06-05 — レシートOCR（Claude ビジョンで自動入力）</h3>
+<p><span class="badge badge-major">major</span> 支出モーダルに「レシートを読み取る」を追加。カメラ/写真から金額・店名・日付・カテゴリ候補を抽出してフォームに自動入力。PR #15。</p>
+<ul>
+  <li><code>POST /api/ocr</code> + <code>src/lib/ocr.ts</code>: Claude ビジョン（既定 <strong>Haiku</strong>）＋ structured outputs で <code>{amount, storeName, spentAt, categoryId}</code> を返す</li>
+  <li>フォーム: カメラ起動 → クライアントで縮小（長辺1568px / EXIF回転補正）→ 各項目に自動入力。日付は表示月と一致時のみ「日」を反映</li>
+  <li><strong>画像は保存しない</strong>（抽出のみ。<code>receiptImageUrl</code>/<code>ocrRawText</code> 未使用）。<code>ANTHROPIC_API_KEY</code> 必須（未設定は 503）。残高不足/認証/混雑を切り分けたエラー表示</li>
+  <li>依存追加: <code>@anthropic-ai/sdk</code></li>
+</ul>
+
+<hr>
+
+<h3>2026-06-05 — ホーム全体カードの改善 + 左右スワイプ月送り</h3>
+<p><span class="badge badge-major">major</span> ホーム（<code>/</code>）の全体カードとナビゲーションを改善。PR #14（<code>feat/home-three-improvements</code>）。</p>
+<h4>変更</h4>
+<ul>
+  <li><strong>ドーナツの選択強調</strong>: 選択中カテゴリのセグメントを僅かに太く（<code>SELECTED_BUMP</code>）＋他を減光（<code>strokeOpacity 0.28</code>）。選択なしのときは全体を減光（<code>dimAll</code>）。<code>DonutChart</code> に <code>selectedId</code> / <code>dimAll</code> props を追加</li>
+  <li><strong>レジェンド／ドーナツを「上位6件＋その他」に</strong>: カテゴリ <strong>8件以上のときだけ</strong>残りを「その他」（グレー <code>OTHERS_COLOR</code> / 擬似ID <code>__others__</code>）に集約。7件以下は全件個別表示（<code>TOP_N=6</code> / <code>OTHERS_THRESHOLD=7</code>）。「その他」も選択可能で、明細はバケツ内の全カテゴリを名前タグ付き（<code>showName</code>）で表示。選択カテゴリが当月に無い場合は個別選択を維持（その他へ吸収しない）</li>
+  <li><strong>左右スワイプで月送り</strong>: 検知レイヤーを画面全体に張り、横移動優位かつ <code>SWIPE_MIN=36px</code> 超で前月/翌月へ。方向付きスライド＋クロスフェード（<code>SLIDE_OFFSET=48px</code>、不透明0の間にデータ差し替え）。PWA 想定で感度高め</li>
+  <li><strong>登録/更新後に確定カテゴリを選択状態へ同期</strong>。CRUD 後はトップへスムーズスクロール</li>
+  <li><strong>当月表示時のヘッダ小キャラ</strong>（<code>header-character.tsx</code>、28px）。タップで一度だけ揺れる（<code>animate-character-wiggle</code>）</li>
+</ul>
+
+<hr>
+
+<h3>2026-06-04 (続き11) — カテゴリ管理（16スロット・名前変更・有効/無効）</h3>
+<p><span class="badge badge-major">major</span> 設定モーダルにカテゴリ管理を追加。PR #13（<code>feat/category-management</code>）。<code>Category.enabled</code> を追加（マイグレーション）。</p>
+<h4>新規</h4>
+<ul>
+  <li><code>src/lib/category-constants.ts</code> — 16スロット定数（<code>CATEGORY_SLOTS=16</code> / <code>slotName</code>＝「ヒヨウNN」 / <code>REQUIRED_SLOT_COUNT=4</code> / <code>isRequiredSlot</code> / <code>OTHERS_CATEGORY_ID</code> / <code>CATEGORY_NAME_MAX=20</code>）。prisma 非依存・副作用なしで両側 import 可</li>
+  <li><code>src/lib/categories.ts</code> — <code>ensureCategorySlots()</code>（欠番を無効スロットで埋め16枠へ収束）＋ <code>validateCategoryPatch()</code></li>
+  <li><code>src/components/category-manager.tsx</code> — 設定モーダル内の管理UI（色ドット＋名前入力＋有効/無効トグル）</li>
+  <li><code>PATCH /api/categories/[id]</code> — リネーム＋有効/無効。世帯スコープ確認・必須ガード・名前重複（P2002→409）</li>
+</ul>
+<h4>変更</h4>
+<ul>
+  <li>カテゴリは<strong>世帯ごと16個固定</strong>。先頭4個（<code>sortOrder 0..3</code>）は必須で無効化不可。プリセット名「ヒヨウ01〜ヒヨウ16」</li>
+  <li><code>GET /api/categories</code>: 既定は有効のみ、<code>?scope=all</code> で全16件（管理用に不足枠を遅延生成）</li>
+  <li>無効化はフォームの選択肢から除外するだけ（月次集計は不変）。<strong>編集時のみ現カテゴリを選択肢に残す</strong>（<code>expense-modal</code> は <code>scope=all</code> 取得、M1 対応）</li>
+  <li>色パレットを<strong>16色に拡張</strong>（隣接 <code>sortOrder</code> の色相が離れる並び）。<code>category-color.ts</code></li>
+  <li><code>seed</code>: 16スロットを「ヒヨウNN」で再構成、デモ支出は <code>sortOrder</code> ベースに変更</li>
+</ul>
+<h4>レビュー反映・実機修正</h4>
+<ul>
+  <li>H1: <code>ensureCategorySlots</code> を「<code>sortOrder 0..15</code> の欠番を直接埋める」方式に堅牢化（範囲外を作らない）</li>
+  <li>M1: <code>Category</code> 型に <code>enabled</code> を追加。無効カテゴリ付き過去支出の編集で選択肢が消えない対応</li>
+  <li>実機: トグルが画面外へはみ出す崩れを修正（行の入力欄に <code>min-w-0</code>）。<code>ExpenseModalProvider</code> に <code>refreshCategories</code> を追加し編集の即時反映</li>
+  <li>実機: トグルのノブ位置崩れを <code>inline-flex</code>＋標準ユーティリティで作り直し。名前入力を <code>text-base</code>（16px）化で iOS 自動ズーム回避。必須は「必須」バッジ→「ON固定・グレーアウト」表示へ</li>
+  <li><strong>カテゴリ名変更をホームのサマリーに即時反映</strong>（<code>categoriesVersion</code> をホームの取得 deps に追加）</li>
+  <li><strong>無効カテゴリは名前入力もロック</strong>（ON にしてからリネームする導線）</li>
+</ul>
+
+<hr>
+
+<h3>2026-06-04 (続き10) — 「合言葉/ロック」→「世帯コード/保存」に表現統一</h3>
+<p><span class="badge badge-minor">minor</span> UI の言い回しが実態（端末ごとに緩く保持・PWA/Safari 間で同期しない）に対し「ロック」が強すぎたため、<strong>表示テキスト・コメント・CLAUDE.md を「世帯コード」「保存／この端末からクリア」に統一</strong>。コード識別子（<code>unlock/lock/passphrase</code>）・API フィールド・cookie 名・<code>db:set-passphrase</code> は変更なし。iOS で Safari とホーム画面 PWA がストレージ分離し保存状態が共有されない旨も追記。</p>
+
+<hr>
 
 <h3>2026-06-04 (続き9) — 合言葉ロック（サーバー保護）</h3>
 <p><span class="badge badge-major">major</span> 家計データを<strong>夫婦共有の「合言葉」＝ <code>household.id</code></strong> でロック。ユーザー管理は持たず、合言葉を知っていること自体を認可とする。<code>AUTH_SECRET</code> / middleware / スキーマ変更なし。</p>
