@@ -144,36 +144,44 @@ export function CategoryManager() {
                     e.currentTarget.blur();
                   }
                 }}
-                className={`flex-1 min-w-0 h-10 px-3 rounded-lg border bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 ${
+                // text-base(16px): iOS Safari は font-size<16px の入力でフォーカス時に自動ズームするため
+                className={`flex-1 min-w-0 h-10 px-3 rounded-lg border bg-background text-base outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 ${
                   cat.enabled
                     ? "border-border"
                     : "border-border/50 text-muted-foreground"
                 }`}
               />
-              {/* 有効/無効トグル。必須スロット（先頭4個）はロックして無効化させない */}
-              {required ? (
-                <span className="shrink-0 inline-flex items-center rounded-full bg-muted px-2 h-6 text-[10px] font-bold text-muted-foreground">
-                  必須
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={cat.enabled}
-                  aria-label={`${cat.name} を${cat.enabled ? "無効" : "有効"}にする`}
-                  disabled={busy}
-                  onClick={() => toggleEnabled(cat)}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-                    cat.enabled ? "bg-blue-600" : "bg-muted-foreground/30"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      cat.enabled ? "translate-x-[22px]" : "translate-x-0.5"
-                    }`}
-                  />
-                </button>
-              )}
+              {/* 有効/無効トグル。必須スロット（先頭4個）は「ON固定・グレーアウト」でロック表示。
+                  inline-flex + items-center + 標準ユーティリティ(translate-x-1/6)で
+                  ノブ位置を確実に出す（任意値の絶対配置はモバイルで崩れることがあった）。 */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={required ? true : cat.enabled}
+                aria-label={
+                  required
+                    ? `${cat.name}（必須・常にオン）`
+                    : `${cat.name} を${cat.enabled ? "無効" : "有効"}にする`
+                }
+                disabled={busy || required}
+                onClick={() => {
+                  if (!required) toggleEnabled(cat);
+                }}
+                title={required ? "必須カテゴリ（常にオン）" : undefined}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed ${
+                  required
+                    ? "bg-blue-600/35"
+                    : cat.enabled
+                      ? "bg-blue-600"
+                      : "bg-muted-foreground/30"
+                } ${busy && !required ? "opacity-50" : ""}`}
+              >
+                <span
+                  className={`inline-block size-4 rounded-full shadow transition-transform ${
+                    required || cat.enabled ? "translate-x-6" : "translate-x-1"
+                  } ${required ? "bg-white/80" : "bg-white"}`}
+                />
+              </button>
             </div>
             {rowError[cat.id] && (
               <p className="pl-[18px] text-xs text-destructive">{rowError[cat.id]}</p>
