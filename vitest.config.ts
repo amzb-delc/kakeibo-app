@@ -9,8 +9,12 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  // .tsx テスト（コンポーネント）の JSX を React 自動ランタイムで変換する。
+  esbuild: { jsx: "automatic" },
   test: {
+    // 既定は node（純粋関数）。コンポーネントテストはファイル先頭の
+    // `// @vitest-environment jsdom` で個別に jsdom に切り替える。
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });
