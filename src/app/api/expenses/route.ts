@@ -1,29 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDemoUserId } from "@/lib/auth";
-import { listExpenses, validateExpenseInput } from "@/lib/expenses";
+import { validateExpenseInput } from "@/lib/expenses";
 import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
-
-export async function GET(req: NextRequest) {
-  const householdId = await requireHouseholdId();
-  if (householdId instanceof NextResponse) return householdId;
-
-  const { searchParams } = new URL(req.url);
-  const yearParam = searchParams.get("year");
-  const monthParam = searchParams.get("month");
-  const categoryId = searchParams.get("categoryId") || undefined;
-
-  const expenses = await listExpenses(
-    {
-      year: yearParam ? Number(yearParam) : undefined,
-      month: monthParam ? Number(monthParam) : undefined,
-      categoryId,
-    },
-    householdId
-  );
-
-  return NextResponse.json(expenses);
-}
 
 export async function POST(req: NextRequest) {
   const householdId = await requireHouseholdId();

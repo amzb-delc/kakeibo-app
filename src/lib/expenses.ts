@@ -1,31 +1,6 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { jstMonthRange, parseJstDate } from "@/lib/date";
+import { parseJstDate } from "@/lib/date";
 import type { ValidationError } from "@/lib/validation";
-
-export const EXPENSE_LIST_LIMIT = 500;
-
-export type ExpenseListParams = {
-  year?: number;
-  month?: number;
-  categoryId?: string;
-};
-
-export async function listExpenses(params: ExpenseListParams, householdId: string) {
-  const where: Prisma.ExpenseWhereInput = { householdId };
-  if (params.year && params.month) {
-    where.spentAt = jstMonthRange(params.year, params.month);
-  }
-  if (params.categoryId) {
-    where.categoryId = params.categoryId;
-  }
-  return prisma.expense.findMany({
-    where,
-    include: { category: { select: { id: true, name: true } } },
-    orderBy: [{ spentAt: "desc" }, { createdAt: "desc" }],
-    take: EXPENSE_LIST_LIMIT,
-  });
-}
 
 export type ExpenseInput = {
   amount: number;
