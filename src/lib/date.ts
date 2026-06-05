@@ -66,8 +66,10 @@ export function ymKey(year: number, month: number): string {
 const WEEKDAYS_JA = ["日", "月", "火", "水", "木", "金", "土"];
 
 export function formatJstDateLabel(date: Date): string {
-  const s = formatJstDate(date);
-  const day = new Date(`${s}T00:00:00+09:00`).getUTCDay();
-  const [, mo, d] = s.split("-");
-  return `${Number(mo)}/${Number(d)}(${WEEKDAYS_JA[day]})`;
+  const s = formatJstDate(date); // JST の YYYY-MM-DD
+  const [y, mo, d] = s.split("-").map(Number);
+  // 曜日は JST の暦日から算出する。UTC midnight として扱えば曜日はその暦日と一致する
+  // （`new Date("...T00:00:00+09:00").getUTCDay()` だと UTC では前日になり曜日が1日ずれる）。
+  const day = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+  return `${mo}/${d}(${WEEKDAYS_JA[day]})`;
 }

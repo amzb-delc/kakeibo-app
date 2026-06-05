@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:seed": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node prisma/seed.ts",
     "db:set-passphrase": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node prisma/set-passphrase.ts"
   },
@@ -37,6 +39,7 @@
     "prisma": "^5.22.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }
