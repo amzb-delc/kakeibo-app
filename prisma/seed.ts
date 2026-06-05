@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+// 16スロット定数はアプリ本体と共有する（@/ エイリアスは ts-node で解決されないため相対 import）。
+import { CATEGORY_SLOTS, slotName } from "../src/lib/category-constants";
 
 const prisma = new PrismaClient();
 
@@ -12,14 +14,10 @@ function mulberry32(seed: number) {
   };
 }
 
-// カテゴリは 16 個固定。プリセット名は「ヒヨウ」+ 2桁連番（1始まり: ヒヨウ01〜ヒヨウ16）。
+// カテゴリは 16 個固定（CATEGORY_SLOTS / slotName は category-constants と共有）。
 // 先頭 9 個（sortOrder 0-8）を有効、残り 7 個を無効とする。
 // 実機確認時は、下記 DEMO_LABELS の意味のある名前へ手動でリネームする想定。
-const CATEGORY_SLOTS = 16;
 const ENABLED_SLOTS = 9;
-// src/lib/category-constants.ts の slotName と同一規則（seed は自己完結のため再掲）
-const slotName = (sortOrder: number) =>
-  `ヒヨウ${String(sortOrder + 1).padStart(2, "0")}`;
 
 // デモ支出を割り当てる論理カテゴリ（slot 0..8 に対応）。
 // 実機ではこの名前へ手動リネームすることで「食費」等として確認できる。
