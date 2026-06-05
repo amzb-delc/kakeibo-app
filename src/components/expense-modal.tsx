@@ -16,6 +16,7 @@ import {
 } from "@/components/expense-form";
 import { todayJst, lastDayOfMonth } from "@/lib/date";
 import { useSession } from "@/components/session-provider";
+import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
 import type { Category } from "@/types";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
@@ -56,16 +57,13 @@ export function useExpenseModal(): ContextValue {
   return ctx;
 }
 
-const ANIM_MS = 320;
-const EASE = "cubic-bezier(0.32, 0.72, 0, 1)"; // iOS シート風のイージング
-const CLOSE_THRESHOLD = 110; // この px 超のドラッグで閉じる
-const FLICK_VELOCITY = 0.5; // px/ms。速い下フリックでも閉じる
-
 export function ExpenseModalProvider({ children }: { children: React.ReactNode }) {
   const { unlocked } = useSession();
   const [active, setActive] = useState<ActiveState | null>(null);
-  const [shown, setShown] = useState(false);
-  const [dragY, setDragY] = useState<number | null>(null); // null = ドラッグ中でない
+  // シートの開閉アニメ・ドラッグ閉じ・Esc・スクロールロックは共通フックに委譲。
+  // 退場アニメ完了時に active を破棄する。
+  const { mounted, open: openSheet, close: closeSheet, panelStyle, backdropStyle, dragHandlers } =
+    useBottomSheet({ draggable: true, onClosed: () => setActive(null) });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -75,8 +73,6 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   const [lastMutatedCategoryId, setLastMutatedCategoryId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const teardownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragStart = useRef<{ y: number; t: number } | null>(null);
   const composeRef = useRef<ComposeContext | null>(null);
 
   // カテゴリは軽量なので保存後に先読みしておく。無効も含めた全件（scope=all）を持ち、
@@ -111,15 +107,15 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     toastTimer.current = setTimeout(() => setToast(null), 2200);
   }, []);
 
-  const open = useCallback((next: ActiveState) => {
-    if (teardownTimer.current) clearTimeout(teardownTimer.current);
-    setConfirmingDelete(false);
-    setDeleting(false);
-    setActive(next);
-    setDragY(null);
-    setShown(false);
-    requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
-  }, []);
+  const open = useCallback(
+    (next: ActiveState) => {
+      setConfirmingDelete(false);
+      setDeleting(false);
+      setActive(next);
+      openSheet();
+    },
+    [openSheet]
+  );
 
   const setComposeContext = useCallback((ctx: ComposeContext | null) => {
     composeRef.current = ctx;
@@ -142,13 +138,8 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
 
   const close = useCallback(() => {
     setConfirmingDelete(false);
-    setShown(false);
-    if (teardownTimer.current) clearTimeout(teardownTimer.current);
-    teardownTimer.current = setTimeout(() => {
-      setActive(null);
-      setDragY(null);
-    }, ANIM_MS);
-  }, []);
+    closeSheet();
+  }, [closeSheet]);
 
   const handleSuccess = useCallback(
     // categoryId は登録/更新で確定したカテゴリ。削除では渡さない（= 選択を変えない）。
@@ -179,76 +170,13 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     }
   }, [active, handleSuccess, showToast]);
 
-  // アンマウント時にタイマーを後始末
+  // アンマウント時に toast タイマーを後始末
   useEffect(
     () => () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
-      if (teardownTimer.current) clearTimeout(teardownTimer.current);
     },
     []
   );
-
-  const isMounted = active !== null;
-
-  // 開いている間は背面スクロールをロック
-  useEffect(() => {
-    if (!isMounted) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [isMounted]);
-
-  // Esc で閉じる
-  useEffect(() => {
-    if (!isMounted) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isMounted, close]);
-
-  // --- ドラッグで閉じる（ヘッダ起点） ---
-  const onDragPointerDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest("button")) return; // ゴミ箱/✕上では発火しない
-    dragStart.current = { y: e.clientY, t: performance.now() };
-    setDragY(0);
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-  };
-  const onDragPointerMove = (e: React.PointerEvent) => {
-    if (!dragStart.current) return;
-    const dy = e.clientY - dragStart.current.y;
-    setDragY(dy > 0 ? dy : dy * 0.2);
-  };
-  const onDragPointerEnd = (e: React.PointerEvent) => {
-    if (!dragStart.current) return;
-    const dy = e.clientY - dragStart.current.y;
-    const dt = performance.now() - dragStart.current.t;
-    const v = dy / Math.max(dt, 1);
-    dragStart.current = null;
-    if (dy > CLOSE_THRESHOLD || (dy > 24 && v > FLICK_VELOCITY)) {
-      setDragY(null);
-      close();
-    } else {
-      setDragY(null);
-    }
-  };
-  const onDragPointerCancel = () => {
-    dragStart.current = null;
-    setDragY(null);
-  };
-
-  const dragging = dragY !== null;
-  const panelStyle: React.CSSProperties = {
-    transform: dragging
-      ? `translateY(${Math.max(0, dragY ?? 0)}px)`
-      : shown
-        ? "translateY(0)"
-        : "translateY(100%)",
-    transition: dragging ? "none" : `transform ${ANIM_MS}ms ${EASE}`,
-  };
 
   const isEditMode = active?.mode === "edit";
   const title = isEditMode ? "支出を編集" : "支出を登録";
@@ -306,76 +234,42 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     >
       {children}
 
-      {active && initial && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={title}
-          className="fixed inset-0 z-50 flex items-end justify-center"
-          onClick={close}
-        >
-          {/* バックドロップ（パネルとは別レイヤー） */}
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 bg-black/40 transition-opacity duration-300 ease-out"
-            style={{ opacity: shown ? 1 : 0 }}
-          />
-
-          {/* パネル */}
-          <div
-            className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto bg-card rounded-t-2xl sm:rounded-2xl sm:mb-4 shadow-xl"
-            style={panelStyle}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* グラバー + ヘッダ（ドラッグハンドル兼用、上部に固定） */}
-            <div
-              className="sticky top-0 z-10 bg-card pt-2.5 px-4 pb-3 border-b border-border/50 touch-none select-none cursor-grab active:cursor-grabbing"
-              onPointerDown={onDragPointerDown}
-              onPointerMove={onDragPointerMove}
-              onPointerUp={onDragPointerEnd}
-              onPointerCancel={onDragPointerCancel}
+      {mounted && active && initial && (
+        <BottomSheet
+          ariaLabel={title}
+          title={title}
+          onClose={close}
+          panelStyle={panelStyle}
+          backdropStyle={backdropStyle}
+          draggable
+          dragHandlers={dragHandlers}
+          headerActions={
+            <button
+              type="button"
+              aria-label="削除"
+              disabled={!isEditMode}
+              onClick={() => setConfirmingDelete(true)}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
             >
-              <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-muted-foreground/25" />
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold">{title}</h2>
-                <div className="flex items-center gap-0.5">
-                  <button
-                    type="button"
-                    aria-label="削除"
-                    disabled={!isEditMode}
-                    onClick={() => setConfirmingDelete(true)}
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={close}
-                    aria-label="閉じる"
-                    className="w-9 h-9 -mr-1 rounded-full flex items-center justify-center text-lg text-muted-foreground hover:bg-muted transition-colors"
-                  >
-                    ✕
-                  </button>
-                </div>
+              <Trash2 className="w-5 h-5" />
+            </button>
+          }
+        >
+          <div style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+            {!categoriesLoaded ? (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                読み込み中…
               </div>
-            </div>
-
-            <div style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-              {!categoriesLoaded ? (
-                <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                  読み込み中…
-                </div>
-              ) : (
-                <ExpenseForm
-                  key={active.mode === "edit" ? active.expense.id : "create"}
-                  categories={formCategories}
-                  initial={initial}
-                  onSuccess={handleSuccess}
-                />
-              )}
-            </div>
+            ) : (
+              <ExpenseForm
+                key={active.mode === "edit" ? active.expense.id : "create"}
+                categories={formCategories}
+                initial={initial}
+                onSuccess={handleSuccess}
+              />
+            )}
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* 削除確認ダイアログ（シートより前面） */}
