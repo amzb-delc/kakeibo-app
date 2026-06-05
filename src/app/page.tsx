@@ -9,6 +9,7 @@ import { useExpenseModal } from "@/components/expense-modal";
 import { useSettingsModal } from "@/components/settings-modal";
 import { useSession } from "@/components/session-provider";
 import { OTHERS_CATEGORY_ID } from "@/lib/category-constants";
+import { topCategoryId as pickTopCategoryId } from "@/lib/summary-view";
 import type { MonthlySummary } from "@/types";
 
 // 左右スワイプで月送りするしきい値（px）。これ未満／縦移動が優位なときは無視。
@@ -36,10 +37,7 @@ export default function SummaryPage() {
   const { unlocked } = useSession();
 
   // 当月の最大カテゴリ（金額降順の先頭）。未選択時の初期選択と FAB 既定値の両方に使う。
-  const topCategoryId =
-    summary && summary.categories.length > 0
-      ? [...summary.categories].sort((a, b) => b.total - a.total)[0].categoryId
-      : null;
+  const topCategoryId = summary ? pickTopCategoryId(summary.categories) : null;
 
   // 登録モーダル（FAB）の既定値に「表示中の月・表示中カテゴリ」を渡す。
   // openCategoryId が未確定（null）の初回フレームでも、view と同じ最大カテゴリを既定にする。
