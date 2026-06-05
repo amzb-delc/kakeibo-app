@@ -4,13 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { categoryColor } from "@/lib/category-color";
 import { CATEGORY_NAME_MAX, isRequiredSlot } from "@/lib/category-constants";
 import { useExpenseModal } from "@/components/expense-modal";
-
-type Category = {
-  id: string;
-  name: string;
-  sortOrder: number;
-  enabled: boolean;
-};
+import type { Category } from "@/types";
 
 export function CategoryManager() {
   const [categories, setCategories] = useState<Category[] | null>(null);

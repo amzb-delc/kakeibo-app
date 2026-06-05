@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { lastDayOfMonth } from "@/lib/date";
 
 const ITEM_H = 36;
 const VISIBLE = 3; // 奇数。中央が選択
@@ -18,7 +19,7 @@ type Props = {
 export function DayWheel({ year, month, value, onChange, disabled }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const lastDay = lastDayOfMonth(year, month);
   const days = Array.from({ length: lastDay }, (_, i) => i + 1);
 
   // 初期位置 & value 外部変更時にスクロール位置を同期

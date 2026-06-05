@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { DayWheel } from "@/components/day-wheel";
 import { categoryColor } from "@/lib/category-color";
+import { pad2, lastDayOfMonth } from "@/lib/date";
 import type { Category, Expense } from "@/types";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
@@ -45,8 +46,6 @@ type Props = {
   // categoryId は確定した支出のカテゴリ（ホームが選択状態に同期するのに使う）。
   onSuccess: (message: string, categoryId: string) => void;
 };
-
-const pad2 = (n: number) => String(n).padStart(2, "0");
 
 // 送信前に画像を縮小して JPEG base64 化する。長辺を 1568px に抑え、
 // トークン量と通信量を削減する（Claude ビジョンの推奨上限に合わせる）。
@@ -126,7 +125,7 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
         // （年月は固定表示のため）。
         if (spentAt && /^\d{4}-\d{2}-\d{2}$/.test(spentAt)) {
           const [y, m, d] = spentAt.split("-").map(Number);
-          const lastDay = new Date(Date.UTC(initial.year, initial.month, 0)).getUTCDate();
+          const lastDay = lastDayOfMonth(initial.year, initial.month);
           if (y === initial.year && m === initial.month && d >= 1 && d <= lastDay) {
             next.day = d;
           }

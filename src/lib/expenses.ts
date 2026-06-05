@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { jstMonthRange, parseJstDate } from "@/lib/date";
+import type { ValidationError } from "@/lib/validation";
 
 export const EXPENSE_LIST_LIMIT = 500;
 
@@ -34,8 +35,6 @@ export type ExpenseInput = {
   memo: string | null;
   receiptImageUrl: string | null;
 };
-
-export type ValidationError = { field: string; message: string };
 
 const MAX_AMOUNT = 100_000_000;
 const MAX_STORE_NAME = 100;

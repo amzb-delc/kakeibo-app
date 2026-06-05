@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getHouseholdId, getDemoUserId } from "@/lib/auth";
+import { getDemoUserId } from "@/lib/auth";
 import { listExpenses, validateExpenseInput } from "@/lib/expenses";
+import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
 
 export async function GET(req: NextRequest) {
-  const householdId = await getHouseholdId();
-  if (!householdId) {
-    return NextResponse.json({ error: "locked" }, { status: 401 });
-  }
+  const householdId = await requireHouseholdId();
+  if (householdId instanceof NextResponse) return householdId;
+
   const { searchParams } = new URL(req.url);
   const yearParam = searchParams.get("year");
   const monthParam = searchParams.get("month");
@@ -26,22 +26,17 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const householdId = await getHouseholdId();
-  if (!householdId) {
-    return NextResponse.json({ error: "locked" }, { status: 401 });
-  }
-  const body = await req.json().catch(() => null);
-  if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "invalid body" }, { status: 400 });
-  }
+  const householdId = await requireHouseholdId();
+  if (householdId instanceof NextResponse) return householdId;
 
-  const { data, error } = await validateExpenseInput(body as Record<string, unknown>, {
+  const body = await parseJsonBody(req);
+  if (body instanceof NextResponse) return body;
+
+  const { data, error } = await validateExpenseInput(body, {
     partial: false,
     householdId,
   });
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
+  if (error) return jsonError(error.message, 400);
 
   const createdByUserId = await getDemoUserId();
 

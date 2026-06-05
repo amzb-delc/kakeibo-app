@@ -14,7 +14,7 @@ import {
   type ExpenseFormValues,
   type ExpenseFormInitial,
 } from "@/components/expense-form";
-import { todayJst } from "@/lib/date";
+import { todayJst, lastDayOfMonth } from "@/lib/date";
 import { useSession } from "@/components/session-provider";
 import type { Category } from "@/types";
 
@@ -130,7 +130,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     const ctx = composeRef.current;
     const year = ctx?.year ?? ty;
     const month = ctx?.month ?? tm;
-    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const lastDay = lastDayOfMonth(year, month);
     const day = Math.min(td, lastDay);
     open({ mode: "create", year, month, day, categoryId: ctx?.categoryId ?? "" });
   }, [open]);
