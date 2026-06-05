@@ -45,6 +45,7 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 | `GET /api/categories` | カテゴリ一覧（sortOrder順） |
 | `POST /api/expenses` | 支出登録（amount, spentAt, categoryId 必須） |
 | `GET /api/monthly-summary?year=&month=` | 月次集計（当月・前月合計、カテゴリ別） |
+| `POST /api/ocr` | レシート画像（base64）から金額・店名・日付・カテゴリ候補を抽出（Claude ビジョン） |
 
 `/api/session` 以外のデータ API は**未保存（cookie 無し）だと 401**。
 
@@ -57,6 +58,7 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 ## 実装上の制約（MVPスコープ）
 
 - ユーザー管理（個人アカウント）は持たない。保護は世帯共有の世帯コードのみ（上記「認証」参照）
-- OCR連携は `handleOcr()` のスタブのみ（`expense-form.tsx`）
+- レシートOCRは実装済み（`POST /api/ocr` + `src/lib/ocr.ts`、Claude ビジョン）。支出モーダルの「レシートを読み取る」ボタンから画像を撮影/選択 → クライアントで縮小 → 金額・店名・日付・カテゴリ候補をフォームに自動入力する。**画像は保存しない**（抽出のみ、`receiptImageUrl`/`ocrRawText` は未使用のまま）。`ANTHROPIC_API_KEY` 必須（未設定なら 503）。モデルは `OCR_MODEL`（既定 `claude-haiku-4-5`）
+- クレカ明細の一括取り込みは未実装（Phase2 予定。iPhone での CSV/PDF 取り回しが課題のため後回し）
 - 通知機能は未実装（`notificationDay`, `notificationTime` フィールドのみ存在）
 - カテゴリ追加UIは未実装

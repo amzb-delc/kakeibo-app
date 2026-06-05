@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +48,30 @@ type Props = {
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
+// 送信前に画像を縮小して JPEG base64 化する。長辺を 1568px に抑え、
+// トークン量と通信量を削減する（Claude ビジョンの推奨上限に合わせる）。
+// iOS 写真の EXIF 回転は createImageBitmap の imageOrientation で正す。
+const OCR_MAX_EDGE = 1568;
+async function fileToDownscaledJpeg(
+  file: File
+): Promise<{ base64: string; mediaType: "image/jpeg" }> {
+  const bitmap = await createImageBitmap(file, {
+    imageOrientation: "from-image",
+  });
+  const scale = Math.min(1, OCR_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("画像の処理に失敗しました");
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  return { base64: dataUrl.split(",")[1] ?? "", mediaType: "image/jpeg" };
+}
+
 export function ExpenseForm({ categories, initial, onSuccess }: Props) {
   const isEdit = initial.id !== undefined;
 
@@ -59,6 +84,65 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // レシート画像を読み取り、取得できた項目をフォームに反映する。
+  const handleReceiptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 同じファイルを連続選択できるようにリセット
+    if (!file) return;
+    setOcrError(null);
+    setOcrLoading(true);
+    try {
+      const { base64, mediaType } = await fileToDownscaledJpeg(file);
+      const res = await fetch("/api/ocr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mediaType }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "読み取りに失敗しました");
+      }
+      const { amount, storeName, spentAt, categoryId } = data as {
+        amount: number | null;
+        storeName: string | null;
+        spentAt: string | null;
+        categoryId: string | null;
+      };
+
+      setForm((p) => {
+        const next = { ...p };
+        if (typeof amount === "number" && amount >= 0) {
+          next.amount = String(Math.trunc(amount)).slice(0, AMOUNT_MAX_DIGITS);
+        }
+        if (storeName) next.storeName = storeName.slice(0, STORE_MAX);
+        if (categoryId && categories.some((c) => c.id === categoryId)) {
+          next.categoryId = categoryId;
+        }
+        // 日付は年月がフォームの表示月と一致するときだけ「日」を反映する
+        // （年月は固定表示のため）。
+        if (spentAt && /^\d{4}-\d{2}-\d{2}$/.test(spentAt)) {
+          const [y, m, d] = spentAt.split("-").map(Number);
+          const lastDay = new Date(Date.UTC(initial.year, initial.month, 0)).getUTCDate();
+          if (y === initial.year && m === initial.month && d >= 1 && d <= lastDay) {
+            next.day = d;
+          }
+        }
+        return next;
+      });
+
+      if (amount == null && !storeName && !spentAt && !categoryId) {
+        setOcrError("レシートから情報を読み取れませんでした");
+      }
+    } catch (err) {
+      setOcrError(err instanceof Error ? err.message : "読み取りに失敗しました");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
 
   const amountEmpty = form.amount === "";
   const categoryEmpty = form.categoryId === "";
@@ -102,6 +186,35 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 px-4 py-5">
+      {/* レシート読み取り（カメラ起動 → 縮小 → OCR → 各項目に自動入力） */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleReceiptFile}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full gap-2"
+        disabled={submitting || ocrLoading}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        {ocrLoading ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Camera className="size-4" />
+        )}
+        {ocrLoading ? "読み取り中…" : "レシートを読み取る"}
+      </Button>
+      {ocrError && (
+        <p className="-mt-2 text-sm text-destructive" role="alert">
+          {ocrError}
+        </p>
+      )}
+
       {/* 日付（年月固定。日は縦ホイールを「YYYY年M月 d 日」の d に埋め込む） */}
       <div className="flex items-center justify-center gap-1.5 text-xl font-bold">
         <span>
