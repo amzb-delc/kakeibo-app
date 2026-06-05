@@ -66,7 +66,7 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
       setBusy(false);
       if (ok) {
         setPassphrase("");
-        close(); // 解錠できたら閉じて家計データを表示
+        close(); // 保存できたら閉じて家計データを表示
       } else {
         setAuthError(true);
       }
@@ -154,20 +154,20 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
               className="px-4 py-4 space-y-4"
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
             >
-              {/* 合言葉セクション: 解錠/ロック */}
+              {/* 世帯コードセクション: 保存/クリア */}
               <section className="bg-muted/30 rounded-2xl border border-border/50 p-4">
                 <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                  合言葉
+                  世帯コード
                   {unlocked === false && (
                     <span className="inline-flex items-center rounded-full bg-red-500 text-white text-[10px] font-bold px-2 py-0.5">
-                      ロック中
+                      未保存
                     </span>
                   )}
                 </h3>
                 {unlocked ? (
                   <div className="space-y-3">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      解錠済み{householdName ? `（${householdName}）` : ""}。この端末では合言葉の再入力なしで表示されます。
+                      保存済み{householdName ? `（${householdName}）` : ""}。この端末では世帯コードの再入力なしで表示されます。
                     </p>
                     <button
                       type="button"
@@ -175,15 +175,15 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
                       disabled={busy}
                       className="inline-flex items-center justify-center h-11 px-5 rounded-xl border border-border text-sm font-medium hover:bg-muted active:scale-95 transition-all disabled:opacity-50"
                     >
-                      {busy ? "処理中…" : "ロックする"}
+                      {busy ? "処理中…" : "この端末からクリア"}
                     </button>
                   </div>
                 ) : (
                   <form onSubmit={handleUnlock} className="space-y-3">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      家計データを表示するには合言葉を入力してください。
+                      家計データを表示するには世帯コードを入力してください。
                     </p>
-                    {/* 日本語の合言葉を入力できるよう type="text"（IME を妨げない）。
+                    {/* 日本語の世帯コードを入力できるよう type="text"（IME を妨げない）。
                         入力中の確認のため伏せ字にはしない。 */}
                     <input
                       type="text"
@@ -198,21 +198,21 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
                       onCompositionEnd={() => {
                         composingRef.current = false;
                       }}
-                      placeholder="合言葉"
+                      placeholder="世帯コード"
                       autoComplete="off"
                       className={`w-full h-11 px-3 rounded-xl border bg-background text-base outline-none focus:ring-2 focus:ring-primary/30 ${
                         authError ? "border-destructive" : "border-border"
                       }`}
                     />
                     {authError && (
-                      <p className="text-xs text-destructive">合言葉が違います。</p>
+                      <p className="text-xs text-destructive">世帯コードが違います。</p>
                     )}
                     <button
                       type="submit"
                       disabled={busy || passphrase.trim().length === 0}
                       className="inline-flex items-center justify-center h-11 px-6 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50"
                     >
-                      {busy ? "確認中…" : "解錠する"}
+                      {busy ? "確認中…" : "保存する"}
                     </button>
                   </form>
                 )}

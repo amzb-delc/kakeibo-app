@@ -49,19 +49,19 @@ export function FooterNav() {
         <button
           type="button"
           onClick={openSettings}
-          aria-label={unlocked === false ? "設定（ロック中）" : "設定"}
+          aria-label={unlocked === false ? "設定（世帯コード未保存）" : "設定"}
           className="flex-1 flex items-center justify-center h-full min-h-[72px] text-muted-foreground hover:text-foreground transition-colors"
         >
           <span className="relative">
             <Settings size={40} strokeWidth={2} aria-hidden="true" />
-            {/* ロック中（合言葉未解錠）はバッジで気づけるようにする */}
+            {/* 未保存（世帯コード未入力）はバッジで気づけるようにする */}
             {unlocked === false && (
               <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-red-500 ring-2 ring-card" />
             )}
           </span>
         </button>
 
-        {/* 登録 FAB はロック中は出さない（ロック中は登録できないため） */}
+        {/* 登録 FAB は未保存のときは出さない（未保存では登録できないため） */}
         {unlocked && (
           <button
             type="button"

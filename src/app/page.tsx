@@ -53,8 +53,8 @@ export default function SummaryPage() {
     }
   }, [year, month]);
 
-  // 解錠済みのときだけ取得。year/month・mutationVersion の変化に加え、
-  // 解錠された瞬間（unlocked が true へ）にも取得する。
+  // 保存済みのときだけ取得。year/month・mutationVersion の変化に加え、
+  // 保存された瞬間（unlocked が true へ）にも取得する。
   useEffect(() => {
     if (unlocked) fetchSummary();
   }, [fetchSummary, mutationVersion, unlocked]);
@@ -113,8 +113,8 @@ export default function SummaryPage() {
     </div>
   );
 
-  // 解錠判定の応答待ち（null）の間は中立のローディング。
-  // サマリーのシェルもロック画面も出さず、ちらつきを防ぐ。
+  // 保存状態の判定待ち（null）の間は中立のローディング。
+  // サマリーのシェルも未保存画面も出さず、ちらつきを防ぐ。
   if (unlocked === null) {
     return (
       <div className="min-h-screen bg-background">
@@ -126,13 +126,13 @@ export default function SummaryPage() {
     );
   }
 
-  // ロック中: 合言葉を入力するまで家計データは出さない（API も 401）。
-  // 解錠は設定モーダルで行う。
+  // 未保存: 世帯コードを入力するまで家計データは出さない（API も 401）。
+  // 保存は設定モーダルで行う。
   if (unlocked === false) {
     return (
       <div className="min-h-screen bg-background">
-        <h1 className="sr-only">ロック中</h1>
-        <PageHeader title="ロック中" />
+        <h1 className="sr-only">未保存</h1>
+        <PageHeader title="未保存" />
         <main className="px-4 py-12 flex flex-col items-center text-center">
           <Image
             src="/character.png"
@@ -142,9 +142,9 @@ export default function SummaryPage() {
             sizes="128px"
             className="w-32 h-32 mb-4 opacity-90"
           />
-          <h2 className="text-base font-semibold mb-1">ロックされています</h2>
+          <h2 className="text-base font-semibold mb-1">世帯コードが未保存です</h2>
           <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-            合言葉を入力すると
+            世帯コードを入力すると
             <br />
             家計データが表示されます。
           </p>
