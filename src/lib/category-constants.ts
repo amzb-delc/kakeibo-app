@@ -4,6 +4,10 @@
 // 世帯ごとにカテゴリは 16 個で固定。
 export const CATEGORY_SLOTS = 16;
 
+// ホーム全体カードのレジェンド／ドーナツで「上位N件以外を合算した『その他』」を表す擬似ID。
+// 実カテゴリのIDと衝突しない予約値（DBには存在しない）。選択値としても使う。
+export const OTHERS_CATEGORY_ID = "__others__";
+
 // カテゴリ名の最大長
 export const CATEGORY_NAME_MAX = 20;
 

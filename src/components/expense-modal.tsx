@@ -35,6 +35,9 @@ type ContextValue = {
   setComposeContext: (ctx: ComposeContext | null) => void;
   /** 登録・更新・削除のたびに増える。一覧側はこれを購読して再取得する。 */
   mutationVersion: number;
+  /** 直近の登録/更新で確定した支出のカテゴリID（削除時は null）。
+   *  ホームが mutationVersion とあわせて購読し、そのカテゴリを選択状態に同期する。 */
+  lastMutatedCategoryId: string | null;
   /** 先読みした全カテゴリ（無効含む）。名前解決やフォームの選択肢生成に使う */
   categories: Category[];
   /** カテゴリ管理で名前変更/有効無効を変えた後に呼ぶ。先読み一覧を再取得する。 */
@@ -69,6 +72,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [categoriesVersion, setCategoriesVersion] = useState(0);
   const [mutationVersion, setMutationVersion] = useState(0);
+  const [lastMutatedCategoryId, setLastMutatedCategoryId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const teardownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -147,8 +151,10 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const handleSuccess = useCallback(
-    (message: string) => {
+    // categoryId は登録/更新で確定したカテゴリ。削除では渡さない（= 選択を変えない）。
+    (message: string, categoryId?: string | null) => {
       close();
+      setLastMutatedCategoryId(categoryId ?? null);
       setMutationVersion((v) => v + 1);
       showToast(message);
     },
@@ -292,6 +298,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
         openEdit,
         setComposeContext,
         mutationVersion,
+        lastMutatedCategoryId,
         categories,
         refreshCategories,
         categoriesVersion,

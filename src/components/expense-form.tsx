@@ -40,8 +40,9 @@ export type ExpenseFormInitial = {
 type Props = {
   categories: Category[];
   initial: ExpenseFormInitial;
-  // 保存の成功後に呼ばれる（モーダルを閉じる・トースト・再取得は親が担当）
-  onSuccess: (message: string) => void;
+  // 保存の成功後に呼ばれる（モーダルを閉じる・トースト・再取得は親が担当）。
+  // categoryId は確定した支出のカテゴリ（ホームが選択状態に同期するのに使う）。
+  onSuccess: (message: string, categoryId: string) => void;
 };
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -92,7 +93,7 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "保存に失敗しました");
       }
-      onSuccess(isEdit ? "更新しました" : "保存しました");
+      onSuccess(isEdit ? "更新しました" : "保存しました", form.categoryId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
       setSubmitting(false);

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { getTrendLevel, TREND_TEXT_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
-import { categoryColor } from "@/lib/category-color";
+import { categoryColor, OTHERS_COLOR } from "@/lib/category-color";
+import { OTHERS_CATEGORY_ID } from "@/lib/category-constants";
 import { useExpenseModal } from "@/components/expense-modal";
 import { DonutChart } from "@/components/donut-chart";
 import type { MonthlySummary, CategorySummary, BoxStats } from "@/types";
@@ -77,7 +78,15 @@ function AnomalyBar({
 }
 
 // 単一選択表示のため、明細カードは常に展開状態（開閉トグルは持たない）。
-function CategoryRow({ category }: { category: CategorySummary }) {
+// showName: 「その他」など複数カテゴリをまとめて表示する場面で、どのカテゴリかが
+// 分かるようカード上部にカテゴリ名タグを出す（単一選択時は見出しに名前が出るので不要）。
+function CategoryRow({
+  category,
+  showName = false,
+}: {
+  category: CategorySummary;
+  showName?: boolean;
+}) {
   const { openEdit } = useExpenseModal();
   // 今月視点で比較する: 今月 > 表示月 なら up(赤=今月の方が多い), 今月 < 表示月 なら down(緑=今月の方が少ない)
   const compareTotal = category.compareTotal;
@@ -88,7 +97,16 @@ function CategoryRow({ category }: { category: CategorySummary }) {
   return (
     <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
       <div className="p-4">
-        <div className="flex items-center justify-end mb-2">
+        <div
+          className={`flex items-center mb-2 ${showName ? "justify-between gap-2" : "justify-end"}`}
+        >
+          {showName && (
+            <span
+              className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-0.5 text-sm font-medium ${color.tag}`}
+            >
+              <span className="truncate">{category.name}</span>
+            </span>
+          )}
           <div className="flex flex-col items-end">
             <span className="text-base font-semibold">{formatYen(category.total)}</span>
             {level && (
@@ -150,28 +168,96 @@ type Props = {
   onToggleCategory: (categoryId: string) => void;
 };
 
+// 全体カードのレジェンド／ドーナツの表示ルール:
+//   - 7件以下: 全カテゴリを個別表示（「その他」は出さない）
+//   - 8件以上: 上位 TOP_N 件＋「その他」(残り合算)。＝「その他」は必ず2件以上を束ねる
+// （残り1件だけを「その他」にするのは無駄なので、7件ちょうどはそのまま7件出す）
+const TOP_N = 6;
+const OTHERS_THRESHOLD = 7; // これを超える件数のときだけ「その他」に集約する
+
 export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }: Props) {
   const { categories: allCategories } = useExpenseModal();
   const compareTotal = summary.compareTotal;
   const totalLevel = compareTotal !== null ? getTrendLevel(compareTotal, summary.total) : null;
   const totalDiff = compareTotal !== null ? formatDiff(compareTotal - summary.total) : null;
-  // ドーナツは金額の大きい順に並べる（カテゴリ別リストの sortOrder 順とは独立）
+
+  // 金額の大きい順に並べる。8件以上のときだけ上位 TOP_N 件＋「その他」に分け、
+  // 7件以下は全件を個別表示する。レジェンドとドーナツはこの並びで 1:1 に対応する。
   const sortedByTotal = [...summary.categories].sort((a, b) => b.total - a.total);
-  const topCategories = sortedByTotal.slice(0, 7);
-  // 「解除なし」設計: 未選択(null)のときだけ最大カテゴリにフォールバックする（初回描画フリッカ防止。
-  // 親 summary/page.tsx の useEffect と同じ初期選択を view 側でも先取りする）。
-  // 一度選択された後は openCategoryId をそのまま使う → 当月にそのカテゴリが無ければ
-  // visibleCategories が空になり下の「キロクナシ」表示に落ちる（選択は親で保持され、戻れば再表示）。
-  const effectiveSelectedId = openCategoryId ?? sortedByTotal[0]?.categoryId ?? null;
-  const visibleCategories = effectiveSelectedId
-    ? summary.categories.filter((c) => c.categoryId === effectiveSelectedId)
-    : [];
-  // 明細見出し横のラベル: 当月に明細があればそれを使い、無い（キロクナシ）場合も
-  // 全カテゴリから名前を解決して表示する。
-  const selectedLabel =
-    visibleCategories[0] ??
-    allCategories.find((c) => c.id === effectiveSelectedId) ??
-    null;
+  const useOthers = sortedByTotal.length > OTHERS_THRESHOLD;
+  const topCategories = useOthers ? sortedByTotal.slice(0, TOP_N) : sortedByTotal;
+  const otherCategories = useOthers ? sortedByTotal.slice(TOP_N) : []; // すでに金額降順
+  const othersTotal = otherCategories.reduce((sum, c) => sum + c.total, 0);
+  const hasOthers = otherCategories.length > 0;
+
+  // レジェンド項目＝ドーナツのセグメント（同じ並び・同じ色）。
+  const legendItems = topCategories.map((c) => ({
+    id: c.categoryId,
+    name: c.name,
+    total: c.total,
+    color: categoryColor(c.sortOrder),
+  }));
+  if (hasOthers) {
+    legendItems.push({
+      id: OTHERS_CATEGORY_ID,
+      name: "その他",
+      total: othersTotal,
+      color: OTHERS_COLOR,
+    });
+  }
+
+  // 選択解決: openCategoryId は実カテゴリID / OTHERS_CATEGORY_ID / null のいずれか。
+  // 「解除なし」設計: 未選択(null)のときだけ最大カテゴリにフォールバック（初回描画フリッカ防止）。
+  //   - 「その他」明示 → その他
+  //   - 上位6件のid → その個別カテゴリ
+  //   - 当月に支出はあるが圏外のid（その他バケツ内）→ 「その他」に集約
+  //   - 当月に支出が無い（＝存在しない）id → 個別のまま維持し下の「キロクナシ」へ
+  //     （月送りで (a) の無い月に来ても (a) の選択を保つ。その他へは吸収しない）
+  const topIds = new Set(topCategories.map((c) => c.categoryId));
+  const presentIds = new Set(summary.categories.map((c) => c.categoryId));
+  const rawSelected = openCategoryId ?? sortedByTotal[0]?.categoryId ?? null;
+  let selectedId: string | null;
+  if (rawSelected === OTHERS_CATEGORY_ID) {
+    selectedId = hasOthers ? OTHERS_CATEGORY_ID : null;
+  } else if (rawSelected && topIds.has(rawSelected)) {
+    selectedId = rawSelected;
+  } else if (rawSelected && presentIds.has(rawSelected)) {
+    selectedId = OTHERS_CATEGORY_ID;
+  } else {
+    selectedId = rawSelected;
+  }
+
+  // ドーナツ／レジェンドのハイライト対象。描画セグメントに無いid（キロクナシ等）は
+  // null 扱いにして「全セグメント減光・ハイライト無し」になるのを防ぐ。
+  const highlightId = legendItems.some((it) => it.id === selectedId) ? selectedId : null;
+
+  // 明細: 「その他」選択時はバケツ内の全カテゴリを金額順で並べる。個別選択時はその1件。
+  const visibleCategories =
+    selectedId === OTHERS_CATEGORY_ID
+      ? otherCategories
+      : selectedId
+        ? summary.categories.filter((c) => c.categoryId === selectedId)
+        : [];
+
+  // 明細見出し横のラベル。「その他」はグレーのまとめラベル。
+  // 個別は当月明細→全カテゴリの順に名前/色を解決（キロクナシ時も名前を出す）。
+  let selectedLabel: { name: string; sortOrder: number } | null = null;
+  let selectedLabelColor = OTHERS_COLOR;
+  if (selectedId === OTHERS_CATEGORY_ID) {
+    selectedLabel = { name: "その他", sortOrder: -1 };
+    selectedLabelColor = OTHERS_COLOR;
+  } else if (selectedId) {
+    const resolved =
+      summary.categories.find((c) => c.categoryId === selectedId) ??
+      (() => {
+        const c = allCategories.find((x) => x.id === selectedId);
+        return c ? { name: c.name, sortOrder: c.sortOrder } : null;
+      })();
+    if (resolved) {
+      selectedLabel = { name: resolved.name, sortOrder: resolved.sortOrder };
+      selectedLabelColor = categoryColor(resolved.sortOrder);
+    }
+  }
 
   return (
     <main className="px-4 py-6 space-y-6">
@@ -180,11 +266,13 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
           <div className="flex items-start gap-3">
             <div className="shrink-0 w-[160px]">
               <DonutChart
-                segments={sortedByTotal.map((c) => ({
-                  id: c.categoryId,
-                  value: c.total,
-                  color: categoryColor(c.sortOrder).hex,
+                segments={legendItems.map((it) => ({
+                  id: it.id,
+                  value: it.total,
+                  color: it.color.hex,
                 }))}
+                selectedId={highlightId}
+                dimAll={highlightId === null}
               >
                 <span className="text-xs text-muted-foreground">合計</span>
                 <p className="text-xl font-bold tabular-nums whitespace-nowrap">
@@ -197,26 +285,25 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
                 )}
               </DonutChart>
             </div>
-            {topCategories.length > 0 && (
+            {legendItems.length > 0 && (
               <ul className="flex-1 min-w-0 space-y-1 pt-1">
-                {topCategories.map((c) => {
-                  const color = categoryColor(c.sortOrder);
-                  const isSelected = effectiveSelectedId === c.categoryId;
+                {legendItems.map((it) => {
+                  const isSelected = selectedId === it.id;
                   return (
-                    <li key={c.categoryId} className="min-w-0">
+                    <li key={it.id} className="min-w-0">
                       <button
                         type="button"
-                        onClick={() => onToggleCategory(c.categoryId)}
+                        onClick={() => onToggleCategory(it.id)}
                         aria-pressed={isSelected}
                         className="flex w-full items-center justify-between gap-2 text-left"
                       >
                         <span
-                          className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-1 text-sm font-medium ${color.tag} ${isSelected ? "ring-2 ring-current ring-offset-1" : ""}`}
+                          className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-1 text-sm font-medium ${it.color.tag} ${isSelected ? "ring-2 ring-current ring-offset-1" : ""}`}
                         >
-                          <span className="truncate">{c.name}</span>
+                          <span className="truncate">{it.name}</span>
                         </span>
                         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                          {formatYen(c.total)}
+                          {formatYen(it.total)}
                         </span>
                       </button>
                     </li>
@@ -233,7 +320,7 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
             <h2 className="text-base font-semibold">明細</h2>
             {selectedLabel && (
               <span
-                className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-sm font-medium ${categoryColor(selectedLabel.sortOrder).tag}`}
+                className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-sm font-medium ${selectedLabelColor.tag}`}
               >
                 {selectedLabel.name}
               </span>
@@ -256,7 +343,11 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
               </div>
             ) : (
               visibleCategories.map((cat) => (
-                <CategoryRow key={cat.categoryId} category={cat} />
+                <CategoryRow
+                  key={cat.categoryId}
+                  category={cat}
+                  showName={selectedId === OTHERS_CATEGORY_ID}
+                />
               ))
             )}
           </div>

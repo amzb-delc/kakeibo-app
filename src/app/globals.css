@@ -137,3 +137,14 @@
     @apply font-sans;
   }
 }
+/* ヘッダーのキャラクターをタップしたときの一発アニメ（ぴょこっと揺れる） */
+@keyframes header-character-wiggle {
+  0% { transform: rotate(0) scale(1); }
+  20% { transform: rotate(-12deg) scale(1.12); }
+  45% { transform: rotate(10deg) scale(1.12); }
+  70% { transform: rotate(-6deg) scale(1.06); }
+  100% { transform: rotate(0) scale(1); }
+}
+.animate-character-wiggle {
+  animation: header-character-wiggle 0.55s ease-in-out;
+}
