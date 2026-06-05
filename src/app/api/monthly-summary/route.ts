@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getHouseholdId } from "@/lib/auth";
 import { jstMonthRange, formatJstDate, shiftMonth, ymKey } from "@/lib/date";
 import { calculateBoxStats } from "@/lib/anomaly";
+import { requireHouseholdId } from "@/lib/api";
 
 export async function GET(req: NextRequest) {
-  const householdId = await getHouseholdId();
-  if (!householdId) {
-    return NextResponse.json({ error: "locked" }, { status: 401 });
-  }
+  const householdId = await requireHouseholdId();
+  if (householdId instanceof NextResponse) return householdId;
   const { searchParams } = new URL(req.url);
   // 当月判定はサーバTZに依存せずJSTで行う
   const [todayYearStr, todayMonthStr] = formatJstDate(new Date()).split("-");
