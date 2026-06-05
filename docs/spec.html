@@ -310,7 +310,6 @@ hr {
     <li><a href="#api-session">GET/POST/DELETE /api/session</a></li>
     <li><a href="#api-categories">GET /api/categories</a></li>
     <li><a href="#api-categories-patch">PATCH /api/categories/[id]</a></li>
-    <li><a href="#api-expenses-list">GET /api/expenses</a></li>
     <li><a href="#api-expenses-create">POST /api/expenses</a></li>
     <li><a href="#api-expenses-get">GET /api/expenses/[id]</a></li>
     <li><a href="#api-expenses-patch">PATCH /api/expenses/[id]</a></li>
@@ -630,13 +629,6 @@ hr {
 <p><strong>世帯スコープ:</strong> 対象が自世帯に存在するか <code>findFirst({ where: { id, householdId } })</code> で確認（無ければ 404、cross-household 改竄防止）。</p>
 <p><strong>ガード:</strong> 必須スロット（<code>sortOrder 0..3</code>）を <code>enabled:false</code> にしようとすると 400「このカテゴリは無効にできません」。名前重複（<code>@@unique</code> P2002）は 409「同じ名前のカテゴリが既にあります」。</p>
 <p><strong>レスポンス:</strong> 更新後の <code>Category</code> / エラーは <code>{ error }</code>。</p>
-</div>
-
-<div class="endpoint" id="api-expenses-list">
-<h4><span class="method method-get">GET</span> /api/expenses</h4>
-<p>クエリで月とカテゴリで絞り込み。最大 <code>500</code> 件、<code>spentAt</code> 降順 → <code>createdAt</code> 降順。</p>
-<p><strong>クエリ:</strong> <code>year</code>, <code>month</code>, <code>categoryId</code>（いずれも任意）。<code>year</code> と <code>month</code> はペアで JST 月境界に変換される。</p>
-<p><strong>レスポンス:</strong> <code>Expense[]</code>（<code>category: { id, name }</code> を include）</p>
 </div>
 
 <div class="endpoint" id="api-expenses-create">
