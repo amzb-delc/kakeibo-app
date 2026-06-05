@@ -8,28 +8,29 @@ export type CategoryRow = {
   enabled: boolean;
 };
 
-// 世帯のカテゴリが 16 個に満たない場合、無効の空きスロットを補充する。
+// 世帯のカテゴリ sortOrder 0..15 のうち欠けている枠を、無効の空きスロットで補充する。
 // 世帯コード変更で id が付け替わった世帯でも、seed を待たずに 16 枠を揃えるための遅延生成。
+// 歯抜け（途中の欠番）があっても確実に 0..15 を埋め、範囲外の sortOrder は作らない。
 export async function ensureCategorySlots(householdId: string): Promise<void> {
   const existing = await prisma.category.findMany({
     where: { householdId },
     select: { sortOrder: true },
-    orderBy: { sortOrder: "desc" },
   });
-  if (existing.length >= CATEGORY_SLOTS) return;
+  const used = new Set(existing.map((c) => c.sortOrder));
 
-  const maxSortOrder = existing[0]?.sortOrder ?? -1;
-  const toCreate = CATEGORY_SLOTS - existing.length;
-  const data = Array.from({ length: toCreate }, (_, k) => {
-    const sortOrder = maxSortOrder + 1 + k;
-    return {
+  const data = [];
+  for (let sortOrder = 0; sortOrder < CATEGORY_SLOTS; sortOrder++) {
+    if (used.has(sortOrder)) continue;
+    data.push({
       householdId,
       name: slotName(sortOrder),
       sortOrder,
       enabled: false,
-    };
-  });
-  // 競合や名前衝突は黙ってスキップ（並行リクエストでも 16 枠に収束する）
+    });
+  }
+  if (data.length === 0) return;
+  // 名前は slotName(sortOrder) で一意なので、並行リクエストが同じ欠番を埋めても
+  // @@unique([householdId, name]) で弾かれる → skipDuplicates で握り潰して 16 枠に収束。
   await prisma.category.createMany({ data, skipDuplicates: true });
 }
 

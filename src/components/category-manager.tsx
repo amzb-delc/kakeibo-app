@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { categoryColor } from "@/lib/category-color";
 import { CATEGORY_NAME_MAX, isRequiredSlot } from "@/lib/category-constants";
+import { useExpenseModal } from "@/components/expense-modal";
 
 type Category = {
   id: string;
@@ -20,6 +21,8 @@ export function CategoryManager() {
   const [savingId, setSavingId] = useState<string | null>(null);
   // 日本語IMEの変換中フラグ（変換確定 Enter での誤送信を防ぐ）
   const composingRef = useRef(false);
+  // 編集後、登録モーダルの先読みカテゴリを再取得させる
+  const { refreshCategories } = useExpenseModal();
 
   // マウント時に全16スロットを取得（scope=all で無効スロットも含む）
   useEffect(() => {
@@ -61,6 +64,8 @@ export function CategoryManager() {
           prev ? prev.map((c) => (c.id === id ? updated : c)) : prev
         );
         setDrafts((p) => ({ ...p, [id]: updated.name }));
+        // 登録/編集モーダルの選択肢へ反映させる
+        refreshCategories();
         return true;
       } catch {
         setRowError((p) => ({ ...p, [id]: "保存に失敗しました" }));
@@ -69,7 +74,7 @@ export function CategoryManager() {
         setSavingId(null);
       }
     },
-    []
+    [refreshCategories]
   );
 
   // 名前: フォーカスを外したタイミングで、変更があれば保存
@@ -139,7 +144,7 @@ export function CategoryManager() {
                     e.currentTarget.blur();
                   }
                 }}
-                className={`flex-1 h-10 px-3 rounded-lg border bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 ${
+                className={`flex-1 min-w-0 h-10 px-3 rounded-lg border bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 ${
                   cat.enabled
                     ? "border-border"
                     : "border-border/50 text-muted-foreground"

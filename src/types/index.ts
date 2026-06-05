@@ -2,6 +2,7 @@ export type Category = {
   id: string;
   name: string;
   sortOrder: number;
+  enabled: boolean;
 };
 
 export type Expense = {
