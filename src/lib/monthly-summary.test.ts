@@ -25,11 +25,14 @@ function exp(p: {
   name: string;
   sortOrder: number;
   spentAt?: Date;
+  updatedAt?: Date;
 }): SummaryExpense {
+  const spentAt = p.spentAt ?? d("2026-04-15");
   return {
     id: p.id,
     amount: p.amount,
-    spentAt: p.spentAt ?? d("2026-04-15"),
+    spentAt,
+    updatedAt: p.updatedAt ?? spentAt,
     storeName: null,
     memo: null,
     categoryId: p.categoryId,

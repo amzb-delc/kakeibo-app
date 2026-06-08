@@ -10,6 +10,7 @@ export type SummaryExpense = {
   id: string;
   amount: number;
   spentAt: Date;
+  updatedAt: Date;
   storeName: string | null;
   memo: string | null;
   categoryId: string;
@@ -24,6 +25,7 @@ export type SummaryCategoryExpense = {
   id: string;
   amount: number;
   spentAt: Date; // route の NextResponse.json で ISO 文字列にシリアライズされる
+  updatedAt: Date;
   storeName: string | null;
   memo: string | null;
 };
@@ -67,6 +69,7 @@ export function buildMonthlySummary(params: {
       id: expense.id,
       amount: expense.amount,
       spentAt: expense.spentAt,
+      updatedAt: expense.updatedAt,
       storeName: expense.storeName,
       memo: expense.memo,
     };
