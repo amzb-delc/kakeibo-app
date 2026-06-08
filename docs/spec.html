@@ -323,7 +323,7 @@ hr {
 
 <header class="title">
   <h1>家計簿アプリ — MVP仕様書</h1>
-  <div class="meta">最終更新: 2026-06-05（レシートOCR〈Claude ビジョン〉 + リファクタ〈型一本化・API共通化・ボトムシート共通化〉 + ユニットテスト導入〈Vitest/jsdom〉。先行: 世帯コード保護・カテゴリ管理・ホーム全体カード改善）</div>
+  <div class="meta">最終更新: 2026-06-08（明細の並び替え〈日付/更新日/金額〉 + 全体カードの件数表示 + リファクタ Tier 5〜7〈Provider/page.tsx 分割・API型集約・ルートテスト基盤〉。先行: レシートOCR・世帯コード保護・カテゴリ管理・ホーム全体カード改善）</div>
 </header>
 
 <section id="overview">
@@ -355,7 +355,10 @@ hr {
 <pre><code>src/
 ├── app/
 │   ├── layout.tsx            # ExpenseModalProvider で全体を包む
-│   ├── page.tsx              # / 月次サマリー（ホーム・アプリの起点。登録・編集の起点）
+│   ├── page.tsx              # / 月次サマリー（ホーム）。描画と下記3フックに分離
+│   ├── use-monthly-summary.ts    # 表示月・取得・月送りスライドアニメ
+│   ├── use-category-selection.ts # 選択カテゴリ状態・同期・compose context
+│   ├── use-swipe-navigation.ts   # 左右スワイプ検出（native touch）
 │   └── api/
 │       ├── categories/route.ts
 │       ├── categories/[id]/route.ts
@@ -367,15 +370,20 @@ hr {
 │   ├── page-header.tsx       # 共通ヘッダ（全ページに sticky）
 │   ├── footer-nav.tsx        # 共通フッタ（サマリー / ＋FAB / 設定）
 │   ├── bottom-sheet.tsx      # useBottomSheet + BottomSheet（シート共通基盤）
-│   ├── expense-modal.tsx     # ExpenseModalProvider（全画面共通のボトムシート）
+│   ├── expense-modal.tsx     # ExpenseModalProvider（モーダル状態/削除/mutation）
+│   ├── toast.tsx             # useToast + Toast（トースト通知）
+│   ├── use-category-cache.ts # useCategoryCache（全カテゴリ先読みキャッシュ）
+│   ├── confirm-dialog.tsx    # 汎用 ConfirmDialog（削除確認など）
 │   ├── settings-modal.tsx    # SettingsModalProvider（設定のボトムシート / 世帯コード保存・カテゴリ管理）
 │   ├── session-provider.tsx  # SessionProvider（世帯コードの保存状態。unlock/lock）
 │   ├── category-manager.tsx  # 設定モーダル内のカテゴリ管理（名前変更 / 有効・無効トグル）
 │   ├── header-character.tsx  # 当月表示時のヘッダ小キャラ（タップで揺れる）
 │   ├── expense-form.tsx      # 登録 + 編集フォーム（モーダル内で使用）
+│   ├── use-receipt-ocr.ts    # useReceiptOcr（画像縮小→/api/ocr→抽出）
+│   ├── category-tag.tsx      # CategoryTag（カテゴリ色タグの共通表示）
 │   ├── day-wheel.tsx         # 日のみの縦ホイール（ドラム）
 │   ├── donut-chart.tsx       # 自前 SVG ドーナツ（選択強調 / 全体減光対応）
-│   ├── monthly-summary.tsx
+│   ├── monthly-summary.tsx   # 月次サマリー表示（ドーナツ/レジェンド/明細/並び替え）
 │   └── ui/                   # shadcn / Base UI コンポーネント
 ├── lib/
 │   ├── auth.ts               # getHouseholdId(cookie) / HOUSEHOLD_COOKIE / getDemoUserId
@@ -385,15 +393,19 @@ hr {
 │   ├── date.ts               # JSTヘルパ + pad2 / lastDayOfMonth / shiftMonth / ymKey
 │   ├── format.ts             # formatYen / formatDiff（金額表示）
 │   ├── ocr.ts                # extractReceipt（Claude ビジョンで構造化抽出）
-│   ├── expenses.ts           # listExpenses + validateExpenseInput
+│   ├── expenses.ts           # validateExpenseInput（支出入力の検証）
+│   ├── expense-sort.ts       # 明細の並び替え（日付/更新日/金額・純関数）
 │   ├── categories.ts         # ensureCategorySlots + validateCategoryPatch
 │   ├── category-constants.ts # 16スロット定数（CATEGORY_SLOTS / slotName / 必須判定 / その他ID）
 │   ├── category-color.ts     # カテゴリ色（16色パレット + その他のグレー）の集約
 │   ├── prisma.ts             # PrismaClient シングルトン
 │   ├── trend.ts              # トレンドレベル判定（差額の色付け用）
 │   └── anomaly.ts            # 直近6ヶ月の box stats（IQR）算出
-├── types/index.ts            # Expense / Category / BoxStats / MonthlySummary（型の単一ソース）
-├── *.test.ts(x)              # Vitest ユニットテスト（lib/* と components/bottom-sheet）
+├── types/
+│   ├── index.ts              # Expense / Category / BoxStats / MonthlySummary（型の単一ソース）
+│   └── api.ts                # API レスポンス契約（OcrResult / SessionStatus / ApiError 等）
+├── test/route-helpers.ts     # ルートテスト用ヘルパ（素の Request 生成）
+├── *.test.ts(x)              # Vitest（lib/* / components/* / app/use-* / api ルート）
 └── ...
 </code></pre>
 
@@ -525,10 +537,11 @@ hr {
 <tr><td>翌月ボタン</td><td>当月なら disabled（スワイプでも当月より先には進めない）</td></tr>
 <tr><td>スワイプ月送り</td><td>検知レイヤー（<code>swipeRef</code>）を<strong>画面全体に張る</strong>。横移動が縦より優位かつ <strong><code>SWIPE_MIN=36px</code> 超</strong>で発火（PWA 想定で感度高め、<code>touchmove</code> は <code>passive:false</code>）。演出は<strong>方向付きスライド＋クロスフェード</strong>: 不透明 0 の間にデータを差し替え、反対側（<code>SLIDE_OFFSET=48px</code>）からスライドイン</td></tr>
 <tr><td>ヘッダキャラ</td><td><strong>当月表示時のみ</strong>ヘッダに小さなキャラ（<code>header-character.tsx</code>、28px、<code>aria-hidden</code>）。タップで一度だけ「ぴょこっ」と揺れる（<code>animate-character-wiggle</code>）。過去月では出さない</td></tr>
-<tr><td>合計カード</td><td>flex 横並びレイアウト: <strong>左にドーナツチャート</strong>（<code>src/components/donut-chart.tsx</code>、自前 SVG、外側コンテナ <code>w-[160px]</code> 固定 / ringWidth 22）、<strong>右にレジェンド（＝カテゴリ選択UI）</strong>（<code>flex-1 min-w-0</code>、カテゴリ色のタグ風表示 <code>category-color.ts</code> の <code>tag</code>、長いカテゴリ名は <code>truncate</code>、タグ右に金額を <code>text-xs</code> muted で表示）。<strong>各タグはタップ可能</strong>で、タップしたカテゴリを下の「明細」に表示する。<strong>「解除なし」設計</strong>: 選択は常に切替のみで再タップでも解除せず（<code>aria-pressed</code>、選択中は <code>ring-2 ring-current</code>）。<strong>レジェンド／ドーナツは「上位6件＋その他」</strong>（<code>TOP_N=6</code>）: カテゴリが<strong>8件以上のときだけ</strong>残りを「その他」（グレー <code>OTHERS_COLOR</code>、擬似ID <code>__others__</code>）に集約し、<strong>7件以下は全件を個別表示</strong>（「その他」が必ず2件以上を束ねるよう <code>OTHERS_THRESHOLD=7</code>）。「その他」もタップで選択でき、明細はバケツ内の全カテゴリを名前タグ付きで表示する。ドーナツ中央に「合計」ラベル → 表示月合計（<code>text-xl whitespace-nowrap</code>）→ 差額（過去月閲覧時のみ、トレンド色）を配置。ドーナツのセグメントは<strong>金額の大きい順（降順）</strong>、カテゴリ色で塗り、レジェンドと 1:1 対応。<strong>選択中セグメントは強調</strong>（該当を僅かに太く <code>SELECTED_BUMP</code> ＋他を <code>strokeOpacity 0.28</code> で減光、未選択時は <code>dimAll</code> で全体減光）。合計カードの異常値バーは廃止（カテゴリ行のバーは継続）</td></tr>
+<tr><td>合計カード</td><td>flex 横並びレイアウト: <strong>左にドーナツチャート</strong>（<code>src/components/donut-chart.tsx</code>、自前 SVG、外側コンテナ <code>w-[160px]</code> 固定 / ringWidth 22）、<strong>右にレジェンド（＝カテゴリ選択UI）</strong>（<code>flex-1 min-w-0</code>、カテゴリ色のタグ風表示 <code>category-color.ts</code> の <code>tag</code>、長いカテゴリ名は <code>truncate</code>、<strong>カテゴリ名の隣に当月件数（「N件」）</strong>、タグ右に金額を <code>text-xs</code> muted で表示。件数の「その他」はバケツ内の合算）。<strong>各タグはタップ可能</strong>で、タップしたカテゴリを下の「明細」に表示する。<strong>「解除なし」設計</strong>: 選択は常に切替のみで再タップでも解除せず（<code>aria-pressed</code>、選択中は <code>ring-2 ring-current</code>）。<strong>レジェンド／ドーナツは「上位6件＋その他」</strong>（<code>TOP_N=6</code>）: カテゴリが<strong>8件以上のときだけ</strong>残りを「その他」（グレー <code>OTHERS_COLOR</code>、擬似ID <code>__others__</code>）に集約し、<strong>7件以下は全件を個別表示</strong>（「その他」が必ず2件以上を束ねるよう <code>OTHERS_THRESHOLD=7</code>）。「その他」もタップで選択でき、明細はバケツ内の全カテゴリを名前タグ付きで表示する。ドーナツ中央に「合計」ラベル → 表示月合計（<code>text-xl whitespace-nowrap</code>）→ 差額（過去月閲覧時のみ、トレンド色）を配置。ドーナツのセグメントは<strong>金額の大きい順（降順）</strong>、カテゴリ色で塗り、レジェンドと 1:1 対応。<strong>選択中セグメントは強調</strong>（該当を僅かに太く <code>SELECTED_BUMP</code> ＋他を <code>strokeOpacity 0.28</code> で減光、未選択時は <code>dimAll</code> で全体減光）。合計カードの異常値バーは廃止（カテゴリ行のバーは継続）</td></tr>
 <tr><td>明細セクション</td><td>見出しは<strong>「明細」</strong>で、その右に<strong>選択中カテゴリのラベル</strong>（カテゴリ色タグ）を表示。当月にそのカテゴリの記録が無い（キロクナシ）場合も <code>useExpenseModal().categories</code>（先読み全カテゴリ）から名前を解決し<strong>ラベルは出し続ける</strong>。明細カードは合計カードのレジェンドで<strong>選択中の1カテゴリのみ</strong>を表示（<code>visibleCategories</code>）。<strong>「その他」選択時はバケツ内の全カテゴリ</strong>を表示し、各カードに<strong>カテゴリ名タグを付ける</strong>（<code>showName</code>。どのカテゴリか区別するため）。個別カテゴリ選択時は<strong>カード内のカテゴリ名タグを廃止</strong>し、右側に金額＋差額（過去月閲覧時のみ、トレンド色）の縦並び、下に異常値バー（フィル長＝支出量、バー色はカテゴリ色）。<strong>開閉トグルは持たず常時展開</strong>（単一選択表示のため）。選択状態はサマリーページが保持（制御コンポーネント）。未選択(null)時のみ最大カテゴリへ自動フォールバック</td></tr>
 <tr><td>異常値バー</td><td>過去6ヶ月（表示月含む）の box stats から「いつもの幅」を算出し、<strong>上フェンス（Q3+1.5×IQR）を 100%</strong> としてフィル長で支出量を可視化。やたら使った月＝バーが長い、やたら使わなかった月＝バーが短い。サンプル不足（N&lt;2 or IQR=0）の月は<strong>斜めストライプ表示</strong>（「判定なし」を視覚的に区別、<code>aria-label</code> に明示）。値ありの月は <code>role="progressbar"</code> + <code>aria-valuenow</code> を付与。カテゴリの異常値サンプルは<strong>そのカテゴリの支出があった月のみ</strong>から採る（ゼロ埋めしない）。初回マウントでも 0%→target にトランジションするよう <code>requestAnimationFrame</code> で1フレーム遅延</td></tr>
-<tr><td>展開時</td><td><strong>そのカテゴリの支出明細を日付降順で一行表示</strong>（日付 <code>M/D(曜)</code> ／ 店名 or メモ ／ 金額）。明細は <code>monthly-summary</code> API が各カテゴリに同梱するため追加通信なし</td></tr>
+<tr><td>明細の並び替え</td><td>明細リスト上部に<strong>全カード共通のソートヘッダ</strong>（<code>日付 / 店名 / 金額</code>、明細行と3カラム整列）を1つ表示（「その他」で複数カードでもヘッダは1つ）。<strong>日付ボタンは1タップで循環</strong>（日付↓→日付↑→更新日↓→更新日↑）、<strong>金額ボタンは↓↑トグル</strong>。アクティブ列は上下三角を青く点灯。並び替えは純関数 <code>lib/expense-sort.ts</code>（日付＝ISO文字列、金額＝数値で比較）</td></tr>
+<tr><td>明細行</td><td>選択カテゴリの支出を一行表示（<strong>日付 ／ 店名 or メモ ／ 金額</strong>の3カラム整列、日付は固定幅）。日付表示は<strong>発生日＝<code>M/D(曜)</code> ／ 更新日＝<code>YYYY-MM-DD</code></strong>。既定は発生日の降順。明細は <code>monthly-summary</code> API が各カテゴリに同梱（<code>updatedAt</code> 含む）するため追加通信なし</td></tr>
 <tr><td>明細タップ</td><td>編集用ボトムシートを開く（<code>useExpenseModal().openEdit(...)</code>）</td></tr>
 <tr><td>更新反映</td><td>登録・編集・削除の成功で <code>ExpenseModalProvider</code> の <code>mutationVersion</code> が増分し、サマリーを自動再取得。画面遷移しないため<strong>選択月・選択カテゴリは保持</strong>される。選択カテゴリは<strong>月切り替えをまたいでも維持</strong>し、切替先の月にそのカテゴリの記録が無ければ「キロクナシ」を表示（記録のある月に戻れば再表示）。<strong>登録/更新後は確定したカテゴリを選択状態に同期</strong>し、<strong>CRUD 後はトップへスムーズスクロール</strong>。カテゴリ名変更も即時反映する（Provider の <code>categoriesVersion</code> をホームの取得 deps に含め、<code>refreshCategories</code> 時にサマリーも再取得）</td></tr>
 <tr><td>空状態</td><td><strong>選択カテゴリが当月に無い（<code>visibleCategories</code> が空）</strong>ときはキャラクター（<code>public/character.png</code>、112px）を中央に置き、「キロクナシ」を表示（当月にデータが1件も無いケースも含む。ワレワレ宇宙人のカタコト感に合わせたコピー）</td></tr>
@@ -854,6 +867,55 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-06-08 — 明細の並び替え（日付/更新日/金額）</h3>
+<p><span class="badge badge-major">major</span> ホーム明細にテーブルヘッダ型の並び替えを追加。PR #35。</p>
+<ul>
+  <li>明細リスト上部に<strong>全カード共通のソートヘッダ</strong>（<code>日付 / 店名 / 金額</code>・明細行と3カラム整列）を1つ配置。「その他」で複数カードでもヘッダは1つ</li>
+  <li><strong>日付ボタンは1タップで循環</strong>: 日付↓→日付↑→更新日↓→更新日↑。<strong>金額ボタンは↓↑トグル</strong>。アクティブ列は上下三角を青く点灯</li>
+  <li><strong>更新日表示時は ISO 形式</strong>（<code>2026-06-08</code>）、発生日は従来の <code>6/8(月)</code></li>
+  <li>カード内を「合計＋当月比較 → 異常値バー → 明細行」に整理（カード内ヘッダ廃止・区切り線除去）</li>
+  <li>並び替えは純関数 <code>src/lib/expense-sort.ts</code>（<code>spentAt</code>/<code>updatedAt</code> は文字列、<code>amount</code> は数値で比較）。<code>CategoryExpense</code> に <code>updatedAt</code> を追加（<strong>マイグレ不要</strong>＝既存列を DTO に通すのみ）</li>
+  <li>テスト: <code>expense-sort</code> 7件、<code>MonthlySummaryView</code> 5件（日付循環・金額トグル・その他は単一ヘッダ＋複数カード）</li>
+</ul>
+
+<hr>
+
+<h3>2026-06-08 — 全体カードに件数表示</h3>
+<p><span class="badge badge-minor">minor</span> 全体カードのレジェンドに各カテゴリの当月件数を表示。PR #34。</p>
+<ul>
+  <li>レジェンド各行にカテゴリ名の隣（左寄せ）で「N件」を表示。「その他」はバケツ内の合算。<code>LegendItem.count</code> を <code>summary-view</code> に追加</li>
+</ul>
+
+<hr>
+
+<h3>2026-06-08 — リファクタ Tier 3〜7 + テスト基盤拡充</h3>
+<p><span class="badge badge-minor">minor</span> 仕様追加で溜まった歪みのリファクタ調査（採番マスターは <code>docs/refactor-backlog.md</code> に永続化）を Tier 3〜7 まで消化。テストは約149件に。PR #21〜#33。</p>
+<h4>Tier 3〜4（純関数化・dead code 撤去・#21〜#24）</h4>
+<ul>
+  <li>monthly-summary の集計とホームの選択解決を<strong>純関数化</strong>してユニットテスト可能に（<code>lib/monthly-summary.ts</code> / <code>lib/summary-view.ts</code>）</li>
+  <li>未使用の <code>GET /api/expenses</code> + <code>listExpenses</code> を撤去 / seed の定数共有・予約カラムの明記</li>
+</ul>
+<h4>Tier 5（低リスク即効・#25）</h4>
+<ul>
+  <li>月送りを <code>shiftMonth()</code> へ / 死んだ <code>receiptImageUrl</code> 入力処理を撤去 / <code>POST /api/session</code> を共通 <code>api.ts</code> 経由に / <code>CategoryTag</code> 抽出 / 未使用 <code>DEMO_HOUSEHOLD_ID</code> 撤去</li>
+</ul>
+<h4>Tier 6（構造リファクタ・#26〜#30）</h4>
+<ul>
+  <li><code>ExpenseModalProvider</code> を <code>useToast</code> / <code>useCategoryCache</code> に分割（公開フック <code>useExpenseModal()</code> は不変）</li>
+  <li><code>app/page.tsx</code>（307→約190行）を3フックに分離: <code>useSwipeNavigation</code> / <code>useMonthlySummary</code> / <code>useCategorySelection</code></li>
+  <li>API レスポンス型を <code>src/types/api.ts</code> に集約（<code>OcrResult</code> / <code>SessionStatus</code> / <code>SessionUnlockResult</code> / <code>ApiError</code>。ルートは <code>satisfies</code> で保証）</li>
+  <li>OCR を <code>useReceiptOcr</code> に切り出し / 削除確認を汎用 <code>ConfirmDialog</code> に。<code>useSwipeNavigation</code> 単体テスト追加</li>
+  <li>※ T6-2（<code>category-manager</code> の fetch 統一）は楽観更新との兼ね合いで費用対効果が薄く<strong>見送り</strong></li>
+</ul>
+<h4>Tier 7（テスト空白埋め・#31〜#33）</h4>
+<ul>
+  <li><code>lib/ocr.ts</code> ユニットテスト（<code>@anthropic-ai/sdk</code> モック）</li>
+  <li><strong>API ルートテスト基盤</strong>（<code>src/test/route-helpers.ts</code>＝素の <code>Request</code> ＋ prisma/auth モック）＋主要4ルート（monthly-summary / categories / expenses / session）。<strong>cookie 無し＝401 の認可契約</strong>・世帯スコープ(IDOR)・cookie 発行/破棄を実行時に固定</li>
+  <li><code>ExpenseForm</code>（送信/バリデーション）・<code>lib/auth.ts</code>（cookie decode・キャッシュ）テスト</li>
+</ul>
+
+<hr>
 
 <h3>2026-06-05 (リファクタ Tier 2 #6) — ボトムシート共通化 + UIテスト導入</h3>
 <p><span class="badge badge-minor">minor</span> 支出/設定モーダルで重複していたシート機構を共通基盤へ。PR #19。</p>
