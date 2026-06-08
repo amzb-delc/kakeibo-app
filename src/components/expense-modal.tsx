@@ -17,6 +17,7 @@ import { todayJst, lastDayOfMonth } from "@/lib/date";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
 import { useToast, Toast } from "@/components/toast";
 import { useCategoryCache } from "@/components/use-category-cache";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { Category } from "@/types";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
@@ -238,43 +239,16 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
 
       {/* 削除確認ダイアログ（シートより前面） */}
       {active && confirmingDelete && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-delete-title"
-          className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/40"
-          onClick={() => !deleting && setConfirmingDelete(false)}
-        >
-          <div
-            className="w-full sm:max-w-sm bg-card rounded-t-2xl sm:rounded-2xl p-5 m-0 sm:m-4 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="confirm-delete-title" className="text-base font-semibold mb-2">
-              この支出を削除しますか？
-            </h2>
-            <p className="text-sm text-muted-foreground mb-5">
-              この操作は取り消せません。
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={() => setConfirmingDelete(false)}
-                className="flex-1 h-12 rounded-xl border border-border text-base font-medium hover:bg-muted transition-colors disabled:opacity-50"
-              >
-                キャンセル
-              </button>
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={handleDelete}
-                className="flex-1 h-12 rounded-xl bg-destructive text-white text-base font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50"
-              >
-                {deleting ? "削除中…" : "削除する"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="この支出を削除しますか？"
+          description="この操作は取り消せません。"
+          confirmLabel="削除する"
+          busyLabel="削除中…"
+          busy={deleting}
+          destructive
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
 
       <Toast message={toastMessage} />
