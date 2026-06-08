@@ -16,6 +16,7 @@ import { DayWheel } from "@/components/day-wheel";
 import { CategoryTag } from "@/components/category-tag";
 import { pad2, lastDayOfMonth } from "@/lib/date";
 import type { Category, Expense } from "@/types";
+import type { ApiError, OcrResult } from "@/types/api";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
 export type ExpenseFormValues = Pick<
@@ -103,14 +104,9 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error ?? "読み取りに失敗しました");
+        throw new Error((data as ApiError).error ?? "読み取りに失敗しました");
       }
-      const { amount, storeName, spentAt, categoryId } = data as {
-        amount: number | null;
-        storeName: string | null;
-        spentAt: string | null;
-        categoryId: string | null;
-      };
+      const { amount, storeName, spentAt, categoryId } = data as OcrResult;
 
       setForm((p) => {
         const next = { ...p };

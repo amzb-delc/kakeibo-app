@@ -32,10 +32,10 @@
 |----|------|------|------|------|------|
 | **T6-1** ★本命（旧 #9 Provider分割） | `ExpenseModalProvider` の6関心を分割。`useToast`(+`<Toast>`) と `useCategoryCache` を専用フックに切り出し、Provider はモーダル状態/削除/mutation に専念。**公開フック `useExpenseModal()` の形は不変**（消費側コード無改修）。各フックにテスト追加 | `src/components/expense-modal.tsx` → `toast.tsx` / `use-category-cache.ts` | M | 高 | ✅ |
 | T6-2 | `useCategoryCache` を `category-manager` でも使い、独自 fetch（`?scope=all`＋alive）を統一する。※フック自体は T6-1 で作成済み、あとは消費側の置換 | `category-manager.tsx:22-39` | S | 中 | 残（フックは作成済） |
-| T6-3 | `page.tsx` のスワイプ/アニメ/データ取得/カテゴリ同期をフック分離 | `src/app/page.tsx`（全体304行） | M-L | 高 |
-| T6-4 | API レスポンス型を `src/types/api.ts` に集約（各所で `res.json() as {...}` 手キャスト） | `expense-form.tsx:108` / `page.tsx:68` ほか | M | 中 |
-| T6-5 | OCR 画像縮小＋抽出をフォームから `useReceiptOcr` 等に切り出し | `src/components/expense-form.tsx:54-144` | S-M | 中 |
-| T6-6 | `ConfirmDialog` 小コンポーネント抽出（削除確認の自前実装を汎用化。旧 T5-5 の置き換え案） | `expense-modal.tsx:276-314` | S-M | 低 |
+| T6-3 | `page.tsx` のスワイプ/アニメ/データ取得/カテゴリ同期をフック分離 | `src/app/page.tsx`（全体304行） | M-L | 高 | 未 |
+| T6-4 | API レスポンス型を `src/types/api.ts` に集約。`OcrResult`/`SessionStatus`/`SessionUnlockResult`/`ApiError` を定義し、ルートは `satisfies`、クライアントは型注釈で参照（OCR のインラインリテラル手キャストを排除） | `types/api.ts` / `ocr`・`session` route / `expense-form`・`session-provider` | M | 中 | ✅ |
+| T6-5 | OCR 画像縮小＋抽出をフォームから `useReceiptOcr` 等に切り出し | `src/components/expense-form.tsx:54-144` | S-M | 中 | 未 |
+| T6-6 | `ConfirmDialog` 小コンポーネント抽出（削除確認の自前実装を汎用化。旧 T5-5 の置き換え案） | `expense-modal.tsx:276-314` | S-M | 低 | 未 |
 
 ## Tier 7 — テスト空白埋め（マイグレ不要）
 | ID | 内容 | 場所 | 工数 | 価値 |

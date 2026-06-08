@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import type { SessionStatus, SessionUnlockResult } from "@/types/api";
 
 // 世帯コードの保存状態をアプリ全体で共有する。
 // 実際のデータ保護はサーバー（cookie + API の 401）が担い、ここはUX用の状態。
@@ -39,7 +40,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     let alive = true;
     fetch("/api/session")
       .then((r) => (r.ok ? r.json() : { unlocked: false }))
-      .then((d) => {
+      .then((d: SessionStatus) => {
         if (!alive) return;
         setUnlocked(!!d.unlocked);
         setHouseholdName(d.householdName ?? null);
@@ -59,7 +60,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ passphrase }),
     });
     if (!res.ok) return false;
-    const d = await res.json().catch(() => null);
+    const d: SessionUnlockResult | null = await res.json().catch(() => null);
     setUnlocked(true);
     setHouseholdName(d?.householdName ?? null);
     return true;
