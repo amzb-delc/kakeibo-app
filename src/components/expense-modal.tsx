@@ -4,7 +4,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useRef,
   useState,
 } from "react";
@@ -15,8 +14,9 @@ import {
   type ExpenseFormInitial,
 } from "@/components/expense-form";
 import { todayJst, lastDayOfMonth } from "@/lib/date";
-import { useSession } from "@/components/session-provider";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
+import { useToast, Toast } from "@/components/toast";
+import { useCategoryCache } from "@/components/use-category-cache";
 import type { Category } from "@/types";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
@@ -58,7 +58,6 @@ export function useExpenseModal(): ContextValue {
 }
 
 export function ExpenseModalProvider({ children }: { children: React.ReactNode }) {
-  const { unlocked } = useSession();
   const [active, setActive] = useState<ActiveState | null>(null);
   // シートの開閉アニメ・ドラッグ閉じ・Esc・スクロールロックは共通フックに委譲。
   // 退場アニメ完了時に active を破棄する。
@@ -66,46 +65,19 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     useBottomSheet({ draggable: true, onClosed: () => setActive(null) });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
-  const [categoriesVersion, setCategoriesVersion] = useState(0);
   const [mutationVersion, setMutationVersion] = useState(0);
   const [lastMutatedCategoryId, setLastMutatedCategoryId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composeRef = useRef<ComposeContext | null>(null);
 
-  // カテゴリは軽量なので保存後に先読みしておく。無効も含めた全件（scope=all）を持ち、
-  // フォームの選択肢生成（編集時は無効でも現カテゴリを残す）や名前解決に使う。
-  // 未保存のときは /api/categories が 401 になるため取得しない（保存で再取得）。
-  // categoriesVersion はカテゴリ管理での編集後の再取得トリガ。
-  useEffect(() => {
-    if (!unlocked) return;
-    let alive = true;
-    fetch("/api/categories?scope=all")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Category[]) => {
-        if (alive) {
-          setCategories(data);
-          setCategoriesLoaded(true);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [unlocked, categoriesVersion]);
-
-  const refreshCategories = useCallback(
-    () => setCategoriesVersion((v) => v + 1),
-    []
-  );
-
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 2200);
-  }, []);
+  // 全カテゴリの先読みキャッシュとトーストは専用フックに委譲。
+  // categories は無効含む全件で、フォームの選択肢生成や名前解決に使う。
+  const {
+    categories,
+    loaded: categoriesLoaded,
+    version: categoriesVersion,
+    refresh: refreshCategories,
+  } = useCategoryCache();
+  const { message: toastMessage, show: showToast } = useToast();
 
   const open = useCallback(
     (next: ActiveState) => {
@@ -169,14 +141,6 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
       showToast("削除に失敗しました");
     }
   }, [active, handleSuccess, showToast]);
-
-  // アンマウント時に toast タイマーを後始末
-  useEffect(
-    () => () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-    },
-    []
-  );
 
   const isEditMode = active?.mode === "edit";
   const title = isEditMode ? "支出を編集" : "支出を登録";
@@ -313,15 +277,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
         </div>
       )}
 
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-6 left-4 right-4 z-[60] bg-foreground text-background rounded-xl px-4 py-3 text-sm font-medium text-center shadow-lg animate-in slide-in-from-bottom"
-        >
-          {toast}
-        </div>
-      )}
+      <Toast message={toastMessage} />
     </ExpenseModalContext.Provider>
   );
 }

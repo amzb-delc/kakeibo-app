@@ -26,10 +26,12 @@
 | ~~T5-5~~ | ~~削除確認ダイアログを `BottomSheet` 再利用に~~ → **見送り**。確認ダイアログは BottomSheet と形が違う（グラバー/✕なし・デスクトップ中央・支出シートより前面 z-[70]）。寄せると UX が変わり BottomSheet の API も肥大。やるなら別途 **ConfirmDialog 小コンポーネント抽出**（下記 T6-6 候補）。 | `expense-modal.tsx:276-314` | — | 低 | ⏸ 見送り |
 
 ## Tier 6 — 構造リファクタ（マイグレ不要）
-| ID | 内容 | 場所 | 工数 | 価値 |
-|----|------|------|------|------|
-| **T6-1** ★本命（旧 #9 Provider分割） | `ExpenseModalProvider` の6関心を分割（モーダル状態 / データ変更 mutationVersion / カテゴリキャッシュ）。`useToast` を layout 直下に切り出し他モーダルからも使えるように | `src/components/expense-modal.tsx:60-327` | M | 高 |
-| T6-2 | `useCategories(scope)` フック抽出（`?scope=all` 取得＋alive クリーンアップが2箇所重複）※T6-1 に内包しうる | `expense-modal.tsx:82-97` / `category-manager.tsx:22-39` | M | 中 |
+**2026-06-08 着手: T6-1 完了（branch `refactor/tier6-provider-split`）。**
+
+| ID | 内容 | 場所 | 工数 | 価値 | 状態 |
+|----|------|------|------|------|------|
+| **T6-1** ★本命（旧 #9 Provider分割） | `ExpenseModalProvider` の6関心を分割。`useToast`(+`<Toast>`) と `useCategoryCache` を専用フックに切り出し、Provider はモーダル状態/削除/mutation に専念。**公開フック `useExpenseModal()` の形は不変**（消費側コード無改修）。各フックにテスト追加 | `src/components/expense-modal.tsx` → `toast.tsx` / `use-category-cache.ts` | M | 高 | ✅ |
+| T6-2 | `useCategoryCache` を `category-manager` でも使い、独自 fetch（`?scope=all`＋alive）を統一する。※フック自体は T6-1 で作成済み、あとは消費側の置換 | `category-manager.tsx:22-39` | S | 中 | 残（フックは作成済） |
 | T6-3 | `page.tsx` のスワイプ/アニメ/データ取得/カテゴリ同期をフック分離 | `src/app/page.tsx`（全体304行） | M-L | 高 |
 | T6-4 | API レスポンス型を `src/types/api.ts` に集約（各所で `res.json() as {...}` 手キャスト） | `expense-form.tsx:108` / `page.tsx:68` ほか | M | 中 |
 | T6-5 | OCR 画像縮小＋抽出をフォームから `useReceiptOcr` 等に切り出し | `src/components/expense-form.tsx:54-144` | S-M | 中 |
