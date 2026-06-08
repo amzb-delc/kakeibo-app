@@ -215,10 +215,15 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
                         aria-pressed={isSelected}
                         className="flex w-full items-center justify-between gap-2 text-left"
                       >
-                        <span
-                          className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-1 text-sm font-medium ${it.color.tag} ${isSelected ? "ring-2 ring-current ring-offset-1" : ""}`}
-                        >
-                          <span className="truncate">{it.name}</span>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span
+                            className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-1 text-sm font-medium ${it.color.tag} ${isSelected ? "ring-2 ring-current ring-offset-1" : ""}`}
+                          >
+                            <span className="truncate">{it.name}</span>
+                          </span>
+                          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
+                            {it.count}件
+                          </span>
                         </span>
                         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                           {formatYen(it.total)}

@@ -3,7 +3,13 @@ import { resolveSummaryView, topCategoryId } from "./summary-view";
 import { OTHERS_CATEGORY_ID } from "./category-constants";
 import type { CategorySummary } from "@/types";
 
-function cat(id: string, total: number, sortOrder = 0, name = id): CategorySummary {
+function cat(
+  id: string,
+  total: number,
+  sortOrder = 0,
+  name = id,
+  count = 0
+): CategorySummary {
   return {
     categoryId: id,
     name,
@@ -11,7 +17,13 @@ function cat(id: string, total: number, sortOrder = 0, name = id): CategorySumma
     total,
     compareTotal: null,
     boxStats: null,
-    expenses: [],
+    expenses: Array.from({ length: count }, (_, i) => ({
+      id: `${id}-e${i}`,
+      amount: 0,
+      spentAt: "2026-06-01",
+      storeName: null,
+      memo: null,
+    })),
   };
 }
 
@@ -41,6 +53,28 @@ describe("resolveSummaryView: バケツ分け", () => {
     const last = v.legendItems[6];
     expect(last.id).toBe(OTHERS_CATEGORY_ID);
     expect(last.total).toBe(10 + 20); // c7(20) + c8(10)
+  });
+});
+
+describe("resolveSummaryView: 件数", () => {
+  it("各レジェンドに当月件数を載せ、その他はバケツ内を合算", () => {
+    const cats = [
+      cat("c1", 100, 0, "c1", 3),
+      cat("c2", 90, 1, "c2", 1),
+      cat("c3", 80, 2, "c3", 2),
+      cat("c4", 70, 3, "c4", 1),
+      cat("c5", 60, 4, "c5", 1),
+      cat("c6", 50, 5, "c6", 1),
+      cat("c7", 40, 6, "c7", 2),
+      cat("c8", 30, 7, "c8", 4),
+    ]; // 8件 → 上位6件 + その他(c7,c8)
+    const v = resolveSummaryView(cats, null, []);
+    const countById = Object.fromEntries(
+      v.legendItems.map((it) => [it.id, it.count])
+    );
+    expect(countById["c1"]).toBe(3);
+    expect(countById["c3"]).toBe(2);
+    expect(countById[OTHERS_CATEGORY_ID]).toBe(2 + 4); // c7 + c8
   });
 });
 
