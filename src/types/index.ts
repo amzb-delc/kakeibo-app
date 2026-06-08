@@ -18,7 +18,8 @@ export type Expense = {
 export type CategoryExpense = {
   id: string;
   amount: number;
-  spentAt: string;
+  spentAt: string; // 発生日（利用日）
+  updatedAt: string; // 更新日（最終編集日時）
   storeName: string | null;
   memo: string | null;
 };

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getReq, jsonReq } from "@/test/route-helpers";
+import { jsonReq } from "@/test/route-helpers";
 
 // session は HOUSEHOLD_COOKIE と getHouseholdId を auth から import する。
 const { getHouseholdId } = vi.hoisted(() => ({ getHouseholdId: vi.fn() }));

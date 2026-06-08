@@ -21,6 +21,7 @@ function cat(
       id: `${id}-e${i}`,
       amount: 0,
       spentAt: "2026-06-01",
+      updatedAt: "2026-06-01",
       storeName: null,
       memo: null,
     })),

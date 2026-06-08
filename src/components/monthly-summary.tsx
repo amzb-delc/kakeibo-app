@@ -9,6 +9,7 @@ import { categoryColor } from "@/lib/category-color";
 import { CategoryTag } from "@/components/category-tag";
 import { OTHERS_CATEGORY_ID } from "@/lib/category-constants";
 import { resolveSummaryView } from "@/lib/summary-view";
+import { sortExpenses, type SortField, type SortDir } from "@/lib/expense-sort";
 import { useExpenseModal } from "@/components/expense-modal";
 import { DonutChart } from "@/components/donut-chart";
 import type { MonthlySummary, CategorySummary, BoxStats } from "@/types";
@@ -70,15 +71,33 @@ function AnomalyBar({
   );
 }
 
+// 並び替えの上下三角。アクティブ列は方向側を青く点灯、非アクティブはグレー。
+function SortTriangles({ active, dir }: { active: boolean; dir: SortDir }) {
+  const upClass = active && dir === "asc" ? "fill-blue-600" : "fill-muted-foreground/30";
+  const downClass = active && dir === "desc" ? "fill-blue-600" : "fill-muted-foreground/30";
+  return (
+    <svg width="9" height="12" viewBox="0 0 9 12" aria-hidden="true" className="shrink-0">
+      <path d="M4.5 0 L8.5 4.5 L0.5 4.5 Z" className={upClass} />
+      <path d="M4.5 12 L8.5 7.5 L0.5 7.5 Z" className={downClass} />
+    </svg>
+  );
+}
+
 // 単一選択表示のため、明細カードは常に展開状態（開閉トグルは持たない）。
 // showName: 「その他」など複数カテゴリをまとめて表示する場面で、どのカテゴリかが
 // 分かるようカード上部にカテゴリ名タグを出す（単一選択時は見出しに名前が出るので不要）。
 function CategoryRow({
   category,
   showName = false,
+  sortField,
+  sortDir,
+  rowDateField,
 }: {
   category: CategorySummary;
   showName?: boolean;
+  sortField: SortField;
+  sortDir: SortDir;
+  rowDateField: "spentAt" | "updatedAt";
 }) {
   const { openEdit } = useExpenseModal();
   // 今月視点で比較する: 今月 > 表示月 なら up(赤=今月の方が多い), 今月 < 表示月 なら down(緑=今月の方が少ない)
@@ -86,19 +105,18 @@ function CategoryRow({
   const level = compareTotal !== null ? getTrendLevel(compareTotal, category.total) : null;
   const diff = compareTotal !== null ? formatDiff(compareTotal - category.total) : null;
   const color = categoryColor(category.sortOrder);
+  // 並び替えはヘッダ（全カード共通）から渡される。行の日付表示は rowDateField に従う。
+  const sortedExpenses = sortExpenses(category.expenses, sortField, sortDir);
 
   return (
     <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-      <div className="p-4">
+      <div className="px-4 pt-4 pb-3">
+        {/* カード上部: 合計＋当月比較 */}
         <div
           className={`flex items-center mb-2 ${showName ? "justify-between gap-2" : "justify-end"}`}
         >
           {showName && (
-            <CategoryTag
-              name={category.name}
-              sortOrder={category.sortOrder}
-              truncate
-            />
+            <CategoryTag name={category.name} sortOrder={category.sortOrder} truncate />
           )}
           <div className="flex flex-col items-end">
             <span className="text-base font-semibold">{formatYen(category.total)}</span>
@@ -117,10 +135,10 @@ function CategoryRow({
         />
       </div>
 
-      {/* 支出明細リスト（常時表示。各行タップで編集モーダルを開く） */}
-      <div className="px-4 pb-4 pt-3 text-sm border-t border-border/50">
+      {/* 支出明細リスト（区切り線なしで続ける。各行タップで編集モーダルを開く） */}
+      <div className="px-4 pb-3 text-sm">
         <div className="divide-y divide-border/50">
-          {category.expenses.map((exp) => (
+          {sortedExpenses.map((exp) => (
             <button
               key={exp.id}
               type="button"
@@ -134,18 +152,17 @@ function CategoryRow({
                   memo: exp.memo,
                 })
               }
-              className="w-full text-left flex items-center justify-between gap-2 -mx-4 px-4 py-2.5 min-h-[44px] active:bg-muted/50 transition-colors"
+              className="w-full text-left flex items-center gap-2 -mx-4 px-4 py-2.5 min-h-[44px] active:bg-muted/50 transition-colors"
             >
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="text-muted-foreground shrink-0">
-                  {formatJstDateLabel(new Date(exp.spentAt))}
-                </span>
-                {(exp.storeName || exp.memo) && (
-                  <span className="text-xs text-muted-foreground truncate">
-                    {exp.storeName ?? exp.memo}
-                  </span>
-                )}
-              </div>
+              {/* ヘッダと同じ3カラム（日付=固定幅 / 店名=可変 / 金額=右） */}
+              <span className="w-[5.5rem] shrink-0 tabular-nums text-muted-foreground">
+                {rowDateField === "updatedAt"
+                  ? formatJstDate(new Date(exp.updatedAt)) // 2026-06-08 形式
+                  : formatJstDateLabel(new Date(exp.spentAt))}
+              </span>
+              <span className="flex-1 min-w-0 truncate text-xs text-muted-foreground">
+                {exp.storeName ?? exp.memo ?? ""}
+              </span>
               <span className="font-medium shrink-0">{formatYen(exp.amount)}</span>
             </button>
           ))}
@@ -176,6 +193,30 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
     selectedLabel,
     selectedLabelColor,
   } = resolveSummaryView(summary.categories, openCategoryId, allCategories);
+
+  // 明細の並び替え（ヘッダ＝全カード共通）。
+  // 日付ボタンは1タップ判定で循環: 日付↓→日付↑→更新日↓→更新日↑（dateStep 0..3）。
+  // 金額ボタンは↓↑トグル。アクティブな列（sortKey）で実際に並べ替える。既定=日付↓。
+  const [dateStep, setDateStep] = useState(0);
+  const [amountDir, setAmountDir] = useState<SortDir>("desc");
+  const [sortKey, setSortKey] = useState<"date" | "amount">("date");
+
+  const dateFieldFromStep: "spentAt" | "updatedAt" =
+    dateStep < 2 ? "spentAt" : "updatedAt";
+  const dateDirFromStep: SortDir = dateStep % 2 === 0 ? "desc" : "asc";
+  const sortField: SortField = sortKey === "amount" ? "amount" : dateFieldFromStep;
+  const sortDir: SortDir = sortKey === "amount" ? amountDir : dateDirFromStep;
+
+  // 日付ボタン: アクティブなら循環を1つ進める。金額ソート中ならまず日付に戻す。
+  const onDateSort = () => {
+    if (sortKey === "date") setDateStep((s) => (s + 1) % 4);
+    else setSortKey("date");
+  };
+  // 金額ボタン: アクティブなら↓↑トグル。日付ソート中ならまず金額にする。
+  const onAmountSort = () => {
+    if (sortKey === "amount") setAmountDir((d) => (d === "asc" ? "desc" : "asc"));
+    else setSortKey("amount");
+  };
 
   return (
     <main className="px-4 py-6 space-y-6">
@@ -249,6 +290,37 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
               </span>
             )}
           </div>
+          {/* 並び替えヘッダ（全カード共通・明細の一番上に1つ）。明細行と同じ3カラムで整列。
+              日付ボタンは1タップで循環、金額は↓↑トグル。px-4 はカード内 px-4 と揃える。 */}
+          {visibleCategories.length > 0 && (
+            <div className="flex items-center gap-2 px-4 mb-2 text-xs font-medium text-muted-foreground">
+              <button
+                type="button"
+                onClick={onDateSort}
+                aria-pressed={sortKey === "date"}
+                aria-label={`${dateFieldFromStep === "updatedAt" ? "更新日" : "日付"}で並び替え`}
+                className={`w-[5.5rem] shrink-0 flex items-center gap-1 py-1 transition-colors ${
+                  sortKey === "date" ? "text-foreground" : "hover:text-foreground"
+                }`}
+              >
+                {dateFieldFromStep === "updatedAt" ? "更新日" : "日付"}
+                <SortTriangles active={sortKey === "date"} dir={dateDirFromStep} />
+              </button>
+              <span className="flex-1 min-w-0">店名</span>
+              <button
+                type="button"
+                onClick={onAmountSort}
+                aria-pressed={sortKey === "amount"}
+                aria-label="金額で並び替え"
+                className={`shrink-0 flex items-center gap-1 py-1 transition-colors ${
+                  sortKey === "amount" ? "text-foreground" : "hover:text-foreground"
+                }`}
+              >
+                金額
+                <SortTriangles active={sortKey === "amount"} dir={amountDir} />
+              </button>
+            </div>
+          )}
           <div className="space-y-3">
             {visibleCategories.length === 0 ? (
               <div className="py-8 flex flex-col items-center text-center">
@@ -270,6 +342,9 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
                   key={cat.categoryId}
                   category={cat}
                   showName={selectedId === OTHERS_CATEGORY_ID}
+                  sortField={sortField}
+                  sortDir={sortDir}
+                  rowDateField={dateFieldFromStep}
                 />
               ))
             )}
