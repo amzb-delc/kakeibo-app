@@ -9,6 +9,7 @@ import { useExpenseModal } from "@/components/expense-modal";
 import { useSettingsModal } from "@/components/settings-modal";
 import { useSession } from "@/components/session-provider";
 import { OTHERS_CATEGORY_ID } from "@/lib/category-constants";
+import { shiftMonth } from "@/lib/date";
 import { topCategoryId as pickTopCategoryId } from "@/lib/summary-view";
 import type { MonthlySummary } from "@/types";
 
@@ -121,15 +122,17 @@ export default function SummaryPage() {
 
   const handlePrevMonth = useCallback(() => {
     pendingNavDir.current = -1;
-    setYear((y) => (month === 1 ? y - 1 : y));
-    setMonth((m) => (m === 1 ? 12 : m - 1));
-  }, [month]);
+    const prev = shiftMonth(year, month, -1);
+    setYear(prev.year);
+    setMonth(prev.month);
+  }, [year, month]);
 
   const handleNextMonth = useCallback(() => {
     pendingNavDir.current = 1;
-    setYear((y) => (month === 12 ? y + 1 : y));
-    setMonth((m) => (m === 12 ? 1 : m + 1));
-  }, [month]);
+    const next = shiftMonth(year, month, 1);
+    setYear(next.year);
+    setMonth(next.month);
+  }, [year, month]);
 
   const isCurrentMonth =
     year === now.getFullYear() && month === now.getMonth() + 1;

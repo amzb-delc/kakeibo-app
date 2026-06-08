@@ -12,7 +12,6 @@ export type Expense = {
   spentAt: string;
   storeName: string | null;
   memo: string | null;
-  receiptImageUrl: string | null;
   category: { id: string; name: string };
 };
 

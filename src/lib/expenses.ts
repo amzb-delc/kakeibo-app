@@ -8,7 +8,6 @@ export type ExpenseInput = {
   categoryId: string;
   storeName: string | null;
   memo: string | null;
-  receiptImageUrl: string | null;
 };
 
 const MAX_AMOUNT = 100_000_000;
@@ -86,17 +85,6 @@ export async function validateExpenseInput(
       data.memo = body.memo;
     } else {
       return { data, error: { field: "memo", message: `memo は${MAX_MEMO}文字以下` } };
-    }
-  }
-
-  // receiptImageUrl
-  if (body.receiptImageUrl !== undefined) {
-    if (body.receiptImageUrl === null || body.receiptImageUrl === "") {
-      data.receiptImageUrl = null;
-    } else if (typeof body.receiptImageUrl === "string") {
-      data.receiptImageUrl = body.receiptImageUrl;
-    } else {
-      return { data, error: { field: "receiptImageUrl", message: "receiptImageUrl が不正" } };
     }
   }
 
