@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/select";
 import { DayWheel } from "@/components/day-wheel";
 import { CategoryTag } from "@/components/category-tag";
+import { useReceiptOcr } from "@/components/use-receipt-ocr";
 import { pad2, lastDayOfMonth } from "@/lib/date";
 import type { Category, Expense } from "@/types";
-import type { ApiError, OcrResult } from "@/types/api";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
 export type ExpenseFormValues = Pick<
@@ -48,30 +48,6 @@ type Props = {
   onSuccess: (message: string, categoryId: string) => void;
 };
 
-// 送信前に画像を縮小して JPEG base64 化する。長辺を 1568px に抑え、
-// トークン量と通信量を削減する（Claude ビジョンの推奨上限に合わせる）。
-// iOS 写真の EXIF 回転は createImageBitmap の imageOrientation で正す。
-const OCR_MAX_EDGE = 1568;
-async function fileToDownscaledJpeg(
-  file: File
-): Promise<{ base64: string; mediaType: "image/jpeg" }> {
-  const bitmap = await createImageBitmap(file, {
-    imageOrientation: "from-image",
-  });
-  const scale = Math.min(1, OCR_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-  const w = Math.max(1, Math.round(bitmap.width * scale));
-  const h = Math.max(1, Math.round(bitmap.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("画像の処理に失敗しました");
-  ctx.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-  return { base64: dataUrl.split(",")[1] ?? "", mediaType: "image/jpeg" };
-}
-
 export function ExpenseForm({ categories, initial, onSuccess }: Props) {
   const isEdit = initial.id !== undefined;
 
@@ -84,58 +60,43 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [ocrError, setOcrError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // レシート画像の縮小・送信・抽出はフックに委譲。結果の反映だけここで行う。
+  const { loading: ocrLoading, error: ocrError, setError: setOcrError, read: readReceipt } =
+    useReceiptOcr();
 
   // レシート画像を読み取り、取得できた項目をフォームに反映する。
   const handleReceiptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ""; // 同じファイルを連続選択できるようにリセット
     if (!file) return;
-    setOcrError(null);
-    setOcrLoading(true);
-    try {
-      const { base64, mediaType } = await fileToDownscaledJpeg(file);
-      const res = await fetch("/api/ocr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, mediaType }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error((data as ApiError).error ?? "読み取りに失敗しました");
-      }
-      const { amount, storeName, spentAt, categoryId } = data as OcrResult;
+    const result = await readReceipt(file);
+    if (!result) return; // 失敗時は readReceipt が error をセット済み
+    const { amount, storeName, spentAt, categoryId } = result;
 
-      setForm((p) => {
-        const next = { ...p };
-        if (typeof amount === "number" && amount >= 0) {
-          next.amount = String(Math.trunc(amount)).slice(0, AMOUNT_MAX_DIGITS);
-        }
-        if (storeName) next.storeName = storeName.slice(0, STORE_MAX);
-        if (categoryId && categories.some((c) => c.id === categoryId)) {
-          next.categoryId = categoryId;
-        }
-        // 日付は年月がフォームの表示月と一致するときだけ「日」を反映する
-        // （年月は固定表示のため）。
-        if (spentAt && /^\d{4}-\d{2}-\d{2}$/.test(spentAt)) {
-          const [y, m, d] = spentAt.split("-").map(Number);
-          const lastDay = lastDayOfMonth(initial.year, initial.month);
-          if (y === initial.year && m === initial.month && d >= 1 && d <= lastDay) {
-            next.day = d;
-          }
-        }
-        return next;
-      });
-
-      if (amount == null && !storeName && !spentAt && !categoryId) {
-        setOcrError("レシートから情報を読み取れませんでした");
+    setForm((p) => {
+      const next = { ...p };
+      if (typeof amount === "number" && amount >= 0) {
+        next.amount = String(Math.trunc(amount)).slice(0, AMOUNT_MAX_DIGITS);
       }
-    } catch (err) {
-      setOcrError(err instanceof Error ? err.message : "読み取りに失敗しました");
-    } finally {
-      setOcrLoading(false);
+      if (storeName) next.storeName = storeName.slice(0, STORE_MAX);
+      if (categoryId && categories.some((c) => c.id === categoryId)) {
+        next.categoryId = categoryId;
+      }
+      // 日付は年月がフォームの表示月と一致するときだけ「日」を反映する
+      // （年月は固定表示のため）。
+      if (spentAt && /^\d{4}-\d{2}-\d{2}$/.test(spentAt)) {
+        const [y, m, d] = spentAt.split("-").map(Number);
+        const lastDay = lastDayOfMonth(initial.year, initial.month);
+        if (y === initial.year && m === initial.month && d >= 1 && d <= lastDay) {
+          next.day = d;
+        }
+      }
+      return next;
+    });
+
+    if (amount == null && !storeName && !spentAt && !categoryId) {
+      setOcrError("レシートから情報を読み取れませんでした");
     }
   };
 
