@@ -1,0 +1,106 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { shiftMonth } from "@/lib/date";
+import type { MonthlySummary } from "@/types";
+
+// 表示中の月・月次サマリーの取得・月送りのスライドアニメを一体で扱うフック。
+// 「月切り替え」と「アニメ付きのデータ差し替え」は1つの機能なので束ねる
+// （アニメ方向 pendingNavDir を内部に閉じ込められる）。以前は SummaryPage に同居していた。
+const SLIDE_OFFSET = 48; // 月送りスライド量(px)。不透明0の間にデータを差し替え反対側から入れる。
+
+export function useMonthlySummary(opts: {
+  unlocked: boolean | null;
+  mutationVersion: number;
+  categoriesVersion: number;
+}) {
+  const { unlocked, mutationVersion, categoriesVersion } = opts;
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [summary, setSummary] = useState<MonthlySummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fade, setFade] = useState(false);
+  const [slideX, setSlideX] = useState(0);
+  const [instant, setInstant] = useState(false); // 反対側への瞬間移動中はトランジション無効
+  const isInitial = useRef(true);
+  const pendingNavDir = useRef(0); // 月送りなら ±1、支出/カテゴリ起因の取得なら 0
+
+  const fetchSummary = useCallback(async () => {
+    setLoading(true);
+    const dir = pendingNavDir.current;
+    if (!isInitial.current) {
+      setFade(true);
+      if (dir !== 0) {
+        // 退場: 進行方向と逆へスライドアウト（次=左へ, 前=右へ）
+        setInstant(false);
+        setSlideX(-dir * SLIDE_OFFSET);
+      }
+    }
+    try {
+      const res = await fetch(`/api/monthly-summary?year=${year}&month=${month}`);
+      if (res.ok) setSummary(await res.json());
+    } finally {
+      setLoading(false);
+      isInitial.current = false;
+      if (dir !== 0) {
+        // 不透明0のうちに反対側へ瞬間移動 → 次フレームで 0 へスライドイン＋フェードイン
+        setInstant(true);
+        setSlideX(dir * SLIDE_OFFSET);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            setInstant(false);
+            setSlideX(0);
+            setFade(false);
+          })
+        );
+      } else {
+        requestAnimationFrame(() => setFade(false));
+      }
+      pendingNavDir.current = 0;
+    }
+  }, [year, month]);
+
+  // 保存済みのときだけ取得。year/month・mutationVersion（支出CRUD）・
+  // categoriesVersion（カテゴリ名変更等）の変化に加え、保存された瞬間にも取得する。
+  useEffect(() => {
+    if (unlocked) fetchSummary();
+  }, [fetchSummary, mutationVersion, categoriesVersion, unlocked]);
+
+  const goPrev = useCallback(() => {
+    pendingNavDir.current = -1;
+    const prev = shiftMonth(year, month, -1);
+    setYear(prev.year);
+    setMonth(prev.month);
+  }, [year, month]);
+
+  const goNext = useCallback(() => {
+    pendingNavDir.current = 1;
+    const next = shiftMonth(year, month, 1);
+    setYear(next.year);
+    setMonth(next.month);
+  }, [year, month]);
+
+  const isCurrentMonth =
+    year === now.getFullYear() && month === now.getMonth() + 1;
+
+  // 月送りスライド＋フェードの style。view 側のラッパに spread する。
+  const transitionStyle: React.CSSProperties = {
+    opacity: fade ? 0 : 1,
+    transform: `translateX(${slideX}px)`,
+    transition: instant
+      ? "none"
+      : "opacity 200ms ease, transform 240ms cubic-bezier(0.32, 0.72, 0, 1)",
+  };
+
+  return {
+    year,
+    month,
+    summary,
+    loading,
+    isCurrentMonth,
+    goPrev,
+    goNext,
+    transitionStyle,
+  };
+}
