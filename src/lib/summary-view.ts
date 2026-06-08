@@ -14,6 +14,7 @@ export type LegendItem = {
   id: string;
   name: string;
   total: number;
+  count: number; // 当月の支出件数（「その他」はバケツ内の合算）
   color: CategoryColor;
 };
 
@@ -50,6 +51,7 @@ export function resolveSummaryView(
     id: c.categoryId,
     name: c.name,
     total: c.total,
+    count: c.expenses.length,
     color: categoryColor(c.sortOrder),
   }));
   if (hasOthers) {
@@ -57,6 +59,7 @@ export function resolveSummaryView(
       id: OTHERS_CATEGORY_ID,
       name: "その他",
       total: othersTotal,
+      count: otherCategories.reduce((sum, c) => sum + c.expenses.length, 0),
       color: OTHERS_COLOR,
     });
   }
