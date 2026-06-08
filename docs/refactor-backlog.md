@@ -31,7 +31,8 @@
 | ID | 内容 | 場所 | 工数 | 価値 | 状態 |
 |----|------|------|------|------|------|
 | **T6-1** ★本命（旧 #9 Provider分割） | `ExpenseModalProvider` の6関心を分割。`useToast`(+`<Toast>`) と `useCategoryCache` を専用フックに切り出し、Provider はモーダル状態/削除/mutation に専念。**公開フック `useExpenseModal()` の形は不変**（消費側コード無改修）。各フックにテスト追加 | `src/components/expense-modal.tsx` → `toast.tsx` / `use-category-cache.ts` | M | 高 | ✅ |
-| T6-2 | `useCategoryCache` を `category-manager` でも使い、独自 fetch（`?scope=all`＋alive）を統一する。※フック自体は T6-1 で作成済み、あとは消費側の置換 | `category-manager.tsx:22-39` | S | 中 | 残（フックは作成済） |
+| ~~T6-2~~ | ~~`category-manager` の独自 fetch を共有キャッシュに統一~~ → **見送り**。category-manager は一覧を読むだけでなく編集（名前/有効無効）し、PATCH 成功時に**楽観的更新**＋Provider キャッシュ通知の2系統を握る。素直に Provider 一覧へ寄せると再取得待ちで旧名がチラつき UX 劣化、綺麗にやるには Provider context に `updateCategory` を足す再拡張が必要で、得るものは「fetch 1個削減」。費用対効果が薄く**やらない判断**。独自 fetch は実害なし（設定を開いた時に最新取得＝自然）。 | `category-manager.tsx:22-39` | — | 低 | ⏸ 見送り |
+| T6-7 | `useSwipeNavigation` の jsdom 単体テスト（合成タッチ dispatch）。T6-3 の実機のみだった穴埋め | `use-swipe-navigation.test.tsx` | S | 中 | ✅ |
 | T6-3 | `page.tsx`(307行→約190行) を3フックに分離: `useSwipeNavigation`(DOM gesture) / `useMonthlySummary`(月ナビ+取得+スライドアニメ) / `useCategorySelection`(選択状態+同期+compose context)。テスト追加 | `src/app/page.tsx` → `use-*.ts` | M-L | 高 | ✅ |
 | T6-4 | API レスポンス型を `src/types/api.ts` に集約。`OcrResult`/`SessionStatus`/`SessionUnlockResult`/`ApiError` を定義し、ルートは `satisfies`、クライアントは型注釈で参照（OCR のインラインリテラル手キャストを排除） | `types/api.ts` / `ocr`・`session` route / `expense-form`・`session-provider` | M | 中 | ✅ |
 | T6-5 | OCR 画像縮小＋抽出を `useReceiptOcr` に切り出し（結果のフォーム反映だけフォームに残す）。テスト追加 | `expense-form.tsx` → `use-receipt-ocr.ts` | S-M | 中 | ✅ |
