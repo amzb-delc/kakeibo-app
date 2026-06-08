@@ -6,6 +6,7 @@ import {
   type OcrMediaType,
 } from "@/lib/ocr";
 import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
+import type { OcrResult } from "@/types/api";
 
 // 画像はクライアントで縮小済み前提。base64 文字列の上限（おおよそ 7MB ぶん）。
 const MAX_BASE64_LENGTH = 7 * 1024 * 1024;
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
       storeName: extracted.storeName,
       spentAt: extracted.spentAt,
       categoryId: matched?.id ?? null,
-    });
+    } satisfies OcrResult);
   } catch (e) {
     console.error("OCR extraction failed", e);
     const status = (e as { status?: number })?.status;
