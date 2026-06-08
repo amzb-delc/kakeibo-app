@@ -42,7 +42,7 @@
 | ID | 内容 | 場所 | 工数 | 価値 |
 |----|------|------|------|------|
 | T7-1 | `lib/ocr.ts` のユニットテスト（@anthropic-ai/sdk をモック）。ハッピーパス/リクエスト形/カテゴリ未設定/拒否/空結果 | `src/lib/ocr.test.ts` | M | 高 | ✅ |
-| T7-2 | API ルートテスト基盤の導入＋主要ルートのテスト（`next/server`・prisma・cookie のモック）。T6-4 の型契約を実行時にもピン留め | `app/api/*/route.ts` | M-L | 高 | 未 |
+| T7-2 | API ルートテスト基盤（`src/test/route-helpers.ts`：素の Request を渡し prisma/auth をモック）＋主要4ルートのテスト。**cookie無し=401 の認可契約**・世帯スコープ(IDOR)・バリデーション・cookie 発行/破棄を実行時に固定 | `monthly-summary`/`categories`/`expenses`/`session` route.test.ts | M-L | 高 | ✅ |
 | T7-3 | 主要コンポーネントの結合テスト / `lib/auth.ts` のテスト | 各コンポーネント・`auth.ts` | M | 中 | 未 |
 
 ## Tier 8 — スキーマ撤去（旧 #12 本体・**DBマイグレ要・先に設計判断**）
