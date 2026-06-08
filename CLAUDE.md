@@ -29,7 +29,7 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 - 世帯コードはアプリから変更しない（仕様）。変更は `npm run db:set-passphrase -- "世帯コード"`（既存世帯の id を付け替え）。
 - 保存UIは設定モーダル（`SettingsModalProvider` / フッタ「設定」）、未保存のときは `/` が未保存画面。`SessionProvider` がクライアントの保存状態を保持。
 - cookie は端末（ブラウザ／PWA）ごとに別物。**iOSでは Safari とホーム画面PWAでストレージが分離**されるため、保存状態は両者で共有されない（片方でクリアしてももう片方には残る）。MVPの軽量な保護として許容する仕様。
-- `DEMO_HOUSEHOLD_ID` は seed / 上記スクリプトの既定値としてのみ残置。
+- seed / 上記スクリプトの既定世帯IDは `"demo-household"`（seed・`set-passphrase.ts` 内のリテラル）。
 
 ## 画面構成
 

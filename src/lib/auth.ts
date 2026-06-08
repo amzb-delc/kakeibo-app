@@ -6,9 +6,8 @@ import { prisma } from "@/lib/prisma";
 // 各 API は cookie から世帯を特定する。cookie 無し＝未保存＝データを返さない。
 export const HOUSEHOLD_COOKIE = "household";
 
-// seed / 一度きりの re-key スクリプトの既定世帯ID。アプリ実行時の参照には使わない。
-export const DEMO_HOUSEHOLD_ID = "demo-household";
-export const DEMO_USER_EMAIL = "demo@example.com";
+// getDemoUserId が引くデモユーザーの email。seed が作成するユーザーと一致させる。
+const DEMO_USER_EMAIL = "demo@example.com";
 
 // 保存 cookie から household id を取り出す。未保存なら null。
 // ※ Server Component / Route Handler / Server Action からのみ呼べる。

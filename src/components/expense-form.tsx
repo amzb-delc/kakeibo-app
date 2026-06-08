@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DayWheel } from "@/components/day-wheel";
-import { categoryColor } from "@/lib/category-color";
+import { CategoryTag } from "@/components/category-tag";
 import { pad2, lastDayOfMonth } from "@/lib/date";
 import type { Category, Expense } from "@/types";
 
@@ -249,24 +249,14 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
                 if (!c) {
                   return <span className="text-muted-foreground/60">カテゴリ</span>;
                 }
-                return (
-                  <span
-                    className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-sm font-medium ${categoryColor(c.sortOrder).tag}`}
-                  >
-                    {c.name}
-                  </span>
-                );
+                return <CategoryTag name={c.name} sortOrder={c.sortOrder} />;
               }}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {categories.map((c) => (
               <SelectItem key={c.id} value={c.id}>
-                <span
-                  className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-sm font-medium ${categoryColor(c.sortOrder).tag}`}
-                >
-                  {c.name}
-                </span>
+                <CategoryTag name={c.name} sortOrder={c.sortOrder} />
               </SelectItem>
             ))}
           </SelectContent>

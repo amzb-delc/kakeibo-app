@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
       spentAt: data.spentAt!,
       storeName: data.storeName ?? null,
       memo: data.memo ?? null,
-      receiptImageUrl: data.receiptImageUrl ?? null,
       createdByUserId,
     },
     include: { category: { select: { id: true, name: true } } },

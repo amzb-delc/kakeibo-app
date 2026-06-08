@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { HOUSEHOLD_COOKIE, getHouseholdId } from "@/lib/auth";
+import { jsonError, parseJsonBody } from "@/lib/api";
 
 // 世帯コード = household.id。署名なし（世帯コードを知っていること自体が認可）。
 // 保存は端末で保持したいので長期 cookie（ブラウザ上限に合わせ 400 日）。
@@ -35,20 +36,18 @@ export async function GET() {
 
 // 保存: 世帯コード（= household.id）を照合し、一致すれば cookie を発行
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
+  const body = await parseJsonBody(req);
+  if (body instanceof NextResponse) return body;
+
   const passphrase =
-    body && typeof body.passphrase === "string" ? body.passphrase.trim() : "";
-  if (!passphrase) {
-    return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
-  }
+    typeof body.passphrase === "string" ? body.passphrase.trim() : "";
+  if (!passphrase) return jsonError("empty", 400);
 
   const household = await prisma.household.findUnique({
     where: { id: passphrase },
     select: { id: true, name: true },
   });
-  if (!household) {
-    return NextResponse.json({ ok: false, error: "invalid" }, { status: 401 });
-  }
+  if (!household) return jsonError("invalid", 401);
 
   const res = NextResponse.json({ ok: true, householdName: household.name });
   res.cookies.set(

@@ -111,3 +111,14 @@ describe("validateExpenseInput: storeName / memo", () => {
     expect(error?.field).toBe("storeName");
   });
 });
+
+describe("validateExpenseInput: receiptImageUrl（撤去済み）", () => {
+  it("渡しても data に含めず、エラーにもしない（無視する）", async () => {
+    const { data, error } = await validateExpenseInput(
+      { ...base, receiptImageUrl: "https://example.com/receipt.jpg" },
+      { partial: false, householdId: HH }
+    );
+    expect(error).toBeUndefined();
+    expect(data).not.toHaveProperty("receiptImageUrl");
+  });
+});

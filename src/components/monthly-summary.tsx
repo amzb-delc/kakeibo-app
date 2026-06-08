@@ -6,6 +6,7 @@ import { getTrendLevel, TREND_TEXT_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
 import { formatYen, formatDiff } from "@/lib/format";
 import { categoryColor } from "@/lib/category-color";
+import { CategoryTag } from "@/components/category-tag";
 import { OTHERS_CATEGORY_ID } from "@/lib/category-constants";
 import { resolveSummaryView } from "@/lib/summary-view";
 import { useExpenseModal } from "@/components/expense-modal";
@@ -93,11 +94,11 @@ function CategoryRow({
           className={`flex items-center mb-2 ${showName ? "justify-between gap-2" : "justify-end"}`}
         >
           {showName && (
-            <span
-              className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-0.5 text-sm font-medium ${color.tag}`}
-            >
-              <span className="truncate">{category.name}</span>
-            </span>
+            <CategoryTag
+              name={category.name}
+              sortOrder={category.sortOrder}
+              truncate
+            />
           )}
           <div className="flex flex-col items-end">
             <span className="text-base font-semibold">{formatYen(category.total)}</span>
