@@ -8,6 +8,7 @@ import {
   parseJstDate,
   formatJstDateLabel,
   parseReceiptDate,
+  clampDay,
 } from "./date";
 
 describe("pad2", () => {
@@ -66,6 +67,12 @@ describe("JST 変換", () => {
     expect(parseJstDate("2024/03/15")).toBeNull();
     expect(parseJstDate("not-a-date")).toBeNull();
   });
+  it("実在しない日付（2/30・4/31・月13）はロールオーバーせず null", () => {
+    expect(parseJstDate("2026-02-30")).toBeNull();
+    expect(parseJstDate("2026-04-31")).toBeNull();
+    expect(parseJstDate("2026-13-01")).toBeNull();
+    expect(parseJstDate("2026-00-10")).toBeNull();
+  });
   it("formatJstDateLabel は M/D(曜)", () => {
     // 2024-03-15 は金曜
     expect(formatJstDateLabel(parseJstDate("2024-03-15") as Date)).toBe("3/15(金)");
@@ -91,5 +98,17 @@ describe("parseReceiptDate", () => {
     expect(parseReceiptDate("")).toBeNull();
     expect(parseReceiptDate(null)).toBeNull();
     expect(parseReceiptDate(undefined)).toBeNull();
+  });
+});
+
+describe("clampDay", () => {
+  it("月末を超える日はその月の末日に丸める", () => {
+    expect(clampDay(2026, 2, 31)).toBe(28); // 平年2月
+    expect(clampDay(2024, 2, 31)).toBe(29); // うるう年2月
+    expect(clampDay(2026, 4, 31)).toBe(30); // 4月は30日まで
+  });
+  it("範囲内はそのまま / 1未満は 1", () => {
+    expect(clampDay(2026, 5, 15)).toBe(15);
+    expect(clampDay(2026, 5, 0)).toBe(1);
   });
 });
