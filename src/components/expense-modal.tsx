@@ -15,6 +15,7 @@ import {
 } from "@/components/expense-form";
 import { Switch } from "@/components/ui/switch";
 import { ReceiptCaptureButton } from "@/components/receipt-capture-button";
+import { formatYen } from "@/lib/format";
 import { todayJst, lastDayOfMonth, parseReceiptDate } from "@/lib/date";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
 import { useToast, Toast } from "@/components/toast";
@@ -326,11 +327,23 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
         </BottomSheet>
       )}
 
-      {/* 削除確認ダイアログ（シートより前面） */}
-      {active && confirmingDelete && (
+      {/* 削除確認ダイアログ（シートより前面）。対象の具体情報（日付・カテゴリ・金額・店名）を掲出。 */}
+      {active?.mode === "edit" && confirmingDelete && (
         <ConfirmDialog
+          detail={(() => {
+            const e = active.expense;
+            const [, m, d] = e.spentAt.split("-").map(Number);
+            const catName =
+              categories.find((c) => c.id === e.categoryId)?.name ?? "未分類";
+            return (
+              <span className="font-medium">
+                {m}月{d}日・{catName}・{formatYen(e.amount)}
+                {e.storeName ? `（${e.storeName}）` : ""}
+              </span>
+            );
+          })()}
           title="この支出を削除しますか？"
-          description="この操作は取り消せません。"
+          description="削除すると元に戻せません。"
           confirmLabel="削除する"
           busyLabel="削除中…"
           busy={deleting}

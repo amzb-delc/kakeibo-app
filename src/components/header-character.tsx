@@ -3,16 +3,19 @@
 import { useState } from "react";
 import Image from "next/image";
 
-// ヘッダーに出す小さなキャラクター。タップすると一発だけ「ぴょこっ」と揺れる。
-// 当月表示のときだけ親から描画される（過去月では出さない）。
-export function HeaderCharacter() {
+// ヘッダーに出す小さなキャラクター。タップで当月へジャンプしつつ「ぴょこっ」と揺れる。
+// 月に関わらず常時表示する。
+export function HeaderCharacter({ onPress }: { onPress?: () => void }) {
   const [playing, setPlaying] = useState(false);
 
   return (
     <button
       type="button"
-      aria-label="キャラクター"
-      onClick={() => setPlaying(true)}
+      aria-label="今月へ移動"
+      onClick={() => {
+        setPlaying(true);
+        onPress?.();
+      }}
       className="w-11 h-11 flex items-center justify-center -mr-1"
     >
       <Image

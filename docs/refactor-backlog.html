@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿アプリ — リファクタ・バックログ</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+.backlink {
+  display: inline-block; margin-bottom: 16px; color: var(--primary);
+  text-decoration: none; font-size: 13px;
+}
+.backlink:hover { text-decoration: underline; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 8px 0; }
+a { color: var(--primary); }
+code {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--primary);
+  background: var(--card); border-radius: 0 8px 8px 0; color: var(--muted);
+  font-size: 14px;
+}
+blockquote strong { color: var(--fg); }
+ul { margin: 8px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px;
+  background: var(--card); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); font-weight: 600; white-space: nowrap; }
+td.c { text-align: center; white-space: nowrap; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-todo { background: var(--todo-bg); color: var(--todo-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.muted { color: var(--muted); }
+del { color: var(--muted); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="backlink" href="spec.html">← MVP仕様書へ戻る</a>
+<h1>リファクタ・バックログ</h1>
+
+<blockquote>
+仕様変更・追加を繰り返してたまった歪みを片付けるための調査結果。<br>
+<strong>この採番（T5/T6… の項目）は機能PR番号とは別系統。</strong> 過去の手元メモの <code>#7/#9/#12</code> との対応は各項目に併記。<br>
+初版: 2026-06-08（Tier 1〜4 消化後に再調査。lib 層は分解＋テスト済みで綺麗、歪みは UI層とスキーマ足場に集中）。<br>
+<strong>状況(2026-06-08): Tier 1〜7 完了でリファクタはひとまず完了。</strong> PR #18〜#33。#7 fetch共通化・T6-2 は意図的に見送り。<strong>Tier 8（スキーマ撤去）は未着手</strong> — DBマイグレ＋設計判断を伴うため、本番化の直前に別途やる方針。
+</blockquote>
+
+<h2>完了済み（Tier 1〜4 / PR #18〜#24）</h2>
+<ul>
+  <li>Tier 1: 型・フォーマッタ・日付ユーティリティを単一ソースへ集約 + Vitest 導入</li>
+  <li>Tier 2: API ルート定型処理を <code>lib/api.ts</code> に共通化 / ボトムシート基盤共通化 + テスト</li>
+  <li>Tier 3: monthly-summary 集計を純関数化 / ホームの選択解決ロジックを純関数化 + テスト</li>
+  <li>Tier 4: 未使用 <code>GET /api/expenses</code> + <code>listExpenses</code> を撤去 / seed 定数共有 + 予約カラム明記</li>
+</ul>
+
+<hr>
+
+<h2>Tier 5 — 低リスク・コードのみ・即効（マイグレ不要）</h2>
+<p>低リスクから消化する従来の流儀どおり、ここから着手するのが安全。<br>
+<strong>2026-06-08 着手: T5-1〜T5-4・T5-6 完了（branch <code>refactor/tier5-quickwins</code>）。T5-5 は見送り。</strong></p>
+<table>
+<thead><tr><th>ID</th><th>内容</th><th>場所</th><th class="c">工数</th><th class="c">価値</th><th class="c">状態</th></tr></thead>
+<tbody>
+<tr><td>T5-1</td><td>月送りを <code>shiftMonth()</code> に置換（自前の境界計算をやめバグ予防）</td><td><code>page.tsx:124-131</code></td><td class="c">S</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T5-2</td><td><code>receiptImageUrl</code> の死んだバリデーション撤去（validate するが保存も読戻しもしない）※#12の一部だがマイグレ不要</td><td><code>expenses.ts:92-101</code></td><td class="c">S</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T5-3</td><td><code>POST /api/session</code> を <code>api.ts</code>（<code>parseJsonBody</code>/<code>jsonError</code>）経由に揃える</td><td><code>session/route.ts:37-50</code></td><td class="c">S</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T5-4</td><td><code>&lt;CategoryTag name sortOrder /&gt;</code> を抽出（タグ表示の重複を集約）</td><td><code>expense-form.tsx</code> / <code>monthly-summary.tsx</code></td><td class="c">S</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T5-6</td><td><code>DEMO_*</code> 定数の整理（<code>DEMO_HOUSEHOLD_ID</code> 撤去、<code>DEMO_USER_EMAIL</code> export 解除）</td><td><code>auth.ts:10-11</code></td><td class="c">S</td><td class="c">低</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr class="muted"><td><del>T5-5</del></td><td><del>削除確認ダイアログを <code>BottomSheet</code> 再利用に</del> → <strong>見送り</strong>。形が違う（グラバー/✕なし・中央・前面 z-[70]）。寄せると UX が変わり API も肥大。やるなら別途 ConfirmDialog 抽出（→ T6-6 で実施）。</td><td><code>expense-modal.tsx</code></td><td class="c">—</td><td class="c">低</td><td class="c"><span class="badge b-hold">⏸ 見送り</span></td></tr>
+</tbody>
+</table>
+
+<h2>Tier 6 — 構造リファクタ（マイグレ不要）</h2>
+<p><strong>2026-06-08 着手: 完了（branch <code>refactor/tier6-provider-split</code> ほか）。</strong></p>
+<table>
+<thead><tr><th>ID</th><th>内容</th><th>場所</th><th class="c">工数</th><th class="c">価値</th><th class="c">状態</th></tr></thead>
+<tbody>
+<tr><td>T6-1 ★本命<br>（旧 #9 Provider分割）</td><td><code>ExpenseModalProvider</code> の6関心を分割。<code>useToast</code>(+<code>&lt;Toast&gt;</code>) と <code>useCategoryCache</code> を専用フックに切り出し。<strong>公開フック <code>useExpenseModal()</code> の形は不変</strong>。各フックにテスト追加</td><td><code>expense-modal.tsx</code> → <code>toast.tsx</code> / <code>use-category-cache.ts</code></td><td class="c">M</td><td class="c">高</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr class="muted"><td><del>T6-2</del></td><td><del><code>category-manager</code> の独自 fetch を共有キャッシュに統一</del> → <strong>見送り</strong>。編集（名前/有効無効）＋楽観的更新＋キャッシュ通知の2系統を握る。寄せると旧名チラつき＆<code>updateCategory</code> 再拡張が必要で、得るものは「fetch 1個削減」。費用対効果が薄く<strong>やらない判断</strong>。</td><td><code>category-manager.tsx:22-39</code></td><td class="c">—</td><td class="c">低</td><td class="c"><span class="badge b-hold">⏸ 見送り</span></td></tr>
+<tr><td>T6-3</td><td><code>page.tsx</code>(307→約190行) を3フックに分離: <code>useSwipeNavigation</code> / <code>useMonthlySummary</code> / <code>useCategorySelection</code>。テスト追加</td><td><code>page.tsx</code> → <code>use-*.ts</code></td><td class="c">M-L</td><td class="c">高</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T6-4</td><td>API レスポンス型を <code>types/api.ts</code> に集約（<code>OcrResult</code>/<code>SessionStatus</code>/<code>ApiError</code> 等）。OCR の手キャストを排除</td><td><code>types/api.ts</code> ほか</td><td class="c">M</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T6-5</td><td>OCR 画像縮小＋抽出を <code>useReceiptOcr</code> に切り出し。テスト追加</td><td><code>expense-form.tsx</code> → <code>use-receipt-ocr.ts</code></td><td class="c">S-M</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T6-6</td><td><code>ConfirmDialog</code> 小コンポーネント抽出（削除確認の汎用化。旧 T5-5 の置き換え）。テスト追加</td><td><code>expense-modal.tsx</code> → <code>confirm-dialog.tsx</code></td><td class="c">S-M</td><td class="c">低</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T6-7</td><td><code>useSwipeNavigation</code> の jsdom 単体テスト（合成タッチ dispatch）</td><td><code>use-swipe-navigation.test.tsx</code></td><td class="c">S</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+</tbody>
+</table>
+
+<h2>Tier 7 — テスト空白埋め（マイグレ不要）</h2>
+<table>
+<thead><tr><th>ID</th><th>内容</th><th>場所</th><th class="c">工数</th><th class="c">価値</th><th class="c">状態</th></tr></thead>
+<tbody>
+<tr><td>T7-1</td><td><code>lib/ocr.ts</code> のユニットテスト（SDK モック）。ハッピー/リクエスト形/カテゴリ未設定/拒否/空結果</td><td><code>ocr.test.ts</code></td><td class="c">M</td><td class="c">高</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T7-2</td><td>API ルートテスト基盤（<code>route-helpers.ts</code>）＋主要4ルート。<strong>cookie無し=401</strong>・世帯スコープ(IDOR)・バリデーション・cookie 発行/破棄を固定</td><td>各 <code>route.test.ts</code></td><td class="c">M-L</td><td class="c">高</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+<tr><td>T7-3</td><td><code>ExpenseForm</code>（gating＋送信→onSuccess→エラー表示）と <code>lib/auth.ts</code> のテスト</td><td><code>expense-form.test.tsx</code> / <code>auth.test.ts</code></td><td class="c">M</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+</tbody>
+</table>
+
+<h2>Tier 8 — スキーマ撤去（旧 #12 本体・<span class="muted">DBマイグレ要・先に設計判断</span>）</h2>
+<p>未使用の「マルチユーザー/通知」足場をどうするか。<strong>完成させる or 撤去する</strong>を先に決める（コード前に意思決定）。撤去なら以下を一括:</p>
+<ul>
+  <li><code>HouseholdMember</code> モデル + <code>role</code>、（監査用途で残すか要確認の）<code>User</code></li>
+  <li><code>Household.notificationDay</code> / <code>notificationTime</code>（通知未実装）</li>
+  <li><code>Expense.receiptImageUrl</code> / <code>ocrRawText</code>（画像非保存方針）</li>
+  <li>工数 M / 価値 中 / <strong>マイグレ YES</strong></li>
+</ul>
+<p><span class="badge b-todo">⬜ 未着手</span> 本番化の直前に実施する方針。</p>
+
+<h2>追加バックログ（2026-06-08〜）</h2>
+<table>
+<thead><tr><th>ID</th><th>内容</th><th>場所</th><th class="c">工数</th><th class="c">価値</th><th class="c">状態</th></tr></thead>
+<tbody>
+<tr><td>SW-1</td><td><code>category-manager</code> の手書きトグル（<code>role="switch"</code> インライン）を共有 <code>Switch</code>（<code>ui/switch.tsx</code>・base-ui）へ置換。必須スロットの「ON固定・グレー」は <code>disabled</code>＋<code>checked</code> で表現。<strong>注意: 配色は一致するが寸法は支出シートヘッダーに合わせ一回り大きい（<code>h-7 w-12</code>、既存トグルは <code>h-6 w-11</code>）</strong>。そのまま置換すると大きくなる。サイズを揃えるなら size variant を足す（サムの移動量がベタ書きで幅変更は要調整）</td><td><code>category-manager.tsx:152-179</code> → <code>ui/switch.tsx</code></td><td class="c">S</td><td class="c">低</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+<tr><td>YM-1</td><td><del>支出フォームの年月を手動編集可能にする</del> → <strong>完了</strong>（PR #39, branch <code>feat/expense-yearmonth-edit</code>）。<code>DayWheel</code> を汎用 <code>Wheel</code> に一般化し年/月/日の3ドラム化（月・日は <code>loop</code> で巡回・年は範囲）。年月変更時は <code>clampDay</code> で日を月末クランプ。無効日付はクライアント＋サーバ（<code>parseJstDate</code> 厳密化）で弾く。登録/編集の保存時もホーム表示月を同期</td><td><code>expense-form.tsx</code> / <code>wheel.tsx</code></td><td class="c">M</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>却下（やらない）</h2>
+<ul>
+  <li><strong>旧 #7 fetch共通化</strong> — 実測 fetch 9箇所・重複ごくわずか・エラー処理は文脈依存。共通フックはかえって冗長で意図が埋もれる。<strong>低価値として正式に却下。</strong></li>
+  <li>エラーメッセージ定数化（i18n 準備）— churn 高・価値低。実際に i18n をやる時まで保留。</li>
+</ul>
+
+<h2>命名ドリフトについて（参考・対応しない）</h2>
+<p>UI は「世帯コード/保存/クリア」だが、識別子は <code>passphrase</code>/<code>unlock</code>/<code>lock</code>/<code>unlocked</code>、cookie 名 <code>household</code>、npm <code>db:set-passphrase</code> のまま。<strong>据え置き決定済み</strong>（CLAUDE.md 記載）。リファクタ対象ではない。</p>
+</div>
+</body>
+</html>
