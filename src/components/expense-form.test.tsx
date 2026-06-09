@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // 本テストの対象外（別コンポーネント）の子は stub 化して送信/バリデーションに集中する。
-vi.mock("@/components/day-wheel", () => ({ DayWheel: () => null }));
+vi.mock("@/components/wheel", () => ({ Wheel: () => null }));
 vi.mock("@/components/ui/select", () => ({
   Select: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SelectTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -65,7 +65,10 @@ describe("ExpenseForm", () => {
     expect(save).toBeEnabled();
     fireEvent.click(save);
     await waitFor(() =>
-      expect(onSuccess).toHaveBeenCalledWith("保存しました", "cat-1")
+      expect(onSuccess).toHaveBeenCalledWith("保存しました", "cat-1", {
+        year: 2026,
+        month: 6,
+      })
     );
     const [url, opts] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toBe("/api/expenses");
@@ -90,7 +93,10 @@ describe("ExpenseForm", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "更新する" }));
     await waitFor(() =>
-      expect(onSuccess).toHaveBeenCalledWith("更新しました", "cat-1")
+      expect(onSuccess).toHaveBeenCalledWith("更新しました", "cat-1", {
+        year: 2026,
+        month: 6,
+      })
     );
     const [url, opts] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toBe("/api/expenses/e1");
@@ -111,7 +117,11 @@ describe("ExpenseForm", () => {
     fireEvent.change(amount, { target: { value: "1200" } });
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
     await waitFor(() =>
-      expect(onSuccess).toHaveBeenCalledWith("保存しました", "cat-1", { keepOpen: true })
+      expect(onSuccess).toHaveBeenCalledWith("保存しました", "cat-1", {
+        keepOpen: true,
+        year: 2026,
+        month: 6,
+      })
     );
     // 金額はクリアされ、続けて入力できる状態に戻る
     await waitFor(() => expect(amount.value).toBe(""));
@@ -157,7 +167,7 @@ describe("ExpenseForm", () => {
       spentAt: "2026-03-15",
       categoryId: "cat-1",
     };
-    render(
+    const { container } = render(
       <ExpenseForm
         categories={categories}
         initial={{ ...initialCreate, categoryId: "" }}
@@ -166,11 +176,13 @@ describe("ExpenseForm", () => {
         onSuccess={onSuccess}
       />
     );
-    // 表示月が初期の 6月 → レシートの 3月 に変わる
-    await waitFor(() => expect(screen.getByText("2026年3月")).toBeInTheDocument());
+    // OCR 反映を待つ（金額が入る）。年月日は Wheel(stub) のため送信内容で検証する。
+    const amount = container.querySelector("#amount") as HTMLInputElement;
+    await waitFor(() => expect(amount.value).toBe("800"));
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     const [, opts] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    // 別月（初期6月→レシート3月）でも年月日を丸ごと反映して送信する
     expect(JSON.parse(opts.body)).toMatchObject({
       amount: 800,
       spentAt: "2026-03-15",

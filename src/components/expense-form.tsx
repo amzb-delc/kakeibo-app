@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,11 +11,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DayWheel } from "@/components/day-wheel";
+import { Wheel } from "@/components/wheel";
 import { CategoryTag } from "@/components/category-tag";
-import { pad2, lastDayOfMonth } from "@/lib/date";
+import { pad2, lastDayOfMonth, clampDay, todayJst } from "@/lib/date";
 import type { Category, Expense } from "@/types";
 import type { OcrResult } from "@/types/api";
+
+const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
+// 年ホイールの既定レンジ（今年から何年さかのぼるか）。
+const YEAR_SPAN_BACK = 5;
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
 export type ExpenseFormValues = Pick<
@@ -50,11 +54,12 @@ type Props = {
   ocrResult?: OcrResult | null;
   // 保存の成功後に呼ばれる（モーダルを閉じる・トースト・再取得は親が担当）。
   // categoryId は確定した支出のカテゴリ（ホームが選択状態に同期するのに使う）。
+  // opts.year/month は保存した支出の年月（ホームの表示月を同期するのに使う）。
   // opts.keepOpen=true（連続入力）のとき、親はシートを閉じない。
   onSuccess: (
     message: string,
     categoryId: string,
-    opts?: { keepOpen?: boolean }
+    opts?: { keepOpen?: boolean; year?: number; month?: number }
   ) => void;
 };
 
@@ -67,8 +72,7 @@ export function ExpenseForm({
 }: Props) {
   const isEdit = initial.id !== undefined;
 
-  // 年月は固定表示だが OCR で別月のレシートを読み取ったときに丸ごと差し替えられるよう
-  // state に持つ（手動で月を変える UI は無い。日は DayWheel、年月は OCR のみが変える）。
+  // 年月日はホイールで選ぶ／OCR で丸ごと差し替わる。年月変更時は日を月末でクランプ。
   const [form, setForm] = useState({
     year: initial.year,
     month: initial.month,
@@ -112,10 +116,39 @@ export function ExpenseForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ocrResult]);
 
+  // 年ホイールのレンジ。今年から YEAR_SPAN_BACK 年前まで。OCR 等で外れた年も必ず含める。
+  const yearValues = useMemo(() => {
+    const todayYear = Number(todayJst().slice(0, 4));
+    const start = Math.min(todayYear - YEAR_SPAN_BACK, form.year);
+    const end = Math.max(todayYear, form.year);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }, [form.year]);
+  // 日ホイールは選択中の年月の末日まで。
+  const dayValues = useMemo(
+    () =>
+      Array.from(
+        { length: lastDayOfMonth(form.year, form.month) },
+        (_, i) => i + 1
+      ),
+    [form.year, form.month]
+  );
+
+  // 年・月を変えたら日を月末でクランプする（例: 1/31 → 2月 で 2/28）。
+  const setYear = (year: number) =>
+    setForm((p) => ({ ...p, year, day: clampDay(year, p.month, p.day) }));
+  const setMonth = (month: number) =>
+    setForm((p) => ({ ...p, month, day: clampDay(p.year, month, p.day) }));
+
   const amountEmpty = form.amount === "";
   const categoryEmpty = form.categoryId === "";
-  // 金額は 0 も許可（未入力のみ不可）。カテゴリは選択必須。
-  const isValid = !amountEmpty && !categoryEmpty;
+  // 日付の妥当性（ホイール＋クランプで通常は常に真だが、保存時バリデーションの保険）。
+  const dateValid =
+    form.month >= 1 &&
+    form.month <= 12 &&
+    form.day >= 1 &&
+    form.day <= lastDayOfMonth(form.year, form.month);
+  // 金額は 0 も許可（未入力のみ不可）。カテゴリは選択必須。日付は妥当であること。
+  const isValid = !amountEmpty && !categoryEmpty && dateValid;
 
   // 必須項目が空のときに枠を強調する
   const emphasizeEmpty = "border-primary/70 ring-1 ring-primary/25";
@@ -124,6 +157,11 @@ export function ExpenseForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting || !isValid) return;
+    // 無効な日付は弾く（ホイール＋クランプで通常起きないが、保険）。
+    if (!dateValid) {
+      setError("日付が正しくありません");
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -145,12 +183,14 @@ export function ExpenseForm({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "保存に失敗しました");
       }
+      // 保存した支出の年月をホームに伝え、表示月を同期させる（別月へ変えたとき用）。
+      const savedMonth = { year: form.year, month: form.month };
       if (isEdit) {
-        onSuccess("更新しました", form.categoryId);
+        onSuccess("更新しました", form.categoryId, savedMonth);
       } else if (keepOpen) {
         // 連続入力: シートは開いたまま。日付＋カテゴリは残し、金額・店名・メモを
         // クリアして次の支出へ。金額に再フォーカスしてすぐ入力できるようにする。
-        onSuccess("保存しました", form.categoryId, { keepOpen: true });
+        onSuccess("保存しました", form.categoryId, { keepOpen: true, ...savedMonth });
         setForm((p) => ({
           year: p.year,
           month: p.month,
@@ -164,7 +204,7 @@ export function ExpenseForm({
         setSubmitting(false);
         document.getElementById("amount")?.focus();
       } else {
-        onSuccess("保存しました", form.categoryId);
+        onSuccess("保存しました", form.categoryId, savedMonth);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
@@ -176,18 +216,34 @@ export function ExpenseForm({
     <form onSubmit={handleSubmit} className="space-y-5 px-4 py-5">
       {/* レシート読み取りはヘッダーの ReceiptCaptureButton に移動（結果は ocrResult で反映）。 */}
 
-      {/* 日付（年月は手動では変えず OCR が差し替える。日は縦ホイールを
-          「YYYY年M月 d 日」の d に埋め込む） */}
-      <div className="flex items-center justify-center gap-1.5 text-xl font-bold">
-        <span>
-          {form.year}年{form.month}月
-        </span>
-        <DayWheel
-          year={form.year}
-          month={form.month}
+      {/* 日付（年・月・日を縦ホイールで選ぶ。「YYYY年 M月 d日」）。
+          ウェイトは他のコントロール（カテゴリ/金額）と揃えて控えめに。 */}
+      <div className="flex items-center justify-center gap-0.5 text-base font-medium text-muted-foreground">
+        <Wheel
+          values={yearValues}
+          value={form.year}
+          onChange={setYear}
+          disabled={submitting}
+          className="w-16"
+          ariaLabel="年"
+        />
+        <span>年</span>
+        <Wheel
+          values={MONTHS}
+          value={form.month}
+          onChange={setMonth}
+          disabled={submitting}
+          loop
+          ariaLabel="月"
+        />
+        <span>月</span>
+        <Wheel
+          values={dayValues}
           value={form.day}
           onChange={(d) => setForm((p) => ({ ...p, day: d }))}
           disabled={submitting}
+          loop
+          ariaLabel="日"
         />
         <span>日</span>
       </div>

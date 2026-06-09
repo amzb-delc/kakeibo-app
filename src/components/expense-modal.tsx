@@ -168,10 +168,18 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     // categoryId は登録/更新で確定したカテゴリ。削除では渡さない（= 選択を変えない）。
     // keepOpen=true（連続入力トグルON）のときはシートを閉じない。フォーム側で
     // 自身のフィールドをリセットし、続けて次の支出を入力できる。
-    (message: string, categoryId?: string | null, opts?: { keepOpen?: boolean }) => {
+    // year/month を渡すと、ホームの表示月をその月へ同期する（年月を別月に変えて保存した時）。
+    (
+      message: string,
+      categoryId?: string | null,
+      opts?: { keepOpen?: boolean; year?: number; month?: number }
+    ) => {
       if (!opts?.keepOpen) close();
       setLastMutatedCategoryId(categoryId ?? null);
       setMutationVersion((v) => v + 1);
+      if (opts?.year && opts?.month) {
+        setCreateMonth({ year: opts.year, month: opts.month });
+      }
       showToast(message);
     },
     [close, showToast]

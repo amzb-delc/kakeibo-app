@@ -71,6 +71,16 @@ describe("validateExpenseInput: spentAt", () => {
     );
     expect(error?.field).toBe("spentAt");
   });
+
+  it("実在しない日付（2/30・4/31・月13）はエラー（ロールオーバーさせない）", async () => {
+    for (const spentAt of ["2026-02-30", "2026-04-31", "2026-13-01"]) {
+      const { error } = await validateExpenseInput(
+        { ...base, spentAt },
+        { partial: false, householdId: HH }
+      );
+      expect(error?.field).toBe("spentAt");
+    }
+  });
 });
 
 describe("validateExpenseInput: categoryId 世帯スコープ(IDOR防止)", () => {

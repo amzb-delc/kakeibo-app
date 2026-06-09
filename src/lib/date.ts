@@ -27,12 +27,20 @@ export function todayJst(): string {
   return formatJstDate(new Date());
 }
 
-// "YYYY-MM-DD"（JST日付）を、その日の JST 00:00 を表す Date に変換
+// "YYYY-MM-DD"（JST日付）を、その日の JST 00:00 を表す Date に変換。
+// 形式不正、および実在しない日付（月 1-12 外 / 月末超過。例: 2/30・4/31）は null。
+// Date.UTC はロールオーバーするので、末日チェックで弾く。
 export function parseJstDate(value: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!m) return null;
   const [, y, mo, d] = m;
-  return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), -JST_OFFSET_HOURS, 0, 0));
+  const year = Number(y);
+  const month = Number(mo);
+  const day = Number(d);
+  if (month < 1 || month > 12 || day < 1 || day > lastDayOfMonth(year, month)) {
+    return null;
+  }
+  return new Date(Date.UTC(year, month - 1, day, -JST_OFFSET_HOURS, 0, 0));
 }
 
 // 数値を2桁ゼロ詰め（例: 3 → "03"）。
@@ -41,6 +49,11 @@ export const pad2 = (n: number) => String(n).padStart(2, "0");
 // 指定月（month は 1-12）の末日。Date.UTC の day=0 は前月末＝当月末日になる。
 export function lastDayOfMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+// 日を 1〜その月の末日に収める（年月変更時に Feb 30 などをならす）。
+export function clampDay(year: number, month: number, day: number): number {
+  return Math.min(Math.max(day, 1), lastDayOfMonth(year, month));
 }
 
 // レシート OCR の日付（"YYYY-MM-DD"）を妥当ならパースする。形式不正・実在しない
