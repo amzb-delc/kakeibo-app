@@ -5,6 +5,7 @@ import Image from "next/image";
 import { MonthlySummaryView } from "@/components/monthly-summary";
 import { PageHeader } from "@/components/page-header";
 import { HeaderCharacter } from "@/components/header-character";
+import { StatementImportButton } from "@/components/statement-import-button";
 import { useExpenseModal } from "@/components/expense-modal";
 import { useSettingsModal } from "@/components/settings-modal";
 import { useSession } from "@/components/session-provider";
@@ -158,6 +159,7 @@ export default function SummaryPage() {
       <h1 className="sr-only">月次サマリー</h1>
       <PageHeader
         title={monthSwitcher}
+        left={unlocked ? <StatementImportButton /> : null}
         right={<HeaderCharacter onPress={goToCurrentMonth} />}
       />
       <div>

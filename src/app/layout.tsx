@@ -5,6 +5,7 @@ import { FooterNav } from "@/components/footer-nav";
 import { SessionProvider } from "@/components/session-provider";
 import { ExpenseModalProvider } from "@/components/expense-modal";
 import { SettingsModalProvider } from "@/components/settings-modal";
+import { StatementImportProvider } from "@/components/statement-import-provider";
 import { HOUSEHOLD_NAME } from "@/lib/app-meta";
 
 const geistSans = Geist({
@@ -52,14 +53,16 @@ export default function RootLayout({
         <SessionProvider>
           <ExpenseModalProvider>
             <SettingsModalProvider>
-              {/*
-                フッタ高 96px + FAB の上方はみ出し 44px + 余白 ≒ 144px(9rem) を確保。
-                末尾のコンテンツが FAB に隠れないようにするため。
-              */}
-              <div className="flex-1 pb-[calc(env(safe-area-inset-bottom)+9rem)]">
-                {children}
-              </div>
-              <FooterNav />
+              <StatementImportProvider>
+                {/*
+                  フッタ高 96px + FAB の上方はみ出し 44px + 余白 ≒ 144px(9rem) を確保。
+                  末尾のコンテンツが FAB に隠れないようにするため。
+                */}
+                <div className="flex-1 pb-[calc(env(safe-area-inset-bottom)+9rem)]">
+                  {children}
+                </div>
+                <FooterNav />
+              </StatementImportProvider>
             </SettingsModalProvider>
           </ExpenseModalProvider>
         </SessionProvider>

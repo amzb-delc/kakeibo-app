@@ -60,6 +60,9 @@ type ContextValue = {
    *  （OCR でレシートの月のシートを開いたとき、ホームもその月へ移動して違和感をなくす）。
    *  openCreate のたびに新しい参照で更新される。 */
   createMonth: { year: number; month: number } | null;
+  /** 明細の一括登録（取り込み）後に呼ぶ。mutationVersion を増分して一覧を再取得させ、
+   *  month を渡すとホーム表示月をその月へ同期し、トーストを表示する。 */
+  notifyBatch: (message: string, month?: { year: number; month: number }) => void;
 };
 
 const ExpenseModalContext = createContext<ContextValue | null>(null);
@@ -186,6 +189,17 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     [close, showToast]
   );
 
+  // 明細の一括登録後に呼ぶ。専用シートは StatementImportProvider 側が持つので、
+  // ここでは一覧再取得（mutationVersion 増分）＋表示月同期＋トーストだけ行う。
+  const notifyBatch = useCallback(
+    (message: string, month?: { year: number; month: number }) => {
+      setMutationVersion((v) => v + 1);
+      if (month) setCreateMonth({ year: month.year, month: month.month });
+      showToast(message);
+    },
+    [showToast]
+  );
+
   const handleDelete = useCallback(async () => {
     if (active?.mode !== "edit") return;
     setDeleting(true);
@@ -258,6 +272,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
         categoriesVersion,
         notify: showToast,
         createMonth,
+        notifyBatch,
       }}
     >
       {children}
