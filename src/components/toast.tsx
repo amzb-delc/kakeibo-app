@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// 画面下部に一定時間だけ出すトースト通知。
+// ヘッダのすぐ下に一定時間だけ出すトースト通知（視認性のため上部に配置）。
 // 以前は ExpenseModalProvider に同居していたが、独立した UI プリミティブとして切り出す。
 const TOAST_MS = 2200;
 
@@ -33,7 +33,7 @@ export function Toast({ message }: { message: string | null }) {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-6 left-4 right-4 z-[60] bg-foreground text-background rounded-xl px-4 py-3 text-sm font-medium text-center shadow-lg animate-in slide-in-from-bottom"
+      className="fixed left-4 right-4 z-[60] top-[calc(env(safe-area-inset-top)+4.75rem)] mx-auto max-w-sm bg-foreground/85 text-background backdrop-blur-sm rounded-xl px-4 py-3 text-sm font-medium text-center shadow-lg animate-in slide-in-from-top fade-in"
     >
       {message}
     </div>

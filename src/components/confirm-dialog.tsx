@@ -7,7 +7,9 @@ import { useId } from "react";
 // 2択ボタンで完結する alert dialog）。
 type ConfirmDialogProps = {
   title: string;
-  description?: string;
+  /** タイトルの上に出す補足（削除対象の詳細など）。title より前に読ませたいとき使う。 */
+  detail?: React.ReactNode;
+  description?: React.ReactNode;
   confirmLabel: string;
   /** busy 中に confirm ボタンへ出す文言（省略時は confirmLabel のまま） */
   busyLabel?: string;
@@ -22,6 +24,7 @@ type ConfirmDialogProps = {
 
 export function ConfirmDialog({
   title,
+  detail,
   description,
   confirmLabel,
   busyLabel,
@@ -44,6 +47,11 @@ export function ConfirmDialog({
         className="w-full sm:max-w-sm bg-card rounded-t-2xl sm:rounded-2xl p-5 m-0 sm:m-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
+        {detail && (
+          <div className="mb-2 rounded-lg bg-muted px-3 py-2 text-sm">
+            {detail}
+          </div>
+        )}
         <h2 id={titleId} className="text-base font-semibold mb-2">
           {title}
         </h2>

@@ -62,18 +62,35 @@ export function useBottomSheet(opts?: {
     }, ANIM_MS);
   }, []);
 
-  // Esc で閉じる + 背面スクロールロック（mounted の間）
+  // Esc で閉じる + 背面スクロールロック（mounted の間）。
+  // iOS では overflow:hidden だけだと入力フォーカス時に背面（ホーム）がスクロールして
+  // しまうため、body を position:fixed で現在位置に固定し、閉じたら元の位置へ戻す。
   useEffect(() => {
     if (!mounted) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
+      Object.assign(body.style, prev);
+      window.scrollTo(0, scrollY);
     };
   }, [mounted, close]);
 
