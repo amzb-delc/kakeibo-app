@@ -13,6 +13,12 @@ type Props = {
   // 読み取り失敗・抽出ゼロ時のメッセージ（トースト表示などに使う）。
   onError?: (message: string) => void;
   className?: string;
+  // 既定アイコン（Camera）のサイズ等を上書きする（既定はモーダルヘッダー用の size-5）。
+  // フッターなど大きめのタップ目標に置くとき size-10 等を渡す。読み取り中スピナーにも効く。
+  iconClassName?: string;
+  // 待機時のアイコンを丸ごと差し替える（例: 連続入力モードを表す“重ねカメラ”）。
+  // 読み取り中は icon に関わらずスピナー（iconClassName でサイズ調整）。
+  icon?: React.ReactNode;
   "aria-label"?: string;
 };
 
@@ -23,6 +29,8 @@ export function ReceiptCaptureButton({
   onResult,
   onError,
   className,
+  iconClassName,
+  icon,
   "aria-label": ariaLabel = "レシートを読み取る",
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,9 +74,9 @@ export function ReceiptCaptureButton({
         )}
       >
         {loading ? (
-          <Loader2 className="size-5 animate-spin" />
+          <Loader2 className={cn("size-5 animate-spin", iconClassName)} />
         ) : (
-          <Camera className="size-5" />
+          icon ?? <Camera className={cn("size-5", iconClassName)} />
         )}
       </button>
     </>

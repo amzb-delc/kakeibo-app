@@ -67,7 +67,11 @@ export function ExpenseForm({
 }: Props) {
   const isEdit = initial.id !== undefined;
 
+  // 年月は固定表示だが OCR で別月のレシートを読み取ったときに丸ごと差し替えられるよう
+  // state に持つ（手動で月を変える UI は無い。日は DayWheel、年月は OCR のみが変える）。
   const [form, setForm] = useState({
+    year: initial.year,
+    month: initial.month,
     day: initial.day,
     categoryId: initial.categoryId,
     amount: initial.amount,
@@ -94,12 +98,12 @@ export function ExpenseForm({
       if (categoryId && categories.some((c) => c.id === categoryId)) {
         next.categoryId = categoryId;
       }
-      // 日付は年月がフォームの表示月と一致するときだけ「日」を反映する
-      // （年月は固定表示のため）。
+      // 日付が有効なら年月日を丸ごと反映する（表示月もレシートの月になる）。
       if (spentAt && /^\d{4}-\d{2}-\d{2}$/.test(spentAt)) {
         const [y, m, d] = spentAt.split("-").map(Number);
-        const lastDay = lastDayOfMonth(initial.year, initial.month);
-        if (y === initial.year && m === initial.month && d >= 1 && d <= lastDay) {
+        if (m >= 1 && m <= 12 && d >= 1 && d <= lastDayOfMonth(y, m)) {
+          next.year = y;
+          next.month = m;
           next.day = d;
         }
       }
@@ -123,7 +127,7 @@ export function ExpenseForm({
     setError(null);
     setSubmitting(true);
     try {
-      const spentAt = `${initial.year}-${pad2(initial.month)}-${pad2(form.day)}`;
+      const spentAt = `${form.year}-${pad2(form.month)}-${pad2(form.day)}`;
       const url = isEdit ? `/api/expenses/${initial.id}` : "/api/expenses";
       const method = isEdit ? "PATCH" : "POST";
       const res = await fetch(url, {
@@ -148,6 +152,8 @@ export function ExpenseForm({
         // クリアして次の支出へ。金額に再フォーカスしてすぐ入力できるようにする。
         onSuccess("保存しました", form.categoryId, { keepOpen: true });
         setForm((p) => ({
+          year: p.year,
+          month: p.month,
           day: p.day,
           categoryId: p.categoryId,
           amount: "",
@@ -170,14 +176,15 @@ export function ExpenseForm({
     <form onSubmit={handleSubmit} className="space-y-5 px-4 py-5">
       {/* レシート読み取りはヘッダーの ReceiptCaptureButton に移動（結果は ocrResult で反映）。 */}
 
-      {/* 日付（年月固定。日は縦ホイールを「YYYY年M月 d 日」の d に埋め込む） */}
+      {/* 日付（年月は手動では変えず OCR が差し替える。日は縦ホイールを
+          「YYYY年M月 d 日」の d に埋め込む） */}
       <div className="flex items-center justify-center gap-1.5 text-xl font-bold">
         <span>
-          {initial.year}年{initial.month}月
+          {form.year}年{form.month}月
         </span>
         <DayWheel
-          year={initial.year}
-          month={initial.month}
+          year={form.year}
+          month={form.month}
           value={form.day}
           onChange={(d) => setForm((p) => ({ ...p, day: d }))}
           disabled={submitting}

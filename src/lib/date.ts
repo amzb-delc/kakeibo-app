@@ -43,6 +43,19 @@ export function lastDayOfMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
+// レシート OCR の日付（"YYYY-MM-DD"）を妥当ならパースする。形式不正・実在しない
+// 日付（月 1-12 外 / 末日超過）は null。OCR の値を支出の年月日に採用するときの検証に使う。
+export function parseReceiptDate(
+  spentAt: string | null | undefined
+): { year: number; month: number; day: number } | null {
+  if (!spentAt || !/^\d{4}-\d{2}-\d{2}$/.test(spentAt)) return null;
+  const [year, month, day] = spentAt.split("-").map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > lastDayOfMonth(year, month)) {
+    return null;
+  }
+  return { year, month, day };
+}
+
 // 月を delta だけずらす（month は 1-12）。年跨ぎを正規化して返す。
 export function shiftMonth(year: number, month: number, delta: number) {
   let y = year;

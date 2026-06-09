@@ -1,41 +1,15 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { BarChart3, Plus, Settings, type LucideIcon } from "lucide-react";
+import { Camera, Plus, Settings } from "lucide-react";
 import { useExpenseModal } from "@/components/expense-modal";
 import { useSettingsModal } from "@/components/settings-modal";
 import { useSession } from "@/components/session-provider";
-
-type TabProps = {
-  href: string;
-  label: string;
-  active: boolean;
-  Icon: LucideIcon;
-};
-
-function Tab({ href, label, active, Icon }: TabProps) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      aria-current={active ? "page" : undefined}
-      className={`flex-1 flex items-center justify-center h-full min-h-[72px] transition-colors ${
-        active ? "text-primary" : "text-muted-foreground"
-      }`}
-    >
-      <Icon size={40} strokeWidth={active ? 2.5 : 2} aria-hidden="true" />
-    </Link>
-  );
-}
+import { ReceiptCaptureButton } from "@/components/receipt-capture-button";
 
 export function FooterNav() {
-  const pathname = usePathname();
-  const { openCreate } = useExpenseModal();
+  const { openCreate, notify } = useExpenseModal();
   const { openSettings } = useSettingsModal();
   const { unlocked } = useSession();
-
-  const isSummary = pathname === "/";
 
   return (
     <nav
@@ -44,8 +18,7 @@ export function FooterNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="relative flex items-stretch h-24">
-        <Tab href="/" label="サマリー" active={isSummary} Icon={BarChart3} />
-        <div className="w-32 shrink-0" aria-hidden="true" />
+        {/* 左: 設定（ホームは唯一のページなのでサマリータブは廃止） */}
         <button
           type="button"
           onClick={openSettings}
@@ -60,6 +33,33 @@ export function FooterNav() {
             )}
           </span>
         </button>
+
+        {/* 中央: FAB 用スペーサー */}
+        <div className="w-32 shrink-0" aria-hidden="true" />
+
+        {/* 右: レシート撮影でOCR → 抽出結果入り・連続入力ONで登録モーダルを開く
+            （まとめ入力動線）。未保存（cookie 無し）は OCR API も 401 なので出さない。
+            アイコンは“重ねカメラ”で連続入力モードを表す。 */}
+        {unlocked ? (
+          <ReceiptCaptureButton
+            onResult={(r) => openCreate({ ocr: r, keepOpen: true })}
+            onError={notify}
+            aria-label="レシートで続けて支出を登録（連続入力）"
+            className="flex-1 w-auto h-full min-h-[72px] rounded-none text-muted-foreground hover:bg-transparent hover:text-foreground"
+            iconClassName="size-10"
+            icon={
+              <span className="relative inline-block size-11" aria-hidden="true">
+                {/* 背面カメラ（右斜め上・薄め）＝重ねて連続入力モードを示す。
+                    2枚を中央寄せ＋わずかにずらして大きく重ねる。 */}
+                <Camera className="absolute inset-0 m-auto size-9 opacity-50 translate-x-[3px] -translate-y-[3px]" />
+                {/* 前面カメラ（左下）。内側を card 色で塗り、背面の透けを隠す。 */}
+                <Camera className="absolute inset-0 m-auto size-9 fill-card -translate-x-[3px] translate-y-[3px]" />
+              </span>
+            }
+          />
+        ) : (
+          <div className="flex-1" aria-hidden="true" />
+        )}
 
         {/* 登録 FAB は未保存のときは出さない（未保存では登録できないため） */}
         {unlocked && (

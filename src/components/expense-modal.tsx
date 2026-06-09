@@ -15,7 +15,7 @@ import {
 } from "@/components/expense-form";
 import { Switch } from "@/components/ui/switch";
 import { ReceiptCaptureButton } from "@/components/receipt-capture-button";
-import { todayJst, lastDayOfMonth } from "@/lib/date";
+import { todayJst, lastDayOfMonth, parseReceiptDate } from "@/lib/date";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
 import { useToast, Toast } from "@/components/toast";
 import { useCategoryCache } from "@/components/use-category-cache";
@@ -34,9 +34,11 @@ type ActiveState =
   | { mode: "edit"; expense: ExpenseEditTarget };
 
 type ContextValue = {
-  /** 新規登録シートを開く。opts.ocr を渡すとレシート OCR の抽出結果で初期値を埋める
-   *  （将来のホーム動線：ホームのカメラで撮影→結果を渡して開く、で使う）。 */
-  openCreate: (opts?: { ocr?: OcrResult | null }) => void;
+  /** 新規登録シートを開く。
+   *  - opts.ocr: レシート OCR の抽出結果で初期値を埋める。日付が有効ならその年月日で開く
+   *    （= レシートの月でシートを開く。ホームの表示月も createMonth 経由で同期される）。
+   *  - opts.keepOpen: 連続入力モード ON で開く（ホームのカメラ＝まとめ入力動線で使う）。 */
+  openCreate: (opts?: { ocr?: OcrResult | null; keepOpen?: boolean }) => void;
   openEdit: (expense: ExpenseEditTarget) => void;
   /** 元ページが選択月・展開カテゴリを publish する。openCreate の既定値に使う */
   setComposeContext: (ctx: ComposeContext | null) => void;
@@ -51,6 +53,12 @@ type ContextValue = {
   refreshCategories: () => void;
   /** カテゴリ編集のたびに増える。サマリー等はこれを購読して再取得する（名前の即時反映）。 */
   categoriesVersion: number;
+  /** プロバイダ内のトーストを表示する。モーダル外（フッターの OCR エラー等）から使う。 */
+  notify: (message: string) => void;
+  /** 新規登録シートを開いた月。ホームがこれを購読して表示月を同期する
+   *  （OCR でレシートの月のシートを開いたとき、ホームもその月へ移動して違和感をなくす）。
+   *  openCreate のたびに新しい参照で更新される。 */
+  createMonth: { year: number; month: number } | null;
 };
 
 const ExpenseModalContext = createContext<ContextValue | null>(null);
@@ -79,6 +87,10 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   // セットされ、開いているフォームに反映される。キャプチャごとに新しい参照で渡る。
   // シートを開き直すと null に戻す（古い結果を別の支出に持ち込まないため）。
   const [ocrResult, setOcrResult] = useState<OcrResult | null>(null);
+  // 新規シートを開いた月。ホームが購読して表示月を同期する（openCreate ごとに新参照）。
+  const [createMonth, setCreateMonth] = useState<{ year: number; month: number } | null>(
+    null
+  );
   const [mutationVersion, setMutationVersion] = useState(0);
   const [lastMutatedCategoryId, setLastMutatedCategoryId] = useState<string | null>(null);
   const composeRef = useRef<ComposeContext | null>(null);
@@ -110,16 +122,25 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const openCreate = useCallback(
-    (opts?: { ocr?: OcrResult | null }) => {
+    (opts?: { ocr?: OcrResult | null; keepOpen?: boolean }) => {
       const [ty, tm, td] = todayJst().split("-").map(Number);
       const ctx = composeRef.current;
-      const year = ctx?.year ?? ty;
-      const month = ctx?.month ?? tm;
-      const lastDay = lastDayOfMonth(year, month);
-      const day = Math.min(td, lastDay);
+      let year = ctx?.year ?? ty;
+      let month = ctx?.month ?? tm;
+      let day = Math.min(td, lastDayOfMonth(year, month));
+      // OCR の日付が有効なら、レシートの年月日でシートを開く（表示月＝レシートの月）。
+      const rd = parseReceiptDate(opts?.ocr?.spentAt);
+      if (rd) {
+        year = rd.year;
+        month = rd.month;
+        day = rd.day;
+      }
       open({ mode: "create", year, month, day, categoryId: ctx?.categoryId ?? "" });
-      // open() で null に戻した後に OCR シードを入れる（後勝ちで反映される）。
+      // open() でリセットした後に OCR シード・連続入力を入れる（後勝ちで反映される）。
       if (opts?.ocr) setOcrResult(opts.ocr);
+      if (opts?.keepOpen) setKeepOpen(true);
+      // ホームが表示月を同期できるよう、開いた月を新参照で発信する。
+      setCreateMonth({ year, month });
     },
     [open]
   );
@@ -128,6 +149,15 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     (expense: ExpenseEditTarget) => open({ mode: "edit", expense }),
     [open]
   );
+
+  // モーダル内ヘッダーのカメラで読み取ったときのハンドラ。フォームへ反映するため
+  // ocrResult を更新しつつ、日付が有効ならフォームの月が変わるのでホームの表示月も
+  // createMonth 経由で同期する（フッター動線の openCreate と挙動を揃える）。
+  const applyHeaderOcr = useCallback((result: OcrResult) => {
+    setOcrResult(result);
+    const rd = parseReceiptDate(result.spentAt);
+    if (rd) setCreateMonth({ year: rd.year, month: rd.month });
+  }, []);
 
   const close = useCallback(() => {
     setConfirmingDelete(false);
@@ -217,6 +247,8 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
         categories,
         refreshCategories,
         categoriesVersion,
+        notify: showToast,
+        createMonth,
       }}
     >
       {children}
@@ -246,7 +278,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
               // （OFF=右に開錠 Unlock / ON=左に閉錠 Lock）。
               <div className="flex items-center gap-0.5">
                 <ReceiptCaptureButton
-                  onResult={setOcrResult}
+                  onResult={applyHeaderOcr}
                   onError={showToast}
                 />
                 <Switch
