@@ -149,6 +149,35 @@ describe("ExpenseForm", () => {
     });
   });
 
+  it("OCRの日付が別月でも年月日を丸ごと反映し、その月で送信する", async () => {
+    const onSuccess = vi.fn();
+    const ocr = {
+      amount: 800,
+      storeName: null,
+      spentAt: "2026-03-15",
+      categoryId: "cat-1",
+    };
+    render(
+      <ExpenseForm
+        categories={categories}
+        initial={{ ...initialCreate, categoryId: "" }}
+        keepOpen={false}
+        ocrResult={ocr}
+        onSuccess={onSuccess}
+      />
+    );
+    // 表示月が初期の 6月 → レシートの 3月 に変わる
+    await waitFor(() => expect(screen.getByText("2026年3月")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "保存する" }));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    const [, opts] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(opts.body)).toMatchObject({
+      amount: 800,
+      spentAt: "2026-03-15",
+      categoryId: "cat-1",
+    });
+  });
+
   it("サーバーエラー時はエラー表示し onSuccess を呼ばない", async () => {
     const onSuccess = vi.fn();
     vi.stubGlobal(

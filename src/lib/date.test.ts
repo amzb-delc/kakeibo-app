@@ -7,6 +7,7 @@ import {
   formatJstDate,
   parseJstDate,
   formatJstDateLabel,
+  parseReceiptDate,
 } from "./date";
 
 describe("pad2", () => {
@@ -68,5 +69,27 @@ describe("JST 変換", () => {
   it("formatJstDateLabel は M/D(曜)", () => {
     // 2024-03-15 は金曜
     expect(formatJstDateLabel(parseJstDate("2024-03-15") as Date)).toBe("3/15(金)");
+  });
+});
+
+describe("parseReceiptDate", () => {
+  it("妥当な日付は {year, month, day} に分解", () => {
+    expect(parseReceiptDate("2026-05-09")).toEqual({ year: 2026, month: 5, day: 9 });
+  });
+  it("うるう年の 2/29 は妥当", () => {
+    expect(parseReceiptDate("2024-02-29")).toEqual({ year: 2024, month: 2, day: 29 });
+  });
+  it("実在しない日付（平年 2/29・月末超過・月 0/13）は null", () => {
+    expect(parseReceiptDate("2025-02-29")).toBeNull();
+    expect(parseReceiptDate("2026-04-31")).toBeNull();
+    expect(parseReceiptDate("2026-00-10")).toBeNull();
+    expect(parseReceiptDate("2026-13-10")).toBeNull();
+  });
+  it("形式不正・空・null は null", () => {
+    expect(parseReceiptDate("2026/05/09")).toBeNull();
+    expect(parseReceiptDate("2026-5-9")).toBeNull();
+    expect(parseReceiptDate("")).toBeNull();
+    expect(parseReceiptDate(null)).toBeNull();
+    expect(parseReceiptDate(undefined)).toBeNull();
   });
 });

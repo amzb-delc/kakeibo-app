@@ -58,8 +58,13 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 ## 実装上の制約（MVPスコープ）
 
 - ユーザー管理（個人アカウント）は持たない。保護は世帯共有の世帯コードのみ（上記「認証」参照）
-- レシートOCRは実装済み（`POST /api/ocr` + `src/lib/ocr.ts`、Claude ビジョン）。支出モーダル**新規登録時のヘッダーのカメラアイコン**（`ReceiptCaptureButton`）から画像を撮影/選択 → クライアントで縮小 → 金額・店名・日付・カテゴリ候補をフォームに自動入力する。撮影・読み取りは `ReceiptCaptureButton`（隠し input + `useReceiptOcr`）が担い、結果は `expense-modal` 経由で `ExpenseForm` に `ocrResult` として渡って反映される（撮影トリガーをホーム等に再利用できるよう部品化）。**画像は保存しない**（抽出のみ、`receiptImageUrl`/`ocrRawText` は未使用のまま）。`ANTHROPIC_API_KEY` 必須（未設定なら 503）。モデルは `OCR_MODEL`（既定 `claude-haiku-4-5`）
-- 連続入力（ロック）トグル: 支出モーダル**新規時のヘッダー**にスイッチ（`src/components/ui/switch.tsx`、base-ui）を置き、ON のとき保存後もシートを閉じず日付＋カテゴリを残して続けて入力する。状態は `expense-modal` が保持し `ExpenseForm` に渡す。錠アイコンはスイッチのトラック内（ON=閉錠・OFF=開錠）。
+- レシートOCRは実装済み（`POST /api/ocr` + `src/lib/ocr.ts`、Claude ビジョン）。撮影・縮小・読み取りは再利用可能な `ReceiptCaptureButton`（隠し input + `useReceiptOcr`）が担い、抽出結果（金額・店名・日付・カテゴリ）だけを `onResult` で返す。**2つの動線**:
+  - **支出モーダル新規時のヘッダーのカメラ**: 開いているフォームに `ocrResult`（`expense-modal` 経由で `ExpenseForm` に渡る）として反映。
+  - **フッター右のカメラ（ホーム）**: 撮影 → `openCreate({ ocr, keepOpen: true })` で**連続入力ON・レシートの月**で登録モーダルを開く（まとめ入力動線）。アイコンは“重ねカメラ”で連続入力モードを表す。
+  - **日付の扱い**: OCR の日付が妥当なら（`parseReceiptDate`、`src/lib/date.ts`）**年月日を丸ごと**フォームに反映する（`ExpenseForm` は年月も state 化済み。手動で年月を変える UI はまだ無い＝**次の改修課題**）。レシートの月でフォームが開くとき、ホームの表示月も `createMonth` 経由で同期する（`useMonthlySummary.goToMonth`）。
+  - **画像は保存しない**（抽出のみ、`receiptImageUrl`/`ocrRawText` は未使用のまま）。`ANTHROPIC_API_KEY` 必須（未設定なら 503）。モデルは `OCR_MODEL`（既定 `claude-haiku-4-5`）
+- 連続入力（ロック）トグル: 支出モーダル**新規時のヘッダー**にスイッチ（`src/components/ui/switch.tsx`、base-ui）を置き、ON のとき保存後もシートを閉じず年月＋日＋カテゴリを残して続けて入力する。状態は `expense-modal` が保持し `ExpenseForm` に渡す。錠アイコンはスイッチのトラック内（ON=閉錠・OFF=開錠）。
+- フッター（`footer-nav.tsx`）: ホームは唯一のページなのでサマリータブは廃止。**左=設定／中央=登録FAB（手入力）／右=レシートOCRカメラ**。FAB とカメラは未保存（`unlocked` でない）のときは出さない（OCR API も 401）。
 - クレカ明細の一括取り込みは未実装（Phase2 予定。iPhone での CSV/PDF 取り回しが課題のため後回し）
 - 通知機能は未実装（`notificationDay`, `notificationTime` フィールドのみ存在）
 - カテゴリ追加UIは未実装
