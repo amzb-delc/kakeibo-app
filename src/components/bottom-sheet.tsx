@@ -194,7 +194,7 @@ export function BottomSheet({
                 type="button"
                 onClick={onClose}
                 aria-label="閉じる"
-                className="w-9 h-9 -mr-1 rounded-full flex items-center justify-center text-lg text-muted-foreground hover:bg-muted transition-colors"
+                className="w-10 h-10 -mr-1 rounded-full flex items-center justify-center text-lg text-muted-foreground hover:bg-muted transition-colors"
               >
                 ✕
               </button>

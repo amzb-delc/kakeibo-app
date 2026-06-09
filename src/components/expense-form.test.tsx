@@ -40,7 +40,12 @@ afterEach(() => {
 describe("ExpenseForm", () => {
   it("必須(金額)が空なら保存ボタンは disabled", () => {
     render(
-      <ExpenseForm categories={categories} initial={initialCreate} onSuccess={vi.fn()} />
+      <ExpenseForm
+        categories={categories}
+        initial={initialCreate}
+        keepOpen={false}
+        onSuccess={vi.fn()}
+      />
     );
     expect(screen.getByRole("button", { name: "保存する" })).toBeDisabled();
   });
@@ -48,7 +53,12 @@ describe("ExpenseForm", () => {
   it("金額入力後に POST し、onSuccess(保存しました, categoryId) を呼ぶ", async () => {
     const onSuccess = vi.fn();
     const { container } = render(
-      <ExpenseForm categories={categories} initial={initialCreate} onSuccess={onSuccess} />
+      <ExpenseForm
+        categories={categories}
+        initial={initialCreate}
+        keepOpen={false}
+        onSuccess={onSuccess}
+      />
     );
     fireEvent.change(container.querySelector("#amount")!, { target: { value: "1200" } });
     const save = screen.getByRole("button", { name: "保存する" });
@@ -71,7 +81,12 @@ describe("ExpenseForm", () => {
     const onSuccess = vi.fn();
     const initialEdit = { ...initialCreate, id: "e1", amount: "500" };
     render(
-      <ExpenseForm categories={categories} initial={initialEdit} onSuccess={onSuccess} />
+      <ExpenseForm
+        categories={categories}
+        initial={initialEdit}
+        keepOpen={false}
+        onSuccess={onSuccess}
+      />
     );
     fireEvent.click(screen.getByRole("button", { name: "更新する" }));
     await waitFor(() =>
@@ -80,6 +95,58 @@ describe("ExpenseForm", () => {
     const [url, opts] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toBe("/api/expenses/e1");
     expect(opts.method).toBe("PATCH");
+  });
+
+  it("連続入力(keepOpen=true): onSuccess を {keepOpen:true} で呼び、金額をクリアして次へ", async () => {
+    const onSuccess = vi.fn();
+    const { container } = render(
+      <ExpenseForm
+        categories={categories}
+        initial={initialCreate}
+        keepOpen={true}
+        onSuccess={onSuccess}
+      />
+    );
+    const amount = container.querySelector("#amount") as HTMLInputElement;
+    fireEvent.change(amount, { target: { value: "1200" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存する" }));
+    await waitFor(() =>
+      expect(onSuccess).toHaveBeenCalledWith("保存しました", "cat-1", { keepOpen: true })
+    );
+    // 金額はクリアされ、続けて入力できる状態に戻る
+    await waitFor(() => expect(amount.value).toBe(""));
+  });
+
+  it("ocrResult が渡るとフォーム各項目に反映され、保存時に送信される", async () => {
+    const onSuccess = vi.fn();
+    const ocr = {
+      amount: 1500,
+      storeName: "スーパー",
+      spentAt: "2026-06-10",
+      categoryId: "cat-1",
+    };
+    const { container } = render(
+      <ExpenseForm
+        categories={categories}
+        initial={{ ...initialCreate, categoryId: "", amount: "" }}
+        keepOpen={false}
+        ocrResult={ocr}
+        onSuccess={onSuccess}
+      />
+    );
+    const amount = container.querySelector("#amount") as HTMLInputElement;
+    const store = container.querySelector("#storeName") as HTMLInputElement;
+    await waitFor(() => expect(amount.value).toBe("1500"));
+    expect(store.value).toBe("スーパー");
+    fireEvent.click(screen.getByRole("button", { name: "保存する" }));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    const [, opts] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(opts.body)).toMatchObject({
+      amount: 1500,
+      categoryId: "cat-1",
+      spentAt: "2026-06-10",
+      storeName: "スーパー",
+    });
   });
 
   it("サーバーエラー時はエラー表示し onSuccess を呼ばない", async () => {
@@ -92,6 +159,7 @@ describe("ExpenseForm", () => {
       <ExpenseForm
         categories={categories}
         initial={{ ...initialCreate, amount: "300" }}
+        keepOpen={false}
         onSuccess={onSuccess}
       />
     );

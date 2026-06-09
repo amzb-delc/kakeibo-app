@@ -58,7 +58,8 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 ## 実装上の制約（MVPスコープ）
 
 - ユーザー管理（個人アカウント）は持たない。保護は世帯共有の世帯コードのみ（上記「認証」参照）
-- レシートOCRは実装済み（`POST /api/ocr` + `src/lib/ocr.ts`、Claude ビジョン）。支出モーダルの「レシートを読み取る」ボタンから画像を撮影/選択 → クライアントで縮小 → 金額・店名・日付・カテゴリ候補をフォームに自動入力する。**画像は保存しない**（抽出のみ、`receiptImageUrl`/`ocrRawText` は未使用のまま）。`ANTHROPIC_API_KEY` 必須（未設定なら 503）。モデルは `OCR_MODEL`（既定 `claude-haiku-4-5`）
+- レシートOCRは実装済み（`POST /api/ocr` + `src/lib/ocr.ts`、Claude ビジョン）。支出モーダル**新規登録時のヘッダーのカメラアイコン**（`ReceiptCaptureButton`）から画像を撮影/選択 → クライアントで縮小 → 金額・店名・日付・カテゴリ候補をフォームに自動入力する。撮影・読み取りは `ReceiptCaptureButton`（隠し input + `useReceiptOcr`）が担い、結果は `expense-modal` 経由で `ExpenseForm` に `ocrResult` として渡って反映される（撮影トリガーをホーム等に再利用できるよう部品化）。**画像は保存しない**（抽出のみ、`receiptImageUrl`/`ocrRawText` は未使用のまま）。`ANTHROPIC_API_KEY` 必須（未設定なら 503）。モデルは `OCR_MODEL`（既定 `claude-haiku-4-5`）
+- 連続入力（ロック）トグル: 支出モーダル**新規時のヘッダー**にスイッチ（`src/components/ui/switch.tsx`、base-ui）を置き、ON のとき保存後もシートを閉じず日付＋カテゴリを残して続けて入力する。状態は `expense-modal` が保持し `ExpenseForm` に渡す。錠アイコンはスイッチのトラック内（ON=閉錠・OFF=開錠）。
 - クレカ明細の一括取り込みは未実装（Phase2 予定。iPhone での CSV/PDF 取り回しが課題のため後回し）
 - 通知機能は未実装（`notificationDay`, `notificationTime` フィールドのみ存在）
 - カテゴリ追加UIは未実装
