@@ -7,18 +7,21 @@ import {
   useRef,
   useState,
 } from "react";
-import { Trash2 } from "lucide-react";
+import { Lock, Trash2, Unlock } from "lucide-react";
 import {
   ExpenseForm,
   type ExpenseFormValues,
   type ExpenseFormInitial,
 } from "@/components/expense-form";
+import { Switch } from "@/components/ui/switch";
+import { ReceiptCaptureButton } from "@/components/receipt-capture-button";
 import { todayJst, lastDayOfMonth } from "@/lib/date";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
 import { useToast, Toast } from "@/components/toast";
 import { useCategoryCache } from "@/components/use-category-cache";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { Category } from "@/types";
+import type { OcrResult } from "@/types/api";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
 export type ExpenseEditTarget = ExpenseFormValues;
@@ -31,7 +34,9 @@ type ActiveState =
   | { mode: "edit"; expense: ExpenseEditTarget };
 
 type ContextValue = {
-  openCreate: () => void;
+  /** 新規登録シートを開く。opts.ocr を渡すとレシート OCR の抽出結果で初期値を埋める
+   *  （将来のホーム動線：ホームのカメラで撮影→結果を渡して開く、で使う）。 */
+  openCreate: (opts?: { ocr?: OcrResult | null }) => void;
   openEdit: (expense: ExpenseEditTarget) => void;
   /** 元ページが選択月・展開カテゴリを publish する。openCreate の既定値に使う */
   setComposeContext: (ctx: ComposeContext | null) => void;
@@ -66,6 +71,14 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     useBottomSheet({ draggable: true, onClosed: () => setActive(null) });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // 連続入力（ロック）トグル: ON のとき保存してもシートを閉じず続けて入力する。
+  // トグル UI はヘッダー（新規時のみ）に置き、状態はここで保持する。連続入力中は
+  // シートを開いたままにするので保存をまたいで保たれ、シートを開き直すと OFF に戻す。
+  const [keepOpen, setKeepOpen] = useState(false);
+  // レシート OCR の抽出結果。ヘッダーのカメラ（ReceiptCaptureButton）で撮影すると
+  // セットされ、開いているフォームに反映される。キャプチャごとに新しい参照で渡る。
+  // シートを開き直すと null に戻す（古い結果を別の支出に持ち込まないため）。
+  const [ocrResult, setOcrResult] = useState<OcrResult | null>(null);
   const [mutationVersion, setMutationVersion] = useState(0);
   const [lastMutatedCategoryId, setLastMutatedCategoryId] = useState<string | null>(null);
   const composeRef = useRef<ComposeContext | null>(null);
@@ -84,6 +97,8 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     (next: ActiveState) => {
       setConfirmingDelete(false);
       setDeleting(false);
+      setKeepOpen(false);
+      setOcrResult(null);
       setActive(next);
       openSheet();
     },
@@ -94,15 +109,20 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
     composeRef.current = ctx;
   }, []);
 
-  const openCreate = useCallback(() => {
-    const [ty, tm, td] = todayJst().split("-").map(Number);
-    const ctx = composeRef.current;
-    const year = ctx?.year ?? ty;
-    const month = ctx?.month ?? tm;
-    const lastDay = lastDayOfMonth(year, month);
-    const day = Math.min(td, lastDay);
-    open({ mode: "create", year, month, day, categoryId: ctx?.categoryId ?? "" });
-  }, [open]);
+  const openCreate = useCallback(
+    (opts?: { ocr?: OcrResult | null }) => {
+      const [ty, tm, td] = todayJst().split("-").map(Number);
+      const ctx = composeRef.current;
+      const year = ctx?.year ?? ty;
+      const month = ctx?.month ?? tm;
+      const lastDay = lastDayOfMonth(year, month);
+      const day = Math.min(td, lastDay);
+      open({ mode: "create", year, month, day, categoryId: ctx?.categoryId ?? "" });
+      // open() で null に戻した後に OCR シードを入れる（後勝ちで反映される）。
+      if (opts?.ocr) setOcrResult(opts.ocr);
+    },
+    [open]
+  );
 
   const openEdit = useCallback(
     (expense: ExpenseEditTarget) => open({ mode: "edit", expense }),
@@ -116,8 +136,10 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
 
   const handleSuccess = useCallback(
     // categoryId は登録/更新で確定したカテゴリ。削除では渡さない（= 選択を変えない）。
-    (message: string, categoryId?: string | null) => {
-      close();
+    // keepOpen=true（連続入力トグルON）のときはシートを閉じない。フォーム側で
+    // 自身のフィールドをリセットし、続けて次の支出を入力できる。
+    (message: string, categoryId?: string | null, opts?: { keepOpen?: boolean }) => {
+      if (!opts?.keepOpen) close();
       setLastMutatedCategoryId(categoryId ?? null);
       setMutationVersion((v) => v + 1);
       showToast(message);
@@ -209,15 +231,40 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
           draggable
           dragHandlers={dragHandlers}
           headerActions={
-            <button
-              type="button"
-              aria-label="削除"
-              disabled={!isEditMode}
-              onClick={() => setConfirmingDelete(true)}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
+            isEditMode ? (
+              <button
+                type="button"
+                aria-label="削除"
+                onClick={() => setConfirmingDelete(true)}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            ) : (
+              // 新規時: レシート撮影（カメラ）＋ 連続入力（ロック）トグル。
+              // 錠アイコンはスイッチのトラック内・サムの反対側の余白に描く
+              // （OFF=右に開錠 Unlock / ON=左に閉錠 Lock）。
+              <div className="flex items-center gap-0.5">
+                <ReceiptCaptureButton
+                  onResult={setOcrResult}
+                  onError={showToast}
+                />
+                <Switch
+                  checked={keepOpen}
+                  onCheckedChange={setKeepOpen}
+                  aria-label="連続入力（保存後も続けて入力）"
+                >
+                  <Lock
+                    className="pointer-events-none absolute left-1.5 top-1/2 size-4 -translate-y-1/2 text-white group-data-[unchecked]:hidden"
+                    aria-hidden="true"
+                  />
+                  <Unlock
+                    className="pointer-events-none absolute right-1.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground group-data-[checked]:hidden"
+                    aria-hidden="true"
+                  />
+                </Switch>
+              </div>
+            )
           }
         >
           <div style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -230,6 +277,8 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
                 key={active.mode === "edit" ? active.expense.id : "create"}
                 categories={formCategories}
                 initial={initial}
+                keepOpen={keepOpen}
+                ocrResult={ocrResult}
                 onSuccess={handleSuccess}
               />
             )}

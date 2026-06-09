@@ -1,7 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Camera, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,9 +13,9 @@ import {
 } from "@/components/ui/select";
 import { DayWheel } from "@/components/day-wheel";
 import { CategoryTag } from "@/components/category-tag";
-import { useReceiptOcr } from "@/components/use-receipt-ocr";
 import { pad2, lastDayOfMonth } from "@/lib/date";
 import type { Category, Expense } from "@/types";
+import type { OcrResult } from "@/types/api";
 
 // サマリー等から編集対象を渡すための型（フォームが必要とする項目のみ）
 export type ExpenseFormValues = Pick<
@@ -43,12 +42,29 @@ export type ExpenseFormInitial = {
 type Props = {
   categories: Category[];
   initial: ExpenseFormInitial;
+  // 連続入力（ロック）トグルの状態。ON のとき保存してもシートを閉じず、続けて入力する。
+  // トグル UI 自体はヘッダー（シート側）にあり、状態は親が保持する。
+  keepOpen: boolean;
+  // レシート OCR の抽出結果。撮影・読み取りはヘッダーの ReceiptCaptureButton が担当し、
+  // 結果だけがここに渡る。キャプチャごとに新しい参照で渡り、フォームに反映する。
+  ocrResult?: OcrResult | null;
   // 保存の成功後に呼ばれる（モーダルを閉じる・トースト・再取得は親が担当）。
   // categoryId は確定した支出のカテゴリ（ホームが選択状態に同期するのに使う）。
-  onSuccess: (message: string, categoryId: string) => void;
+  // opts.keepOpen=true（連続入力）のとき、親はシートを閉じない。
+  onSuccess: (
+    message: string,
+    categoryId: string,
+    opts?: { keepOpen?: boolean }
+  ) => void;
 };
 
-export function ExpenseForm({ categories, initial, onSuccess }: Props) {
+export function ExpenseForm({
+  categories,
+  initial,
+  keepOpen,
+  ocrResult,
+  onSuccess,
+}: Props) {
   const isEdit = initial.id !== undefined;
 
   const [form, setForm] = useState({
@@ -60,20 +76,15 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  // レシート画像の縮小・送信・抽出はフックに委譲。結果の反映だけここで行う。
-  const { loading: ocrLoading, error: ocrError, setError: setOcrError, read: readReceipt } =
-    useReceiptOcr();
 
-  // レシート画像を読み取り、取得できた項目をフォームに反映する。
-  const handleReceiptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // 同じファイルを連続選択できるようにリセット
-    if (!file) return;
-    const result = await readReceipt(file);
-    if (!result) return; // 失敗時は readReceipt が error をセット済み
-    const { amount, storeName, spentAt, categoryId } = result;
-
+  // OCR 結果が来たらフォームに反映する（撮影・読み取りはヘッダーの
+  // ReceiptCaptureButton が担当し、結果だけが ocrResult として渡る）。
+  // カテゴリの妥当性・日付の月一致といった反映ルールはフォーム側の責務。
+  // ocrResult はキャプチャごとに新しい参照で渡るので、参照が変わったときだけ適用する
+  // （categories の遅延ロード等で再適用してユーザー入力を上書きしないよう deps は絞る）。
+  useEffect(() => {
+    if (!ocrResult) return;
+    const { amount, storeName, spentAt, categoryId } = ocrResult;
     setForm((p) => {
       const next = { ...p };
       if (typeof amount === "number" && amount >= 0) {
@@ -94,11 +105,8 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
       }
       return next;
     });
-
-    if (amount == null && !storeName && !spentAt && !categoryId) {
-      setOcrError("レシートから情報を読み取れませんでした");
-    }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ocrResult]);
 
   const amountEmpty = form.amount === "";
   const categoryEmpty = form.categoryId === "";
@@ -133,7 +141,25 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "保存に失敗しました");
       }
-      onSuccess(isEdit ? "更新しました" : "保存しました", form.categoryId);
+      if (isEdit) {
+        onSuccess("更新しました", form.categoryId);
+      } else if (keepOpen) {
+        // 連続入力: シートは開いたまま。日付＋カテゴリは残し、金額・店名・メモを
+        // クリアして次の支出へ。金額に再フォーカスしてすぐ入力できるようにする。
+        onSuccess("保存しました", form.categoryId, { keepOpen: true });
+        setForm((p) => ({
+          day: p.day,
+          categoryId: p.categoryId,
+          amount: "",
+          storeName: "",
+          memo: "",
+        }));
+        setError(null);
+        setSubmitting(false);
+        document.getElementById("amount")?.focus();
+      } else {
+        onSuccess("保存しました", form.categoryId);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
       setSubmitting(false);
@@ -142,34 +168,7 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 px-4 py-5">
-      {/* レシート読み取り（カメラ起動 → 縮小 → OCR → 各項目に自動入力） */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleReceiptFile}
-      />
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full gap-2"
-        disabled={submitting || ocrLoading}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        {ocrLoading ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <Camera className="size-4" />
-        )}
-        {ocrLoading ? "読み取り中…" : "レシートを読み取る"}
-      </Button>
-      {ocrError && (
-        <p className="-mt-2 text-sm text-destructive" role="alert">
-          {ocrError}
-        </p>
-      )}
+      {/* レシート読み取りはヘッダーの ReceiptCaptureButton に移動（結果は ocrResult で反映）。 */}
 
       {/* 日付（年月固定。日は縦ホイールを「YYYY年M月 d 日」の d に埋め込む） */}
       <div className="flex items-center justify-center gap-1.5 text-xl font-bold">
@@ -278,8 +277,9 @@ export function ExpenseForm({ categories, initial, onSuccess }: Props) {
         </p>
       )}
 
-      {/* 保存（半分幅・必須が空ならグレー） */}
-      <div className="flex justify-center pt-1">
+      {/* 保存（半分幅・必須が空ならグレー）。連続入力トグル（ON で保存後もシートを
+          閉じず続けて入力）はヘッダー側にある。 */}
+      <div className="flex flex-col items-center gap-3 pt-1">
         <Button type="submit" disabled={submitting || !isValid} className="w-1/2">
           {submitting ? "保存中…" : isEdit ? "更新する" : "保存する"}
         </Button>
