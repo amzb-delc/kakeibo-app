@@ -58,6 +58,7 @@
 | ID | 内容 | 場所 | 工数 | 価値 | 状態 |
 |----|------|------|------|------|------|
 | SW-1 | `category-manager` の手書きトグル（`role="switch"` インライン）を共有 `Switch`（`src/components/ui/switch.tsx`・base-ui）へ置換。必須スロットの「ON固定・グレー」状態は `disabled`＋`checked` で表現。`Switch` は連続入力トグル（branch `feat/quick-expense-entry`）で新設済み。**注意: 配色は一致するが寸法は支出シートヘッダーのタップ目標／錠アイコン視認性に合わせ一回り大きい（`h-7 w-12`、既存トグルは `h-6 w-11`）**。そのまま置換するとトグルが大きくなる。サイズを揃えたいなら size variant を足す（サムの移動量がベタ書きなので幅変更は要調整） | `category-manager.tsx:152-179` → `ui/switch.tsx` | S | 低 | ⬜ |
+| YM-1 | **支出フォームの年月を手動編集可能にする**。現状 `ExpenseForm` の年月は state 化済みだが変更 UI が無く、**OCR のみが年月を差し替える**。OCR は誤読することがあるので、ユーザーが年月を直せる手段が要る（例: 年月もホイール化、または月送りの簡易ボタン）。変えた月に応じて `DayWheel` の末日・`lastDayOfMonth` クランプを追従。ホーム表示月の同期（`createMonth`）を手動変更時にどう扱うかも要検討 | `expense-form.tsx`（年月表示まわり） | M | 中 | ⬜ |
 
 ---
 

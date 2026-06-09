@@ -81,6 +81,14 @@ export function useMonthlySummary(opts: {
     setMonth(next.month);
   }, [year, month]);
 
+  // 指定の年月へ直接移動する（月送りのスライドはせずフェードのみ）。
+  // ホームの表示月を OCR でレシートの月に同期するときに使う。同月なら no-op。
+  const goToMonth = useCallback((y: number, m: number) => {
+    pendingNavDir.current = 0;
+    setYear(y);
+    setMonth(m);
+  }, []);
+
   const isCurrentMonth =
     year === now.getFullYear() && month === now.getMonth() + 1;
 
@@ -101,6 +109,7 @@ export function useMonthlySummary(opts: {
     isCurrentMonth,
     goPrev,
     goNext,
+    goToMonth,
     transitionStyle,
   };
 }

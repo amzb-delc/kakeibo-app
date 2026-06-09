@@ -13,8 +13,13 @@ import { useCategorySelection } from "@/app/use-category-selection";
 import { useSwipeNavigation } from "@/app/use-swipe-navigation";
 
 export default function SummaryPage() {
-  const { mutationVersion, lastMutatedCategoryId, categoriesVersion, setComposeContext } =
-    useExpenseModal();
+  const {
+    mutationVersion,
+    lastMutatedCategoryId,
+    categoriesVersion,
+    setComposeContext,
+    createMonth,
+  } = useExpenseModal();
   const { openSettings } = useSettingsModal();
   const { unlocked } = useSession();
   const swipeRef = useRef<HTMLDivElement>(null);
@@ -27,8 +32,19 @@ export default function SummaryPage() {
     isCurrentMonth,
     goPrev,
     goNext,
+    goToMonth,
     transitionStyle,
   } = useMonthlySummary({ unlocked, mutationVersion, categoriesVersion });
+
+  // OCR でレシートの月のシートを開いたら、ホームの表示月もその月へ同期する。
+  // createMonth は openCreate ごとに新参照。手入力（同月）なら goToMonth は no-op。
+  const syncedCreateMonthRef = useRef<typeof createMonth>(null);
+  useEffect(() => {
+    if (createMonth && syncedCreateMonthRef.current !== createMonth) {
+      syncedCreateMonthRef.current = createMonth;
+      goToMonth(createMonth.year, createMonth.month);
+    }
+  }, [createMonth, goToMonth]);
 
   const { openCategoryId, toggleCategory } = useCategorySelection({
     summary,
