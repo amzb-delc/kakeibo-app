@@ -6,6 +6,11 @@ import { useStatementImport } from "@/components/use-statement-import";
 import { useStatementImportPreview } from "@/components/statement-import-provider";
 import { cn } from "@/lib/utils";
 
+// フォルダタップ → 先に案内トーストを出し、少し間を置いてからピッカーを開く。
+// 注意: iOS では input.click() をタップと同じ実行コンテキスト外（setTimeout 内）で
+// 呼ぶとブロックされる場合がある。実機での動作確認が必須。
+const PICKER_DELAY_MS = 700;
+
 // ホームのヘッダ左に置く「フォルダ」アイコンボタン。
 // タップで PDF ファイルピッカー → 抽出 → プレビューシートを開く。
 // 未保存（unlocked でない）ときは呼び出し側（page.tsx）で非表示にする。
@@ -30,6 +35,12 @@ export function StatementImportButton({ className }: { className?: string }) {
     openPreview(r.result.rows);
   };
 
+  const handleClick = () => {
+    notify("[PDF取込]クレカ明細を選んで下さい");
+    // トーストを一瞬見せてからピッカーを開く（iOS では開かない可能性あり・要実機確認）
+    setTimeout(() => inputRef.current?.click(), PICKER_DELAY_MS);
+  };
+
   return (
     <>
       <input
@@ -43,7 +54,7 @@ export function StatementImportButton({ className }: { className?: string }) {
         type="button"
         aria-label="クレジットカード明細を取り込む"
         disabled={loading}
-        onClick={() => inputRef.current?.click()}
+        onClick={handleClick}
         className={cn(
           "w-11 h-11 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50",
           className
