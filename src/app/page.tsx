@@ -33,6 +33,7 @@ export default function SummaryPage() {
     goPrev,
     goNext,
     goToMonth,
+    goToCurrentMonth,
     transitionStyle,
   } = useMonthlySummary({ unlocked, mutationVersion, categoriesVersion });
 
@@ -157,7 +158,7 @@ export default function SummaryPage() {
       <h1 className="sr-only">月次サマリー</h1>
       <PageHeader
         title={monthSwitcher}
-        right={isCurrentMonth ? <HeaderCharacter /> : undefined}
+        right={<HeaderCharacter onPress={goToCurrentMonth} />}
       />
       <div>
         {!summary && loading ? (

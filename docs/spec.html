@@ -298,6 +298,7 @@ hr {
     <li><a href="#design">UIガイド</a></li>
     <li><a href="#out-of-scope">MVPスコープ外</a></li>
     <li><a href="#changelog">改修履歴</a></li>
+    <li><a href="refactor-backlog.html">リファクタ・バックログ →</a></li>
   </ul>
   <h2>画面</h2>
   <ul>
@@ -323,7 +324,7 @@ hr {
 
 <header class="title">
   <h1>家計簿アプリ — MVP仕様書</h1>
-  <div class="meta">最終更新: 2026-06-08（明細の並び替え〈日付/更新日/金額〉 + 全体カードの件数表示 + リファクタ Tier 5〜7〈Provider/page.tsx 分割・API型集約・ルートテスト基盤〉。先行: レシートOCR・世帯コード保護・カテゴリ管理・ホーム全体カード改善）</div>
+  <div class="meta">最終更新: 2026-06-09（UX改善〈トースト位置/削除確認/iOSスクロール/ヘッダキャラ〉 + 連続入力スイッチ + 年月日ホイール化 + OCRまとめ入力動線。先行: 明細並び替え・全体カード件数・レシートOCR・世帯コード保護・カテゴリ管理・リファクタ Tier 5〜7）</div>
 </header>
 
 <section id="overview">
@@ -368,7 +369,7 @@ hr {
 │       └── ocr/route.ts          # レシート画像 → 構造化抽出（Claude ビジョン）
 ├── components/
 │   ├── page-header.tsx       # 共通ヘッダ（全ページに sticky）
-│   ├── footer-nav.tsx        # 共通フッタ（サマリー / ＋FAB / 設定）
+│   ├── footer-nav.tsx        # 共通フッタ（設定 / ＋FAB / レシートOCRカメラ）
 │   ├── bottom-sheet.tsx      # useBottomSheet + BottomSheet（シート共通基盤）
 │   ├── expense-modal.tsx     # ExpenseModalProvider（モーダル状態/削除/mutation）
 │   ├── toast.tsx             # useToast + Toast（トースト通知）
@@ -381,7 +382,7 @@ hr {
 │   ├── expense-form.tsx      # 登録 + 編集フォーム（モーダル内で使用）
 │   ├── use-receipt-ocr.ts    # useReceiptOcr（画像縮小→/api/ocr→抽出）
 │   ├── category-tag.tsx      # CategoryTag（カテゴリ色タグの共通表示）
-│   ├── day-wheel.tsx         # 日のみの縦ホイール（ドラム）
+│   ├── wheel.tsx             # 汎用の縦ホイール（年月日ドラム・月日は loop 巡回）
 │   ├── donut-chart.tsx       # 自前 SVG ドーナツ（選択強調 / 全体減光対応）
 │   ├── monthly-summary.tsx   # 月次サマリー表示（ドーナツ/レジェンド/明細/並び替え）
 │   └── ui/                   # shadcn / Base UI コンポーネント
@@ -482,9 +483,9 @@ hr {
 ├───────────────────────────┤
 │        ┏━━━━━━━━┓         │
 │        ┃   ＋   ┃         │  ← FAB（青グラデ + 白リング）
-│  [📊]   ┗━━━━━━━━┛   [⚙]  │  ← 右: 設定（モーダルを開く）
+│  [⚙]   ┗━━━━━━━━┛   [📷]  │  ← 左: 設定 / 右: レシートOCRカメラ
 └───────────────────────────┘
-       ↑ サマリー      ↑ 設定</div>
+       ↑ 設定         ↑ カメラ</div>
 
 <h3>PageHeader（src/components/page-header.tsx）</h3>
 <table>
@@ -501,10 +502,10 @@ hr {
 <table>
 <tr><th>項目</th><th>仕様</th></tr>
 <tr><td>位置</td><td><code>fixed bottom-0 z-30</code>、<code>safe-area-inset-bottom</code> 対応、フッタ高 <code>h-24</code>（96px）</td></tr>
-<tr><td>タブ構成</td><td>左: サマリー（BarChart3 アイコン、<code>href="/"</code>）、中央: ＋FAB、右: <strong>設定（Settings アイコン）— リンクではなく <code>useSettingsModal().openSettings()</code> で設定ボトムシートを開くボタン</strong>。アクティブタブは <code>text-primary</code> + <code>aria-current="page"</code></td></tr>
+<tr><td>構成</td><td><strong>サマリータブは廃止</strong>（ホームが唯一のページ）。左: <strong>設定</strong>（Settings アイコン、<code>useSettingsModal().openSettings()</code> でボトムシートを開く）、中央: ＋FAB（手入力登録）、右: <strong>レシートOCRカメラ</strong>（重ねカメラ＝連続入力モード、撮影 → <code>openCreate({ ocr, keepOpen: true })</code>）。<strong>FAB とカメラは未保存（<code>unlocked</code> でない）とき非表示</strong></td></tr>
 <tr><td>＋FAB</td><td>88×88、青グラデ <code>from-blue-500 to-blue-700</code>、白リング 8px、青系の接地シャドウ2層、<code>active:scale-90 translate-y-0.5</code> の押下感。<code>&lt;button&gt;</code>（リンクではない）</td></tr>
 <tr><td>FAB の動線</td><td><code>useExpenseModal().openCreate()</code> を呼び、登録用ボトムシートをその場で開く（画面遷移しない）</td></tr>
-<tr><td>アクティブ判定</td><td>サマリー: <code>pathname === "/"</code></td></tr>
+<tr><td>表示制御</td><td>ホームが単一ページのため<strong>タブのアクティブ判定は持たない</strong>。FAB・カメラは <code>SessionProvider</code> の保存状態が <code>unlocked</code> のときのみ表示</td></tr>
 </table>
 
 <h3>余白計算</h3>
@@ -580,9 +581,9 @@ hr {
 <tr><td>共通基盤</td><td>シートの開閉アニメ・Esc・スクロールロック・<code>translateY</code>駆動・バックドロップ・グラバーヘッダ・下スワイプ閉じ（opt-in）は <code>src/components/bottom-sheet.tsx</code> の <strong><code>useBottomSheet</code> フック＋<code>BottomSheet</code> コンポーネント</strong>に集約。支出モーダルと設定モーダルが共有する（定数 <code>ANIM_MS=320</code> 等も一本化）</td></tr>
 <tr><td>開閉アニメ</td><td>バックドロップ（dim）はパネルと<strong>別レイヤー</strong>。パネルは <code>translateY(0 ⇄ 100%)</code> を <code>transition</code> で駆動（<code>cubic-bezier(0.32,0.72,0,1)</code> / 320ms）、dim は opacity を独立フェード。開く時は2フレーム後に表示状態へ切替えて transition を発火。閉じ切ったら DOM から除去（reduced-motion でも timeout で確実に teardown）</td></tr>
 <tr><td>フォーム構成</td><td>並び順は <strong>日付 → カテゴリ → 金額 → 店名 → メモ</strong>。<strong>全項目ラベルなし</strong>（プレースホルダで補助、文字色は <code>text-muted-foreground/60</code> と薄め）。フォーム最上部に<strong>「レシートを読み取る」ボタン</strong></td></tr>
-<tr><td>レシート読み取り（OCR）</td><td>ボタンタップで<strong>カメラ起動</strong>（<code>&lt;input type="file" accept="image/*" capture="environment"&gt;</code>）。選んだ画像を<strong>クライアントで縮小</strong>（長辺1568px、<code>createImageBitmap</code> で EXIF 回転補正、JPEG化）して <code>POST /api/ocr</code> へ。返った<strong>金額・店名・カテゴリ</strong>を各項目へ自動入力、<strong>日付は表示月と年月が一致するときのみ「日」を反映</strong>。読み取り中はボタンがスピナー＋無効化、失敗時は原因をボタン下に表示。<strong>画像は保存しない</strong></td></tr>
+<tr><td>レシート読み取り（OCR）</td><td>ボタンタップで<strong>カメラ起動</strong>（<code>&lt;input type="file" accept="image/*" capture="environment"&gt;</code>、再利用部品 <code>ReceiptCaptureButton</code> + <code>useReceiptOcr</code>）。選んだ画像を<strong>クライアントで縮小</strong>（長辺1568px、EXIF 回転補正、JPEG化）して <code>POST /api/ocr</code> へ。返った<strong>金額・店名・カテゴリ</strong>を各項目へ自動入力、<strong>日付は妥当なら年月日を丸ごと反映</strong>（<code>parseReceiptDate</code>）。レシートの月でフォームが開くときは<strong>ホームの表示月も同期</strong>（<code>goToMonth</code>）。読み取り中はスピナー＋無効化、失敗時は原因表示。<strong>画像は保存しない</strong>。2つの動線（支出モーダルのヘッダカメラ／フッター右のカメラ＝まとめ入力 <code>openCreate({ ocr, keepOpen: true })</code>）</td></tr>
 <tr><td>未入力の強調</td><td>必須（カテゴリ・金額）が<strong>空のとき枠を強調</strong>（<code>border-primary/70 ring-1 ring-primary/25</code>）。入力すると解除</td></tr>
-<tr><td>日付</td><td>年月は固定表示（登録=元ページの選択月／編集=対象支出の月）。日のみ<strong>縦ホイール</strong>（<code>day-wheel.tsx</code>）で選択し、「<code>YYYY年M月 d 日</code>」の d にインライン埋め込み。<code>spentAt</code> は <code>YYYY-MM-DD</code> に組み立て</td></tr>
+<tr><td>日付</td><td><strong>年・月・日とも縦ホイール</strong>（<code>wheel.tsx</code> 汎用ドラム）で選択。<strong>月・日は端で巡回</strong>（<code>loop</code>）、<strong>年は範囲</strong>（今年〜5年前＋OCR等で外れた年も内包）。年月変更時は日を月末で<strong>クランプ</strong>（<code>clampDay</code>）。無効日付（2/30 等）は<strong>保存をブロック</strong>（クライアント＋サーバ <code>parseJstDate</code> が null）。<code>spentAt</code> は <code>YYYY-MM-DD</code> に組み立て、保存時の年月で<strong>ホーム表示月を同期</strong></td></tr>
 <tr><td>カテゴリ</td><td><strong>Select（プルダウン）</strong>。画面外要素の誤選択を防ぐためチップ横スクロールから変更。色分けタグで表示。起動時に <code>GET /api/categories</code> を先読みキャッシュ。初期値は <code>setComposeContext</code> の展開カテゴリ</td></tr>
 <tr><td>金額</td><td>¥プレフィクス・右寄せ。<strong>システムの数値キーボード</strong>（<code>inputMode="numeric"</code>、数字のみ・最大9桁）。カテゴリと横並び・<strong>同じ高さ 48px</strong>。<strong>0円も可</strong>（未入力のみ不可）</td></tr>
 <tr><td>店名 / メモ</td><td>任意（空文字は null）。プレースホルダは「店名」「メモ」。入力時にハードキャップ <strong>店名 32 / メモ 140 字</strong>（フォーム幅に収める）。メモは <strong>3行</strong></td></tr>
@@ -868,6 +869,30 @@ hr {
 <section id="changelog">
 <h2>改修履歴</h2>
 
+<h3>2026-06-09 — UX改善まとめ（トースト位置 / 削除確認 / iOSスクロール / ヘッダキャラ）</h3>
+<p><span class="badge badge-minor">minor</span> 細かな使い勝手の改善をまとめて反映。コミット 2fac447 / e8b949d。</p>
+<ul>
+  <li><strong>トースト位置</strong>をヘッダ直下に調整（<code>toast.tsx</code>、safe-area 考慮）</li>
+  <li><strong>削除確認</strong>を <code>ConfirmDialog</code> で挟む（編集シートのゴミ箱 → 確認 → 削除）</li>
+  <li><strong>iOS スクロールロック</strong>をボトムシート表示中に強化（<code>bottom-sheet.tsx</code>、<code>position:fixed</code> + 位置復元）</li>
+  <li><strong>ヘッダキャラ</strong>を常時表示化し、タップで当月へ移動（<code>header-character.tsx</code>、<code>aria-label</code>「今月へ移動」）</li>
+  <li>リファクタ・バックログを HTML 化（<code>docs/refactor-backlog.html</code>、spec から閲覧可能に）</li>
+</ul>
+
+<hr>
+
+<h3>2026-06-08 — 支出フォームの年月日ホイール化 + 連続入力スイッチ + OCRまとめ入力</h3>
+<p><span class="badge badge-major">major</span> 入力動線を強化。PR #39 ほか。</p>
+<ul>
+  <li><strong>年月日を縦ホイール化</strong>（<code>day-wheel.tsx</code> → 汎用 <code>wheel.tsx</code>）。月・日は <code>loop</code> 巡回、年は範囲。年月変更時は <code>clampDay</code> で月末クランプ。無効日付はクライアント＋サーバ（<code>parseJstDate</code>）で弾く</li>
+  <li><strong>連続入力スイッチ</strong>（<code>ui/switch.tsx</code>）を支出モーダル新規時ヘッダに追加。ON のとき保存後もシートを閉じず年月＋日＋カテゴリを残して続けて入力。錠アイコン（ON=閉錠 / OFF=開錠）</li>
+  <li><strong>フッター右にレシートOCRカメラ</strong>を新設（サマリータブ廃止後の右スロット）。撮影 → <code>openCreate({ ocr, keepOpen: true })</code> で連続入力ON・レシートの月でモーダルを開く（まとめ入力動線、重ねカメラアイコン）</li>
+  <li>OCR の日付が妥当なら<strong>年月日を丸ごと反映</strong>（<code>parseReceiptDate</code>）、レシートの月で<strong>ホーム表示月も同期</strong>（<code>goToMonth</code>）</li>
+  <li>テスト: 年月日ホイール・日付バリデーション・月同期</li>
+</ul>
+
+<hr>
+
 <h3>2026-06-08 — 明細の並び替え（日付/更新日/金額）</h3>
 <p><span class="badge badge-major">major</span> ホーム明細にテーブルヘッダ型の並び替えを追加。PR #35。</p>
 <ul>
@@ -890,7 +915,7 @@ hr {
 <hr>
 
 <h3>2026-06-08 — リファクタ Tier 3〜7 + テスト基盤拡充</h3>
-<p><span class="badge badge-minor">minor</span> 仕様追加で溜まった歪みのリファクタ調査（採番マスターは <code>docs/refactor-backlog.md</code> に永続化）を Tier 3〜7 まで消化。テストは約149件に。PR #21〜#33。</p>
+<p><span class="badge badge-minor">minor</span> 仕様追加で溜まった歪みのリファクタ調査（採番マスターは <a href="refactor-backlog.html">docs/refactor-backlog.html</a> に永続化）を Tier 3〜7 まで消化。テストは約149件に。PR #21〜#33。</p>
 <h4>Tier 3〜4（純関数化・dead code 撤去・#21〜#24）</h4>
 <ul>
   <li>monthly-summary の集計とホームの選択解決を<strong>純関数化</strong>してユニットテスト可能に（<code>lib/monthly-summary.ts</code> / <code>lib/summary-view.ts</code>）</li>

@@ -89,6 +89,12 @@ export function useMonthlySummary(opts: {
     setMonth(m);
   }, []);
 
+  // 当月へ移動する（キャラクタータップ用）。同月なら no-op。
+  const goToCurrentMonth = useCallback(() => {
+    const d = new Date();
+    goToMonth(d.getFullYear(), d.getMonth() + 1);
+  }, [goToMonth]);
+
   const isCurrentMonth =
     year === now.getFullYear() && month === now.getMonth() + 1;
 
@@ -110,6 +116,7 @@ export function useMonthlySummary(opts: {
     goPrev,
     goNext,
     goToMonth,
+    goToCurrentMonth,
     transitionStyle,
   };
 }

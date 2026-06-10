@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { categoryColor } from "@/lib/category-color";
 import { CATEGORY_NAME_MAX, isRequiredSlot } from "@/lib/category-constants";
 import { useExpenseModal } from "@/components/expense-modal";
+import { useImeComposition } from "@/components/use-ime-composition";
 import type { Category } from "@/types";
 
 export function CategoryManager() {
@@ -14,7 +15,7 @@ export function CategoryManager() {
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   // 日本語IMEの変換中フラグ（変換確定 Enter での誤送信を防ぐ）
-  const composingRef = useRef(false);
+  const { isComposing, bind: imeBind } = useImeComposition();
   // 編集後、登録モーダルの先読みカテゴリを再取得させる
   const { refreshCategories } = useExpenseModal();
 
@@ -127,15 +128,10 @@ export function CategoryManager() {
                 onChange={(e) =>
                   setDrafts((p) => ({ ...p, [cat.id]: e.target.value }))
                 }
-                onCompositionStart={() => {
-                  composingRef.current = true;
-                }}
-                onCompositionEnd={() => {
-                  composingRef.current = false;
-                }}
+                {...imeBind}
                 onBlur={() => commitName(cat)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !composingRef.current) {
+                  if (e.key === "Enter" && !isComposing()) {
                     e.currentTarget.blur();
                   }
                 }}
