@@ -195,3 +195,49 @@ describe("BottomSheet", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+describe("背面スクロールロック（多重シート対応 / SL-1）", () => {
+  beforeEach(() => {
+    document.body.style.cssText = "";
+    // jsdom の scrollY は 0 固定なので、復元位置の検証用に値を差し込む。
+    Object.defineProperty(window, "scrollY", { value: 100, configurable: true });
+    window.scrollTo = vi.fn();
+  });
+
+  it("開くと body を fixed で固定し、閉じると元のスタイル＋スクロール位置へ戻す", () => {
+    const { result } = renderHook(() => useBottomSheet());
+    act(() => result.current.open());
+    expect(document.body.style.position).toBe("fixed");
+    expect(document.body.style.top).toBe("-100px");
+
+    act(() => result.current.close());
+    act(() => vi.advanceTimersByTime(320));
+    expect(document.body.style.position).toBe("");
+    expect(document.body.style.top).toBe("");
+    expect(window.scrollTo).toHaveBeenCalledWith(0, 100);
+  });
+
+  it("2枚重ねても固定は1度だけ。1枚目を閉じても固定は維持し、最後の1枚で復元する", () => {
+    const a = renderHook(() => useBottomSheet());
+    const b = renderHook(() => useBottomSheet());
+
+    act(() => a.result.current.open());
+    expect(document.body.style.position).toBe("fixed");
+    expect(document.body.style.top).toBe("-100px");
+
+    // 2枚目を開く。既に固定中なので捕捉し直さず top は 1枚目の値のまま。
+    act(() => b.result.current.open());
+    expect(document.body.style.top).toBe("-100px");
+
+    // 1枚目を閉じる → まだ 2枚目が開いているので固定は維持（早期復元しない）。
+    act(() => a.result.current.close());
+    act(() => vi.advanceTimersByTime(320));
+    expect(document.body.style.position).toBe("fixed");
+
+    // 2枚目を閉じる → ここで初めて復元される。
+    act(() => b.result.current.close());
+    act(() => vi.advanceTimersByTime(320));
+    expect(document.body.style.position).toBe("");
+    expect(window.scrollTo).toHaveBeenLastCalledWith(0, 100);
+  });
+});
