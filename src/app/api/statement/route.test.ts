@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { jsonReq } from "@/test/route-helpers";
+import { resetRateLimit } from "@/lib/rate-limit";
 
 const { getHouseholdId } = vi.hoisted(() => ({ getHouseholdId: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getHouseholdId }));
@@ -32,6 +33,7 @@ beforeEach(() => {
   getHouseholdId.mockReset().mockResolvedValue("hh-1");
   findMany.mockReset().mockResolvedValue(CATEGORIES);
   extractStatement.mockReset();
+  resetRateLimit(); // 世帯バケットを毎テスト初期化
   // 既定: 重複フラグは素通し（入力 rows をそのまま返す）。
   findDuplicateFlags.mockReset().mockImplementation((_hh, rows) => Promise.resolve(rows));
 });
@@ -66,6 +68,20 @@ describe("POST /api/statement", () => {
     const big = "a".repeat(6 * 1024 * 1024 + 1);
     const res = await POST(jsonReq(URL, { pdfBase64: big }));
     expect(res.status).toBe(413);
+    expect(extractStatement).not.toHaveBeenCalled();
+  });
+
+  it("SEC-4: 世帯の試行が上限を超えると 429（抽出しない）", async () => {
+    extractStatement.mockResolvedValue({ rows: [] });
+    // 上限 10 回までは 200
+    for (let i = 0; i < 10; i++) {
+      const ok = await POST(jsonReq(URL, { pdfBase64: "PDF" }));
+      expect(ok.status).toBe(200);
+    }
+    extractStatement.mockClear();
+    const res = await POST(jsonReq(URL, { pdfBase64: "PDF" }));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBeTruthy();
     expect(extractStatement).not.toHaveBeenCalled();
   });
 

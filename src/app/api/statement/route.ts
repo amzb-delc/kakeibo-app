@@ -2,19 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { extractStatement } from "@/lib/statement";
 import { findDuplicateFlags } from "@/lib/duplicate";
-import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
+import {
+  requireHouseholdId,
+  parseJsonBody,
+  jsonError,
+  checkContentLength,
+} from "@/lib/api";
+import { rateLimit } from "@/lib/rate-limit";
 import type { StatementExtractResult, StatementRow } from "@/types/api";
 
 // PDF base64 の上限（控えめ）。デプロイ環境のリクエストボディ上限に合わせて調整する。
 const MAX_BASE64_LENGTH = 6 * 1024 * 1024;
+// JSON ボディ全体の上限。Content-Length 事前チェック用（SEC-4）。
+const MAX_BODY_BYTES = 7 * 1024 * 1024;
+// 世帯単位のコスト/DoS 上限。明細(Sonnet)は重いので 60 秒 10 回まで（SEC-4）。
+const STATEMENT_RATE_LIMIT = { limit: 10, windowMs: 60 * 1000 };
 
 export async function POST(req: NextRequest) {
   const householdId = await requireHouseholdId();
   if (householdId instanceof NextResponse) return householdId;
 
+  // SEC-4: 世帯単位でレート制限（API コスト爆発の抑止）
+  const limit = rateLimit(`statement:${householdId}`, STATEMENT_RATE_LIMIT);
+  if (!limit.ok) {
+    const res = jsonError("混み合っています。少し待って再試行してください", 429);
+    res.headers.set("Retry-After", String(limit.retryAfterSec));
+    return res;
+  }
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return jsonError("明細読み取りは未設定です（ANTHROPIC_API_KEY）", 503);
   }
+
+  // SEC-4: 巨大ボディを parse 前に弾く
+  const tooLarge = checkContentLength(req, MAX_BODY_BYTES);
+  if (tooLarge) return tooLarge;
 
   const body = await parseJsonBody(req);
   if (body instanceof NextResponse) return body;
