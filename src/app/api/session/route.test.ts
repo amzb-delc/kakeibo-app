@@ -2,19 +2,28 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { jsonReq } from "@/test/route-helpers";
 import { resetRateLimit } from "@/lib/rate-limit";
 
-// session は HOUSEHOLD_COOKIE と getHouseholdId を auth から import する。
-const { getHouseholdId } = vi.hoisted(() => ({ getHouseholdId: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ HOUSEHOLD_COOKIE: "household", getHouseholdId }));
+// session は cookie 定数と getHouseholdId / getEnteredBy を auth から import する。
+const { getHouseholdId, getEnteredBy } = vi.hoisted(() => ({
+  getHouseholdId: vi.fn(),
+  getEnteredBy: vi.fn(),
+}));
+vi.mock("@/lib/auth", () => ({
+  HOUSEHOLD_COOKIE: "household",
+  ENTERED_BY_COOKIE: "enteredBy",
+  getHouseholdId,
+  getEnteredBy,
+}));
 
 const { findUnique } = vi.hoisted(() => ({ findUnique: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: { household: { findUnique } } }));
 
-import { GET, POST, DELETE } from "./route";
+import { GET, POST, PATCH, DELETE } from "./route";
 
 const URL = "http://localhost/api/session";
 
 beforeEach(() => {
   getHouseholdId.mockReset();
+  getEnteredBy.mockReset().mockResolvedValue(null);
   findUnique.mockReset();
   resetRateLimit(); // IP バケットを毎テスト初期化（モジュール状態の持ち越し防止）
 });
@@ -24,18 +33,38 @@ afterEach(() => {
 });
 
 describe("GET /api/session", () => {
-  it("cookie 無しは unlocked:false", async () => {
+  it("cookie 無しは unlocked:false（enteredBy も返す）", async () => {
     getHouseholdId.mockResolvedValue(null);
     const res = await GET();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ unlocked: false });
+    expect(await res.json()).toEqual({ unlocked: false, enteredBy: null });
   });
 
-  it("保存済みは unlocked:true + 世帯名", async () => {
+  it("保存済みは unlocked:true + 世帯名 + enteredBy", async () => {
     getHouseholdId.mockResolvedValue("夫婦の合言葉");
+    getEnteredBy.mockResolvedValue(2);
     findUnique.mockResolvedValue({ name: "我が家" });
     const res = await GET();
-    expect(await res.json()).toEqual({ unlocked: true, householdName: "我が家" });
+    expect(await res.json()).toEqual({
+      unlocked: true,
+      householdName: "我が家",
+      enteredBy: 2,
+    });
+  });
+});
+
+describe("PATCH /api/session（入力者の保存）", () => {
+  it("1/2 以外は 400・cookie を発行しない", async () => {
+    const res = await PATCH(jsonReq(URL, { enteredBy: 3 }, "PATCH"));
+    expect(res.status).toBe(400);
+    expect(res.cookies.get("enteredBy")).toBeUndefined();
+  });
+
+  it("1 を保存すると 200・enteredBy cookie を発行", async () => {
+    const res = await PATCH(jsonReq(URL, { enteredBy: 1 }, "PATCH"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, enteredBy: 1 });
+    expect(res.cookies.get("enteredBy")?.value).toBe("1");
   });
 });
 
@@ -92,11 +121,14 @@ describe("POST /api/session（世帯コード保存）", () => {
 });
 
 describe("DELETE /api/session（クリア）", () => {
-  it("cookie を破棄する（maxAge=0）", async () => {
+  it("世帯コードと入力者の cookie を両方破棄する（maxAge=0）", async () => {
     const res = await DELETE();
     expect(await res.json()).toEqual({ ok: true });
-    const cookie = res.cookies.get("household");
-    expect(cookie?.value).toBe("");
-    expect(cookie?.maxAge).toBe(0);
+    const household = res.cookies.get("household");
+    expect(household?.value).toBe("");
+    expect(household?.maxAge).toBe(0);
+    const entered = res.cookies.get("enteredBy");
+    expect(entered?.value).toBe("");
+    expect(entered?.maxAge).toBe(0);
   });
 });

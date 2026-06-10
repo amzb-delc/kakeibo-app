@@ -21,7 +21,8 @@ export function useSettingsModal(): ContextValue {
 }
 
 export function SettingsModalProvider({ children }: { children: React.ReactNode }) {
-  const { unlocked, householdName, unlock, lock } = useSession();
+  const { unlocked, householdName, enteredBy, unlock, lock, setEnteredBy } =
+    useSession();
   const { mounted, open, close, panelStyle, backdropStyle } = useBottomSheet();
   const [passphrase, setPassphrase] = useState("");
   const [authError, setAuthError] = useState(false);
@@ -136,6 +137,52 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
                 </form>
               )}
             </section>
+
+            {/* 入力者: 保存済みのときのみ。端末ごとに夫/妻を選び、新規登録に付与する。 */}
+            {unlocked && (
+              <section className="bg-muted/30 rounded-2xl border border-border/50 p-4">
+                <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
+                  入力者
+                  {enteredBy == null && (
+                    <span className="inline-flex items-center rounded-full bg-red-500 text-white text-[10px] font-bold px-2 py-0.5">
+                      未選択
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                  この端末で登録する人を選んでください。新しく登録する支出に自動で記録されます（登録前に必須）。
+                </p>
+                <div className="flex gap-3">
+                  {(
+                    [
+                      { value: 1, symbol: "♂", label: "夫", active: "border-blue-500 bg-blue-50 text-blue-600", idle: "text-blue-500/70" },
+                      { value: 2, symbol: "♀", label: "妻", active: "border-rose-500 bg-rose-50 text-rose-600", idle: "text-rose-500/70" },
+                    ] as const
+                  ).map((o) => {
+                    const selected = enteredBy === o.value;
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => setEnteredBy(o.value)}
+                        aria-pressed={selected}
+                        aria-label={o.label}
+                        className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-xl border-2 text-base font-semibold transition-all active:scale-95 ${
+                          selected
+                            ? o.active
+                            : `border-border bg-background ${o.idle} hover:bg-muted`
+                        }`}
+                      >
+                        <span className="text-2xl leading-none" aria-hidden="true">
+                          {o.symbol}
+                        </span>
+                        <span>{o.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             {/* カテゴリ管理: 保存済み（cookie あり）のときのみ。名前変更＋有効/無効。 */}
             {unlocked && (

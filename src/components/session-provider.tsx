@@ -7,7 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import type { SessionStatus, SessionUnlockResult } from "@/types/api";
+import type { SessionStatus, SessionUnlockResult, EnteredBy } from "@/types/api";
 
 // 世帯コードの保存状態をアプリ全体で共有する。
 // 実際のデータ保護はサーバー（cookie + API の 401）が担い、ここはUX用の状態。
@@ -15,10 +15,14 @@ type ContextValue = {
   /** null=判定中, true=保存済み, false=未保存 */
   unlocked: boolean | null;
   householdName: string | null;
+  /** 入力者（夫/妻）。null=未設定。新規登録時にサーバが付与する。 */
+  enteredBy: EnteredBy | null;
   /** 世帯コードを保存。成功で true */
   unlock: (passphrase: string) => Promise<boolean>;
   /** クリア（cookie 破棄） */
   lock: () => Promise<void>;
+  /** 入力者を端末に保存（PATCH /api/session） */
+  setEnteredBy: (value: EnteredBy) => Promise<void>;
 };
 
 const SessionContext = createContext<ContextValue | null>(null);
@@ -34,6 +38,7 @@ export function useSession(): ContextValue {
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [unlocked, setUnlocked] = useState<boolean | null>(null);
   const [householdName, setHouseholdName] = useState<string | null>(null);
+  const [enteredBy, setEnteredByState] = useState<EnteredBy | null>(null);
 
   // 起動時に現在の保存状態を取得
   useEffect(() => {
@@ -44,6 +49,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         if (!alive) return;
         setUnlocked(!!d.unlocked);
         setHouseholdName(d.householdName ?? null);
+        setEnteredByState(d.enteredBy ?? null);
       })
       .catch(() => {
         if (alive) setUnlocked(false);
@@ -70,10 +76,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     await fetch("/api/session", { method: "DELETE" }).catch(() => {});
     setUnlocked(false);
     setHouseholdName(null);
+    setEnteredByState(null); // クリアで入力者 cookie も破棄されるため state も戻す
+  }, []);
+
+  const setEnteredBy = useCallback(async (value: EnteredBy) => {
+    const res = await fetch("/api/session", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enteredBy: value }),
+    }).catch(() => null);
+    if (res?.ok) setEnteredByState(value);
   }, []);
 
   return (
-    <SessionContext.Provider value={{ unlocked, householdName, unlock, lock }}>
+    <SessionContext.Provider
+      value={{ unlocked, householdName, enteredBy, unlock, lock, setEnteredBy }}
+    >
       {children}
     </SessionContext.Provider>
   );

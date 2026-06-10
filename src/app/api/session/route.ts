@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { HOUSEHOLD_COOKIE, getHouseholdId } from "@/lib/auth";
+import {
+  HOUSEHOLD_COOKIE,
+  ENTERED_BY_COOKIE,
+  getHouseholdId,
+  getEnteredBy,
+} from "@/lib/auth";
 import { jsonError, parseJsonBody } from "@/lib/api";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { DEFAULT_HOUSEHOLD_ID } from "@/lib/household-defaults";
@@ -24,24 +29,47 @@ function cookieOptions(maxAge: number) {
   };
 }
 
-// 現在の保存状態（クライアントの未保存表示用）
+// 現在の保存状態（クライアントの未保存表示用）。入力者 cookie も合わせて返す。
 export async function GET() {
+  const enteredBy = await getEnteredBy();
   const id = await getHouseholdId();
-  if (!id) return NextResponse.json({ unlocked: false } satisfies SessionStatus);
+  if (!id)
+    return NextResponse.json({ unlocked: false, enteredBy } satisfies SessionStatus);
   const household = await prisma.household.findUnique({
     where: { id },
     select: { name: true },
   });
   if (!household) {
     // cookie はあるが世帯が無い（世帯コード変更・再seed 後など）→ 無効 cookie を破棄
-    const res = NextResponse.json({ unlocked: false } satisfies SessionStatus);
+    const res = NextResponse.json({
+      unlocked: false,
+      enteredBy,
+    } satisfies SessionStatus);
     res.cookies.set(HOUSEHOLD_COOKIE, "", cookieOptions(0));
     return res;
   }
   return NextResponse.json({
     unlocked: true,
     householdName: household.name,
+    enteredBy,
   } satisfies SessionStatus);
+}
+
+// 入力者（夫/妻）を端末に保存。1=♂ / 2=♀ のみ受け付ける。
+export async function PATCH(req: NextRequest) {
+  const body = await parseJsonBody(req);
+  if (body instanceof NextResponse) return body;
+
+  const value = body.enteredBy;
+  if (value !== 1 && value !== 2) return jsonError("invalid", 400);
+
+  const res = NextResponse.json({ ok: true, enteredBy: value });
+  res.cookies.set(
+    ENTERED_BY_COOKIE,
+    String(value),
+    cookieOptions(COOKIE_MAX_AGE)
+  );
+  return res;
 }
 
 // 保存: 世帯コード（= household.id）を照合し、一致すれば cookie を発行
@@ -88,9 +116,10 @@ export async function POST(req: NextRequest) {
   return res;
 }
 
-// クリア: cookie を破棄
+// クリア: 世帯コードと入力者の cookie をどちらも破棄（端末リセットを一貫させる）
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
   res.cookies.set(HOUSEHOLD_COOKIE, "", cookieOptions(0));
+  res.cookies.set(ENTERED_BY_COOKIE, "", cookieOptions(0));
   return res;
 }
