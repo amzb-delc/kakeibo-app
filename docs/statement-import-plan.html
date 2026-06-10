@@ -131,7 +131,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 <h1>クレカ明細PDF取り込み — 実装プラン</h1>
 
 <blockquote>
-作成: 2026-06-09。<strong>ステータス: 設計中（実装未着手）</strong>。<br>
+作成: 2026-06-09。<strong>ステータス: ✅ 実装完了（2026-06-10・PR #48）</strong>。実際の入口は<strong>ホームのヘッダ左「フォルダ」アイコン</strong>（設計途中で設定モーダル内から変更）、それ以外は本プラン通り。詳細は <a href="spec.html#api-statement">MVP仕様書</a> 参照。以下は設計時の記録。<br>
 レシートOCRパイプライン（<code>lib/ocr.ts</code>）を踏襲し、<strong>カード明細PDFをClaudeで構造化抽出 → プレビュー編集 → 一括登録</strong>する。CLAUDE.md で Phase2 に後回しだった機能。<br>
 <strong>3論点 確定済み（2026-06-09）</strong>: 入口=設定モーダル内＋ピッカー自動オープン / 返金マイナス行=取込OFF既定で除外 / 一括登録=全行ロールバック＋プレビュー行トグル。末尾「決定事項」参照。<strong>実装に入れる状態。</strong>
 </blockquote>
