@@ -118,6 +118,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 初版: 2026-06-08（Tier 1〜4 消化後に再調査。lib 層は分解＋テスト済みで綺麗、歪みは UI層とスキーマ足場に集中）。<br>
 <strong>状況(2026-06-08): Tier 1〜7 完了でリファクタはひとまず完了。</strong> PR #18〜#33。#7 fetch共通化・T6-2 は意図的に見送り。<strong>Tier 8（スキーマ撤去）は未着手</strong> — DBマイグレ＋設計判断を伴うため、本番化の直前に別途やる方針。<br>
 <strong>追記(2026-06-10): 追加バックログを全消化。</strong> ホーム無関係7件（DV-1/SP-1=#41・WT-1=#42・IME-1=#43・SW-1=#45・SL-1=#46・EM-1=#47）→ NM-1/TO-1=#55 → 明細取り込みテスト TC-2=#52・TC-1③=#53。<strong>実コードのバックログ項目はすべて完了。残るは Tier 8（スキーマ撤去・マイグレ要・本番直前）と、任意の UI テスト <code>statement-preview-sheet.tsx</code> のみ。</strong>（#47×#41 のマージ衝突で <code>splitYmd</code> import 漏れ→ fix PR #50。TC 行は #44 追加分が doc マージで欠落していたため本更新で復元）
+<strong>追記(2026-06-10): 追加バックログの「ホーム無関係」7件を消化（PR #41〜#47）。</strong> DV-1/SP-1（PR #41）・WT-1（#42）・IME-1（#43）・SW-1（#45）・SL-1（#46）・EM-1（#47）。<strong>残りは NM-1・TO-1（ホーム関連・低）＋ TC-1・TC-2（明細取り込みのテスト）＋ Tier 8。</strong>（#47×#41 のマージ衝突で <code>splitYmd</code> import 漏れ→ fix PR #50 で修正）<br>
+<strong>追記(2026-06-10): セキュリティ監査の結果を「セキュリティ・バックログ」セクションに追加（SEC-1〜SEC-9）。</strong> 公開デプロイ前必須の High 2件（SEC-1 ブルートフォース無制限・SEC-2 既定コード <code>demo-household</code>）＋ Medium 3・Low 4。IDOR/SQLi/XSS は健全と確認済み。
 </blockquote>
 
 <h2>完了済み（Tier 1〜4 / PR #18〜#24）</h2>
@@ -200,6 +202,26 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 <tr><td>TC-2</td><td><code>lib/duplicate.ts</code> の分岐網羅を引き上げ（着手前 43%）。純関数 <code>markDuplicates</code> は既存テスト済みで、prisma 依存の <code>findDuplicateFlags</code> が未カバーだった。<code>prisma.expense.findMany</code> をモックして突合パスを固定。<strong>43%→96%。</strong></td><td><code>duplicate.ts</code></td><td class="c">S</td><td class="c">中</td><td class="c"><span class="badge b-done">✅ 完了</span><br><span class="muted">PR #52</span></td></tr>
 </tbody>
 </table>
+
+<h2>セキュリティ・バックログ（2026-06-10）</h2>
+<p>家計簿アプリのセキュリティ監査（Fable サブエージェント・コード根拠付き）で洗い出した対処項目。<br>
+<strong>前提:</strong> 本アプリは「世帯コード = <code>household.id</code> を知る端末＝全権」という MVP の割り切り設計。これが安全なのは「世帯コードが推測・列挙されない」前提で、<strong>SEC-1・SEC-2（High）はその前提自体を崩すため公開デプロイ前に必須</strong>。<br>
+IDOR・SQLi・XSS は健全と確認済み（<code>expenses/[id]</code> は全て <code>where:{id,householdId}</code>／生SQLゼロ／<code>dangerouslySetInnerHTML</code> ゼロ）。世帯コード方式そのもの・cookie無署名400日・失効はスクリプトのみ等は CLAUDE.md 明記の許容事項として<strong>対象外</strong>。</p>
+<table>
+<thead><tr><th>ID</th><th class="c">深刻度</th><th>内容</th><th>場所</th><th class="c">工数</th><th class="c">状態</th></tr></thead>
+<tbody>
+<tr><td>SEC-1</td><td class="c"><span class="badge b-hold">High</span></td><td><strong><code>/api/session</code> POST のブルートフォース無制限。</strong> 任意文字列を無制限に試行でき、一致で400日cookie発行。失敗401/成功200が明確なオラクル。世帯コードは人間が選ぶ日本語フレーズ（例 <code>"うちのひみつ2026"</code>）でエントロピー低く辞書攻撃が現実的。一致＝全支出の閲覧・改竄・削除。<strong>対策:</strong> IP単位＋全体のレートリミット（例 5回/分）、失敗時遅延、コードの最低長・エントロピー要件。</td><td><code>session/route.ts:70-93</code></td><td class="c">M</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+<tr><td>SEC-2</td><td class="c"><span class="badge b-hold">High</span></td><td><strong>seed 既定の世帯コード <code>"demo-household"</code> が既知・固定。</strong> <code>db:set-passphrase</code> を実行し忘れて本番化すると、誰でも <code>POST /api/session {"passphrase":"demo-household"}</code> で全権取得。変更を強制する仕組みがコード上に無い。<strong>対策:</strong> <code>demo-household</code> への保存を拒否、またはデプロイ手順で set-passphrase 必須化＋起動時チェック。</td><td><code>seed.ts:61</code> / <code>session/route.ts:78-82</code></td><td class="c">S</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+<tr><td>SEC-3</td><td class="c"><span class="badge b-todo">Medium</span></td><td>cookie が無署名・失効不能の実質 bearer token。盗難時にサーバ側で個別失効できず、コードを知れば cookie 自作で <code>/api/session</code> を経ずに侵入可。<strong>対策:</strong> cookie を HMAC 署名（推測コード直セットの経路を閉じ、レートリミットを session に集約できる）、または世帯id とは別のセッショントークンを持つ。</td><td><code>auth.ts:17-21</code> / <code>api.ts:16-20</code></td><td class="c">M</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+<tr><td>SEC-4</td><td class="c"><span class="badge b-todo">Medium</span></td><td>AI連携（OCR/statement）のコスト・DoS 対策が薄い。base64 上限（7MB/6MB）チェックは <code>req.json()</code> でボディ全体をパース<strong>した後</strong>。回数制限・世帯クォータ無し → 認証越え（or コード漏洩）で叩けば Anthropic API コスト青天井。<strong>対策:</strong> <code>Content-Length</code> 事前チェック、ホスティング層のボディ上限、世帯単位の日次回数クォータ。</td><td><code>ocr/route.ts:12,33</code> / <code>statement/route.ts:9,26</code></td><td class="c">M</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+<tr><td>SEC-5</td><td class="c"><span class="badge b-todo">Medium</span></td><td>依存に既知脆弱性 10件（high 3 / moderate 7、<code>npm audit</code>）。実行リクエスト経路に乗るかは未確認だが <code>npm audit fix</code> 可能。<strong>対策:</strong> <code>npm audit fix</code> 実行＋CI に audit チェック追加。</td><td><code>package-lock.json</code></td><td class="c">S</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+<tr><td>SEC-6</td><td class="c"><span class="badge b-todo">Low</span></td><td>CSRF: トークン／Origin 検証なし（SameSite=Lax 頼み）。かつ <code>GET /api/categories?scope=all</code> が DB 書き込み副作用（<code>ensureCategorySlots</code> の <code>createMany</code>）を持つ＝「GETに副作用」原則違反（冪等・無害だが）。<strong>対策:</strong> Origin ヘッダ検証の追加、スロット補充の POST 化 or 現状許容を明記。</td><td><code>categories/route.ts:14-17</code></td><td class="c">S</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+<tr><td>SEC-7</td><td class="c"><span class="badge b-todo">Low</span></td><td>不正 cookie（<code>household=%</code> 等）で <code>decodeURIComponent</code> が <code>URIError</code> をスロー → 全データAPIが未捕捉500。<strong>対策:</strong> try/catch して null を返す。</td><td><code>auth.ts:20</code></td><td class="c">S</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+<tr><td>SEC-8</td><td class="c"><span class="badge b-todo">Low</span></td><td><code>monthly-summary</code> の <code>?year=abc</code> 等で Invalid Date → Prisma 例外で未捕捉500。年月の範囲検証（妥当な年・month 1-12）が無い。<strong>対策:</strong> NaN／範囲外は 400 で弾く。</td><td><code>monthly-summary/route.ts:15-16</code></td><td class="c">S</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+<tr><td>SEC-9</td><td class="c"><span class="badge b-todo">Low</span></td><td>statement のエラーメッセージ素通し。status を持たない<strong>あらゆる</strong>例外のメッセージがクライアントに返る（内部情報混入の潜在経路）。<strong>対策:</strong> 自前エラーをカスタムクラス化して <code>instanceof</code> で判別。</td><td><code>statement/route.ts:74-77</code></td><td class="c">S</td><td class="c"><span class="badge b-todo">⬜ 未着手</span></td></tr>
+</tbody>
+</table>
+<p class="muted">Info（対応不要・確認のみ）: セキュリティヘッダ（CSP/HSTS等）未設定 → デプロイ時にホスティング層 or <code>next.config</code> の <code>headers()</code> で付与推奨。Expense 応答が <code>select</code> 無しで内部列を全部返す（自世帯データのみなので実害なし）。プロンプトインジェクションは structured output＋カテゴリ完全一致＋プレビュー確認＋React自動エスケープで多層緩和済み。</p>
 
 <hr>
 

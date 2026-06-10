@@ -82,14 +82,16 @@ export function useMonthlySummary(opts: {
   }, [year, month]);
 
   // 指定の年月へ直接移動する（月送りのスライドはせずフェードのみ）。
-  // ホームの表示月を OCR でレシートの月に同期するときに使う。同月なら no-op。
+  // ホームの表示月を OCR でレシートの月に同期するときに使う。
+  // 明示ガードは持たず無条件に setState するが、同じ年月なら React の同値 bail-out で
+  // 再レンダされない（＝実質 no-op）。
   const goToMonth = useCallback((y: number, m: number) => {
     pendingNavDir.current = 0;
     setYear(y);
     setMonth(m);
   }, []);
 
-  // 当月へ移動する（キャラクタータップ用）。同月なら no-op。
+  // 当月へ移動する（キャラクタータップ用）。当月表示中なら同値 bail-out で実質 no-op。
   const goToCurrentMonth = useCallback(() => {
     const d = new Date();
     goToMonth(d.getFullYear(), d.getMonth() + 1);

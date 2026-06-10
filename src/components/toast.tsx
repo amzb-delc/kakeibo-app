@@ -30,6 +30,9 @@ export function useToast() {
 export function Toast({ message }: { message: string | null }) {
   if (!message) return null;
   return (
+    // top の 4.75rem は PageHeader 実高（safe-area 下端＝ヘッダ直下）に手計算で合わせた
+    // マジックナンバー。ヘッダのパディング/フォントを変えるとズレるので、その際は要調整
+    // （低優先・現状は許容範囲）。
     <div
       role="status"
       aria-live="polite"
