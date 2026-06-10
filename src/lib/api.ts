@@ -27,3 +27,17 @@ export async function parseJsonBody(
   if (!body || typeof body !== "object") return jsonError("invalid body", 400);
   return body as Record<string, unknown>;
 }
+
+// Content-Length が上限超のリクエストを、ボディを parse する前に弾く（SEC-4）。
+// 巨大ペイロードを req.json() でフルパースする前にメモリ確保を防ぐのが目的。
+// ヘッダ欠落・不正時は素通し（後段の base64 長チェックが最終防衛線）。超過なら 413。
+export function checkContentLength(
+  req: Request,
+  maxBytes: number
+): NextResponse | null {
+  const len = Number(req.headers.get("content-length"));
+  if (Number.isFinite(len) && len > maxBytes) {
+    return jsonError("リクエストが大きすぎます", 413);
+  }
+  return null;
+}
