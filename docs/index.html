@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿アプリ — ドキュメント</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+  --decide-bg: #fee2e2;
+  --decide-fg: #991b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+    --decide-bg: #450a0a;
+    --decide-fg: #fca5a5;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+p { margin: 8px 0; }
+a { color: var(--primary); }
+.muted { color: var(--muted); }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.cards { display: grid; gap: 12px; margin: 14px 0; }
+.card {
+  display: block; background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; text-decoration: none; color: inherit;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04); transition: border-color .15s, transform .15s;
+}
+.card:hover { border-color: var(--primary); transform: translateY(-1px); }
+.card .t { font-size: 15.5px; font-weight: 700; color: var(--primary); }
+.card .d { font-size: 13.5px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>家計簿アプリ — ドキュメント</h1>
+<p class="muted">夫婦のための家計簿アプリ（Next.js 16 + Prisma + PostgreSQL）の設計・仕様ドキュメント一覧。各ページ上部の「← ドキュメント一覧へ」でここに戻れます。</p>
+
+<h2>仕様</h2>
+<div class="cards">
+  <a class="card" href="spec.html">
+    <div class="t">MVP仕様書 →</div>
+    <div class="d">データモデル・画面構成・API仕様・ビジネスルール・UIガイド・改修履歴。<strong>最新の仕様はここが基準</strong>（living spec）。</div>
+  </a>
+</div>
+
+<h2>実装プラン</h2>
+<p class="muted">機能ごとの設計時の記録。最新の挙動・仕様は MVP仕様書を参照。</p>
+<div class="cards">
+  <a class="card" href="statement-import-plan.html">
+    <div class="t">クレカ明細PDF取り込み <span class="badge b-done">✅ 実装完了</span></div>
+    <div class="d">カード明細PDFをClaudeで構造化抽出 → プレビュー編集 → 一括登録。重複候補フラグ付き（PR #48）。</div>
+  </a>
+  <a class="card" href="entered-by-plan.html">
+    <div class="t">入力者（夫/妻） <span class="badge b-done">✅ 実装完了</span></div>
+    <div class="d">支出に入力者（♂/♀）を記録。端末ごとの cookie 設定で新規登録時に付与、既定は妻、編集は据え置き（PR #58 → #63）。</div>
+  </a>
+</div>
+
+<h2>バックログ</h2>
+<div class="cards">
+  <a class="card" href="refactor-backlog.html">
+    <div class="t">リファクタ・バックログ →</div>
+    <div class="d">リファクタ Tier 一覧と進捗、セキュリティ監査（SEC-1〜9）。</div>
+  </a>
+</div>
+</div>
+</body>
+</html>

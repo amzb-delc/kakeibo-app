@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿アプリ — 入力者（夫/妻）実装プラン</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+  --decide-bg: #fee2e2;
+  --decide-fg: #991b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+    --decide-bg: #450a0a;
+    --decide-fg: #fca5a5;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+.backlink {
+  display: inline-block; margin-bottom: 16px; color: var(--primary);
+  text-decoration: none; font-size: 13px;
+}
+.backlink:hover { text-decoration: underline; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 8px 0; }
+a { color: var(--primary); }
+code {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+pre {
+  background: var(--code-bg); padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 12px 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--primary);
+  background: var(--card); border-radius: 0 8px 8px 0; color: var(--muted);
+  font-size: 14px;
+}
+blockquote strong { color: var(--fg); }
+ul { margin: 8px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px;
+  background: var(--card); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); font-weight: 600; white-space: nowrap; }
+td.c { text-align: center; white-space: nowrap; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-todo { background: var(--todo-bg); color: var(--todo-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.b-decide { background: var(--decide-bg); color: var(--decide-fg); }
+.rec { color: var(--success); font-weight: 600; }
+.muted { color: var(--muted); }
+del { color: var(--muted); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+.decision {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--destructive); border-radius: 0 8px 8px 0;
+  padding: 12px 16px; margin: 14px 0;
+}
+.decision h3 { margin-top: 0; }
+.decision.decided { border-left-color: var(--success); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="backlink" href="index.html">← ドキュメント一覧へ</a>
+<h1>入力者（夫/妻）— 実装プラン</h1>
+
+<blockquote>
+作成: 2026-06-10。<strong>ステータス: ✅ 実装完了（2026-06-10・PR #58 → #63）</strong>。
+支出ごとに<strong>「どちらが登録したか（入力者）」</strong>を記録する。夫婦の2人だけなので値は <strong>1=♂（夫）/ 2=♀（妻）</strong>。<br>
+入力者は<strong>端末ごとの設定</strong>（世帯コードと同じ cookie 方式）で持ち、<strong>新規登録時にサーバが cookie から付与</strong>する。<strong>編集では据え置き</strong>。<br>
+<strong>方針の変遷</strong>: #58 では「登録前に必須」ゲート付きで実装 → #63 で<strong>既定値＝妻(2) を起動時に発行</strong>し、必須ゲートは撤去した（下記「決定事項」参照）。<strong>一覧での入力者表示（男女アイコン）は別フェーズ。</strong>
+</blockquote>
+
+<h2>Context（なぜ作るか）</h2>
+<p>レシートOCR・手入力・明細取り込みで支出は記録できるようになったが、<strong>夫婦どちらが登録したかは残っていない</strong>。後で「誰の支出か／誰が入れたか」を見たいというニーズがある。既存の <code>Expense.createdByUserId</code> は<strong>常に demo ユーザー固定の別概念</strong>（このアプリはユーザー管理を持たず、世帯コード方式）なので流用できない。そこで<strong>新フィールド <code>enteredBy</code></strong> を追加する。夫の端末・妻の端末がそれぞれ自分を表すので、<strong>「入力者＝端末ごとの設定」</strong>が自然な単位になる。</p>
+
+<h2>確定要件（ヒアリング済み）</h2>
+<table>
+<thead><tr><th>項目</th><th>決定</th></tr></thead>
+<tbody>
+<tr><td>値</td><td><strong>1=♂（夫）/ 2=♀（妻）</strong> の2択のみ（夫婦）。</td></tr>
+<tr><td>表示</td><td>設定モーダルで <strong>記号 ♂ / ♀</strong>（♂=青系・♀=赤系）。lucide に専用の男女アイコンが無いため Unicode 記号を採用。</td></tr>
+<tr><td>設定場所</td><td><strong>設定モーダルで端末ごとに一度選ぶ</strong>。世帯コードと同じ httpOnly cookie 方式（<code>ENTERED_BY_COOKIE</code>）。</td></tr>
+<tr><td>付与</td><td><strong>新規登録時のみ、サーバが cookie から読んで付与</strong>。フォームでは毎回選ばない。</td></tr>
+<tr><td>編集</td><td><strong>反映しない（据え置き）</strong>。既存の入力者を書き換えない。</td></tr>
+<tr><td>既定値</td><td><strong>妻(2)</strong>。入力者 cookie が無い端末は起動時の <code>GET /api/session</code> で <code>2</code> を発行（妻がメイン利用の想定。夫は設定で♂に切替）。<span class="muted">→ #63 で追加。</span></td></tr>
+<tr><td>必須</td><td><strong>必須ゲートなし</strong>（既定値が常に入るため）。<span class="muted">→ #58 では必須だったが #63 で撤去。</span></td></tr>
+<tr><td>一覧表示</td><td><strong>今回スコープ外</strong>（明細行の男女アイコン表示は後ほど別途）。</td></tr>
+</tbody>
+</table>
+
+<h2>設計の肝</h2>
+<p>入力者を<strong>世帯コードと同じ「httpOnly cookie + SessionProvider」</strong>に乗せ、<strong>新規登録 POST 時にサーバが cookie から読んで付与</strong>する。こうすると<strong>編集 PATCH は <code>enteredBy</code> を一切触らない</strong>ため「編集時は反映しない」が自動的に成立し、<code>expense-form.tsx</code> / <code>validateExpenseInput</code> への変更も不要になる（入力者はフォーム payload ではなく cookie 由来）。</p>
+
+<h2>全体フロー</h2>
+<pre><code>設定                          クライアント                    サーバ
+設定モーダル ♂/♀ タップ
+  └ setEnteredBy(1|2) ───▶ PATCH /api/session ──────▶ ENTERED_BY_COOKIE を発行(httpOnly,400日)
+
+起動時
+  SessionProvider mount ──▶ GET /api/session ───────▶ getEnteredBy()
+                                                       cookie 無し → 既定 2(♀) を Set-Cookie
+                          ◀── { unlocked, enteredBy } ─┘
+
+新規登録（FAB / レシート / 明細一括）
+  POST /api/expenses ───────────────────────────────▶ requireHouseholdId()
+  POST /api/expenses/batch                             enteredBy = getEnteredBy()  ← cookie
+                                                       prisma.expense.create({ …, enteredBy })
+
+編集
+  PATCH /api/expenses/[id] ─────────────────────────▶ enteredBy は data に含めない＝据え置き</code></pre>
+
+<h2>データモデル</h2>
+<pre><code>model Expense {
+  …
+  enteredBy  Int?   // 1=♂(夫) / 2=♀(妻)。未設定の既存行は null
+}</code></pre>
+<p>マイグレーション <code>add_entered_by_to_expense</code>（<code>ALTER TABLE "Expense" ADD COLUMN "enteredBy" INTEGER;</code>）。nullable なので既存行は <code>null</code> のまま。</p>
+
+<h2>新規 / 変更ファイル</h2>
+<table>
+<thead><tr><th>パス</th><th>変更</th></tr></thead>
+<tbody>
+<tr><td><code>prisma/schema.prisma</code> ＋ migration</td><td><code>Expense.enteredBy Int?</code> を追加。</td></tr>
+<tr><td><code>src/lib/auth.ts</code></td><td><code>ENTERED_BY_COOKIE = "enteredBy"</code> ＋ <code>getEnteredBy(): 1|2|null</code>（cookie を <code>"1"→1 / "2"→2</code>、不正は null）。</td></tr>
+<tr><td><code>src/app/api/session/route.ts</code></td><td><strong>GET</strong>: <code>enteredBy</code> を返す＋cookie 無しは既定 <code>2</code> を Set-Cookie（<code>DEFAULT_ENTERED_BY</code>）。<strong>PATCH 新設</strong>: <code>{enteredBy:1|2}</code> を検証し cookie 発行。<strong>DELETE</strong>: 世帯と入力者の cookie を両方破棄。</td></tr>
+<tr><td><code>src/types/api.ts</code></td><td><code>EnteredBy = 1|2</code> 型、<code>SessionStatus.enteredBy</code> を追加。</td></tr>
+<tr><td><code>src/components/session-provider.tsx</code></td><td><code>enteredBy</code> state ＋ <code>setEnteredBy(v)</code>（<code>PATCH /api/session</code>）。起動 GET で取り込み、<code>lock()</code> で null に戻す。</td></tr>
+<tr><td><code>src/components/settings-modal.tsx</code></td><td><code>unlocked</code> 時のみ「入力者」セクション。♂/♀ の2ボタン（選択ハイライト・♂=青/♀=赤）。</td></tr>
+<tr><td><code>src/app/api/expenses/route.ts</code><br><code>src/app/api/expenses/batch/route.ts</code></td><td><code>enteredBy = getEnteredBy()</code> を <code>create</code> の <code>data</code> に付与。<span class="muted">#58 では未設定を 400 <code>enteredByRequired</code> で弾いたが、#63 で既定値方式にしたため撤去。</span></td></tr>
+<tr><td><code>src/app/api/expenses/[id]/route.ts</code></td><td><strong>変更なし</strong>（<code>enteredBy</code> を扱わない＝据え置き）。</td></tr>
+<tr><td><code>CLAUDE.md</code></td><td>API表・データモデル補足を更新。</td></tr>
+</tbody>
+</table>
+<p class="muted"><strong>触らないもの</strong>: <code>expense-form.tsx</code> / <code>validateExpenseInput</code>（<code>src/lib/expenses.ts</code>）/ <code>createdByUserId</code> 周り / 明細・サマリーの表示ロジック。</p>
+
+<hr>
+
+<h2 id="decisions">★ 決定事項</h2>
+
+<div class="decision decided">
+<h3>① 入力者は「端末ごとの cookie 設定」 <span class="badge b-done">✅ 決定</span></h3>
+<p>各配偶者が自分の端末を使うので「端末＝人」が自然。世帯コードと同じ httpOnly cookie 方式に統一。新規登録時にサーバが cookie から付与し、編集は触らない（＝据え置きが自動成立）。</p>
+</div>
+
+<div class="decision decided">
+<h3>② 既定値＝妻(2)・必須ゲート撤去 <span class="badge b-done">✅ 決定（#63で方針転換）</span></h3>
+<p>#58 当初は「入力者を選ぶまで登録不可（FAB/カメラ/明細を設定へ誘導＋API 400 <code>enteredByRequired</code>）」だったが、運用上の摩擦を避けるため<strong>起動時に既定値 妻(2) を cookie 発行</strong>する方式へ変更。妻はそのまま登録でき、夫だけ設定で♂に切替。<strong>常に値が入るので必須ゲートは全撤去</strong>（API 400・UI 誘導・「未選択」バッジ・「登録前に必須」文言）。</p>
+<p class="muted">トレードオフ: 夫が切替を忘れると支出が妻として記録される。妻メイン利用の前提では許容。</p>
+</div>
+
+<div class="decision decided">
+<h3>③ 一覧での入力者表示は別フェーズ <span class="badge b-hold">⏸ 後で相談</span></h3>
+<p>今回は「保存できる」までがスコープ。明細行への男女アイコン表示は、表示位置・既存 null データの見せ方を含めて別途設計する。</p>
+</div>
+
+<hr>
+
+<h2>検証（実装後）</h2>
+<ul>
+  <li><code>npx prisma migrate dev</code> → <code>npm run lint</code> → <code>npm test</code>（入力者の付与・PATCH cookie・GET 既定値発行のテストが緑。#63 で必須ゲートのテストは撤去）。</li>
+  <li><code>npm run dev</code> → 新しい端末（cookie 無し）で起動すると入力者＝妻、そのまま登録できる。設定で ♂ に切替 → 以降その端末の新規登録は <code>enteredBy=1</code>。</li>
+  <li><code>npx prisma studio</code> で登録した支出の <code>Expense.enteredBy</code> を確認。その支出を編集・保存 → <code>enteredBy</code> が据え置き（変わらない）。</li>
+</ul>
+
+</div>
+</body>
+</html>

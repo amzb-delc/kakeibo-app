@@ -32,6 +32,13 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 - cookie は端末（ブラウザ／PWA）ごとに別物。**iOSでは Safari とホーム画面PWAでストレージが分離**されるため、保存状態は両者で共有されない（片方でクリアしてももう片方には残る）。MVPの軽量な保護として許容する仕様。
 - seed / 上記スクリプトの既定世帯IDは `"demo-household"`（seed・`set-passphrase.ts` 内のリテラル）。
 
+## ドキュメント
+
+`docs/` に**自己完結 HTML** で読み物を置く規約（人間がブラウザで読めて見やすい・git 追跡で共有可能）。**起点は `docs/index.html`**（全ドキュメントへのリンク集）。各ページ上部の `← ドキュメント一覧へ` で index に戻れる。`spec.html`（MVP仕様書＝living spec）、`refactor-backlog.html`、各機能の実装プラン（`*-plan.html`）。**docs を増やしたら `index.html` にカード/リンクを追加する。**
+
+- **実装を伴う改修のプランは `docs/<feature>-plan.html` に残す**（plan mode の `~/.claude/plans/*.md` はリポ外・ランダム名で共有/発見しづらいため）。スタイルは既存の `docs/statement-import-plan.html` / `docs/entered-by-plan.html` に倣う（light/dark 対応・`.wrap`・`h1/h2/h3`・`.badge`・`.decision` 等）。冒頭に `← MVP仕様書へ戻る` の backlink と、作成日＋ステータス（✅実装完了・PR番号）の blockquote を置く。
+- 仕様の変更は `spec.html`（living spec）に反映する。プラン HTML は「設計時の記録」として残す。
+
 ## 画面構成
 
 | パス | 概要 |
