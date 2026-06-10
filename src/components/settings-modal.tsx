@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import { useSession } from "@/components/session-provider";
 import { CategoryManager } from "@/components/category-manager";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
+import { useImeComposition } from "@/components/use-ime-composition";
 
 type ContextValue = {
   openSettings: () => void;
@@ -26,7 +27,7 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
   const [authError, setAuthError] = useState(false);
   const [busy, setBusy] = useState(false);
   // 日本語IMEの変換中フラグ。変換確定の Enter でフォーム送信されるのを防ぐ。
-  const composingRef = useRef(false);
+  const { isComposing, bind: imeBind } = useImeComposition();
 
   const openSettings = useCallback(() => {
     setPassphrase("");
@@ -37,7 +38,7 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
   const handleUnlock = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (composingRef.current) return; // IME 変換確定の Enter では送信しない
+      if (isComposing()) return; // IME 変換確定の Enter では送信しない
       const value = passphrase.trim();
       if (!value || busy) return;
       setBusy(true);
@@ -51,7 +52,7 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
         setAuthError(true);
       }
     },
-    [passphrase, busy, unlock, close]
+    [passphrase, busy, unlock, close, isComposing]
   );
 
   const handleLock = useCallback(async () => {
@@ -115,12 +116,7 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
                       setPassphrase(e.target.value);
                       setAuthError(false);
                     }}
-                    onCompositionStart={() => {
-                      composingRef.current = true;
-                    }}
-                    onCompositionEnd={() => {
-                      composingRef.current = false;
-                    }}
+                    {...imeBind}
                     placeholder="世帯コード"
                     autoComplete="off"
                     className={`w-full h-11 px-3 rounded-xl border bg-background text-base outline-none focus:ring-2 focus:ring-primary/30 ${

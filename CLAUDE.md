@@ -37,13 +37,17 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 |------|------|
 | `/` | 月次サマリー（ホーム・アプリの起点）。月切り替え・カテゴリ選択・明細表示。登録/編集は FAB のモーダルで行う |
 
+※ ページ遷移は持たず、支出の登録/編集（`ExpenseModalProvider`）と設定（世帯コード保存・カテゴリ管理、`SettingsModalProvider`）は**ボトムシートのモーダル**で開く。
+
 ## APIルート
 
 | エンドポイント | 概要 |
 |------|------|
 | `GET/POST/DELETE /api/session` | 保存状態の取得 / 世帯コードを保存（cookie発行） / クリア（cookie破棄） |
-| `GET /api/categories` | カテゴリ一覧（sortOrder順） |
+| `GET /api/categories` | カテゴリ一覧（sortOrder順）。`?scope=all` で無効含む全16スロット（管理画面用） |
+| `PATCH /api/categories/[id]` | カテゴリの名前変更・有効/無効トグル（`Category.enabled`） |
 | `POST /api/expenses` | 支出登録（amount, spentAt, categoryId 必須） |
+| `GET/PATCH/DELETE /api/expenses/[id]` | 支出の取得 / 編集 / 削除 |
 | `GET /api/monthly-summary?year=&month=` | 月次集計（当月・前月合計、カテゴリ別） |
 | `POST /api/ocr` | レシート画像（base64）から金額・店名・日付・カテゴリ候補を抽出（Claude ビジョン） |
 
@@ -52,7 +56,7 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 ## データモデルの補足
 
 - `Expense.amount` は円単位の整数
-- `Category` は `householdId` ごとにユニーク（MVPではseedで固定、追加UIなし）
+- `Category` は `householdId` ごとにユニーク。**16スロット固定**（seedで生成）。追加・削除・並び替えは不可だが、**名前変更・有効/無効トグルは実装済み**（設定モーダル内 `category-manager.tsx` ＋ `PATCH /api/categories/[id]`、`Category.enabled` 列）
 - トレンド判定ロジックは `src/lib/trend.ts` に集約
 
 ## 実装上の制約（MVPスコープ）
@@ -68,4 +72,4 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 - フッター（`footer-nav.tsx`）: ホームは唯一のページなのでサマリータブは廃止。**左=設定／中央=登録FAB（手入力）／右=レシートOCRカメラ**。FAB とカメラは未保存（`unlocked` でない）のときは出さない（OCR API も 401）。
 - クレカ明細の一括取り込みは未実装（Phase2 予定。iPhone での CSV/PDF 取り回しが課題のため後回し）
 - 通知機能は未実装（`notificationDay`, `notificationTime` フィールドのみ存在）
-- カテゴリ追加UIは未実装
+- カテゴリの**追加・削除・並び替えは未対応**（16スロット固定）。名前変更・有効/無効の管理UIは実装済み（`category-manager.tsx`、設定モーダル内）

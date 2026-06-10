@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Wheel } from "@/components/wheel";
 import { CategoryTag } from "@/components/category-tag";
-import { pad2, lastDayOfMonth, clampDay, todayJst } from "@/lib/date";
+import { pad2, lastDayOfMonth, clampDay, todayJst, parseReceiptDate } from "@/lib/date";
 import type { Category, Expense } from "@/types";
 import type { OcrResult } from "@/types/api";
 
@@ -103,13 +103,12 @@ export function ExpenseForm({
         next.categoryId = categoryId;
       }
       // 日付が有効なら年月日を丸ごと反映する（表示月もレシートの月になる）。
-      if (spentAt && /^\d{4}-\d{2}-\d{2}$/.test(spentAt)) {
-        const [y, m, d] = spentAt.split("-").map(Number);
-        if (m >= 1 && m <= 12 && d >= 1 && d <= lastDayOfMonth(y, m)) {
-          next.year = y;
-          next.month = m;
-          next.day = d;
-        }
+      // 検証は parseReceiptDate（date.ts）に集約する。
+      const rd = parseReceiptDate(spentAt);
+      if (rd) {
+        next.year = rd.year;
+        next.month = rd.month;
+        next.day = rd.day;
       }
       return next;
     });
