@@ -11,6 +11,7 @@ import {
   parseJsonBody,
   requireHouseholdId,
   checkContentLength,
+  requireSameOrigin,
 } from "./api";
 
 const mockGetHouseholdId = vi.mocked(getHouseholdId);
@@ -66,6 +67,30 @@ describe("checkContentLength", () => {
   it("ヘッダ欠落・非数値は null（後段チェックに委ねる）", () => {
     expect(checkContentLength(reqWith({}), 1000)).toBeNull();
     expect(checkContentLength(reqWith({ "content-length": "abc" }), 1000)).toBeNull();
+  });
+});
+
+describe("requireSameOrigin", () => {
+  const reqWith = (headers: Record<string, string>) =>
+    new Request("http://localhost/api/x", { method: "POST", headers });
+
+  it("Origin 無しは null（許可・非ブラウザクライアント）", () => {
+    expect(requireSameOrigin(reqWith({}))).toBeNull();
+  });
+
+  it("同一オリジンは null（許可）", () => {
+    expect(requireSameOrigin(reqWith({ origin: "http://localhost" }))).toBeNull();
+  });
+
+  it("クロスオリジンは 403", () => {
+    const res = requireSameOrigin(reqWith({ origin: "http://evil.example" }));
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(403);
+  });
+
+  it("不正な Origin は 403", () => {
+    const res = requireSameOrigin(reqWith({ origin: "not-a-url" }));
+    expect((res as Response).status).toBe(403);
   });
 });
 

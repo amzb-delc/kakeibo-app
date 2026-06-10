@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { jstMonthRange, formatJstDate, shiftMonth, ymKey } from "@/lib/date";
-import { requireHouseholdId } from "@/lib/api";
+import { requireHouseholdId, jsonError } from "@/lib/api";
 import { buildMonthlySummary } from "@/lib/monthly-summary";
 
 export async function GET(req: NextRequest) {
@@ -14,6 +14,19 @@ export async function GET(req: NextRequest) {
   const currentMonth = Number(todayMonthStr);
   const year = Number(searchParams.get("year") ?? currentYear);
   const month = Number(searchParams.get("month") ?? currentMonth);
+
+  // SEC-8: 不正な year/month（NaN・範囲外）は 400。放置すると jstMonthRange が
+  // Invalid Date を作り、Prisma が例外 → 未捕捉 500 になる。
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    month < 1 ||
+    month > 12 ||
+    year < 1970 ||
+    year > 9999
+  ) {
+    return jsonError("invalid year/month", 400);
+  }
 
   const isCurrentMonth = year === currentYear && month === currentMonth;
 

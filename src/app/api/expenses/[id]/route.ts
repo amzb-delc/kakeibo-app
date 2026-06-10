@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { validateExpenseInput } from "@/lib/expenses";
-import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
+import {
+  requireHouseholdId,
+  parseJsonBody,
+  jsonError,
+  requireSameOrigin,
+} from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -21,6 +26,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   const householdId = await requireHouseholdId();
   if (householdId instanceof NextResponse) return householdId;
 
@@ -48,7 +56,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json(expense);
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   const householdId = await requireHouseholdId();
   if (householdId instanceof NextResponse) return householdId;
 

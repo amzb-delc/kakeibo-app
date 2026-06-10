@@ -19,6 +19,16 @@ export type StatementExtraction = {
   rows: StatementExtractionRow[];
 };
 
+// 抽出側の「ユーザーに見せてよい」自前エラー（拒否 / max_tokens / 空）。
+// route 側はこれだけメッセージを透過し、想定外の例外（ネットワーク等）は
+// 内部情報を晒さない汎用メッセージに丸める（SEC-9）。
+export class StatementExtractionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StatementExtractionError";
+  }
+}
+
 // 構造化出力スキーマ。配列直返しより「オブジェクト直下の配列」が安定する
 // （structured outputs は additionalProperties:false と全プロパティ必須が要件）。
 // 配列の minItems/maxItems は非対応なので行数はプロンプト指示＋サーバ側で担保する。
@@ -106,17 +116,17 @@ ${categoryList}
   });
 
   if (res.stop_reason === "refusal") {
-    throw new Error("明細の読み取りを拒否されました");
+    throw new StatementExtractionError("明細の読み取りを拒否されました");
   }
   if (res.stop_reason === "max_tokens") {
-    throw new Error(
+    throw new StatementExtractionError(
       "明細が長すぎて全件を読み取れませんでした。ページを分けてお試しください"
     );
   }
 
   const textBlock = res.content.find((b) => b.type === "text");
   if (!textBlock || textBlock.type !== "text") {
-    throw new Error("明細の読み取り結果が空でした");
+    throw new StatementExtractionError("明細の読み取り結果が空でした");
   }
 
   return JSON.parse(textBlock.text) as StatementExtraction;

@@ -28,6 +28,24 @@ export async function parseJsonBody(
   return body as Record<string, unknown>;
 }
 
+// 状態変更リクエスト（POST/PATCH/DELETE）の CSRF 多層防御（SEC-6）。
+// Origin ヘッダのホストがリクエストのホストと一致するか検証し、SameSite=Lax を補完する。
+// Origin が無いリクエスト（非ブラウザクライアント等）は許可（CSRF は被害者ブラウザの
+// Origin 付きリクエストが前提）。不一致・不正 Origin は 403。
+export function requireSameOrigin(req: Request): NextResponse | null {
+  const origin = req.headers.get("origin");
+  if (!origin) return null;
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return jsonError("forbidden", 403);
+  }
+  // リクエスト URL のホスト（プロキシ配下では x-forwarded-host を反映した nextUrl）と比較。
+  if (originHost !== new URL(req.url).host) return jsonError("forbidden", 403);
+  return null;
+}
+
 // Content-Length が上限超のリクエストを、ボディを parse する前に弾く（SEC-4）。
 // 巨大ペイロードを req.json() でフルパースする前にメモリ確保を防ぐのが目的。
 // ヘッダ欠落・不正時は素通し（後段の base64 長チェックが最終防衛線）。超過なら 413。

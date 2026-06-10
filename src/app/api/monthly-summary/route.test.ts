@@ -38,4 +38,13 @@ describe("GET /api/monthly-summary", () => {
       expect(call[0].where.householdId).toBe("hh-1");
     }
   });
+
+  it("SEC-8: 不正な year/month は 400（DB 照合しない）", async () => {
+    getHouseholdId.mockResolvedValue("hh-1");
+    for (const q of ["year=abc&month=6", "year=2026&month=13", "year=2026&month=0"]) {
+      const res = await GET(getReq(`http://localhost/api/monthly-summary?${q}`));
+      expect(res.status).toBe(400);
+    }
+    expect(findMany).not.toHaveBeenCalled();
+  });
 });

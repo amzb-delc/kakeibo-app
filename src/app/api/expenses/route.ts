@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDemoUserId, getEnteredBy } from "@/lib/auth";
 import { validateExpenseInput } from "@/lib/expenses";
-import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
+import {
+  requireHouseholdId,
+  parseJsonBody,
+  jsonError,
+  requireSameOrigin,
+} from "@/lib/api";
 
 export async function POST(req: NextRequest) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   const householdId = await requireHouseholdId();
   if (householdId instanceof NextResponse) return householdId;
 

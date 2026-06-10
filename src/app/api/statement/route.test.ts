@@ -11,8 +11,14 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 // 抽出（SDK）と重複判定（prisma）は別レイヤでテスト済みなのでここではモック。
+// StatementExtractionError は実クラスを再エクスポート（route の instanceof 判定が効くように）。
 const { extractStatement } = vi.hoisted(() => ({ extractStatement: vi.fn() }));
-vi.mock("@/lib/statement", () => ({ extractStatement }));
+vi.mock("@/lib/statement", async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof import("@/lib/statement");
+  return { extractStatement, StatementExtractionError: actual.StatementExtractionError };
+});
+
+import { StatementExtractionError } from "@/lib/statement";
 
 const { findDuplicateFlags } = vi.hoisted(() => ({ findDuplicateFlags: vi.fn() }));
 vi.mock("@/lib/duplicate", () => ({ findDuplicateFlags }));
@@ -119,11 +125,33 @@ describe("POST /api/statement", () => {
     expect(res.status).toBe(502);
   });
 
-  it("extractStatement の自前エラー（status無し）はメッセージを 502 で透過", async () => {
-    extractStatement.mockRejectedValue(new Error("明細が長すぎて全件を読み取れませんでした"));
+  it("SEC-9: 自前エラー（StatementExtractionError）はメッセージを 502 で透過", async () => {
+    extractStatement.mockRejectedValue(
+      new StatementExtractionError("明細が長すぎて全件を読み取れませんでした")
+    );
     const res = await POST(jsonReq(URL, { pdfBase64: "PDF" }));
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.error).toContain("長すぎ");
+  });
+
+  it("SEC-9: 想定外の例外（plain Error）はメッセージを晒さず汎用文言", async () => {
+    extractStatement.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.5:5432"));
+    const res = await POST(jsonReq(URL, { pdfBase64: "PDF" }));
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toBe("明細の読み取りに失敗しました");
+    expect(body.error).not.toContain("ECONNREFUSED");
+  });
+
+  it("SEC-6: クロスオリジンの POST は 403（抽出しない）", async () => {
+    const req = new Request(URL, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://evil.example" },
+      body: JSON.stringify({ pdfBase64: "PDF" }),
+    });
+    const res = await POST(req as never);
+    expect(res.status).toBe(403);
+    expect(extractStatement).not.toHaveBeenCalled();
   });
 });

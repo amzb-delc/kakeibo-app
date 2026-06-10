@@ -10,6 +10,7 @@ import {
   parseJsonBody,
   jsonError,
   checkContentLength,
+  requireSameOrigin,
 } from "@/lib/api";
 import { rateLimit } from "@/lib/rate-limit";
 import type { OcrResult } from "@/types/api";
@@ -22,6 +23,9 @@ const MAX_BODY_BYTES = 8 * 1024 * 1024;
 const OCR_RATE_LIMIT = { limit: 30, windowMs: 60 * 1000 };
 
 export async function POST(req: NextRequest) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   const householdId = await requireHouseholdId();
   if (householdId instanceof NextResponse) return householdId;
 

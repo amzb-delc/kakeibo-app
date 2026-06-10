@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { extractStatement } from "@/lib/statement";
+import { extractStatement, StatementExtractionError } from "@/lib/statement";
 import { findDuplicateFlags } from "@/lib/duplicate";
 import {
   requireHouseholdId,
   parseJsonBody,
   jsonError,
   checkContentLength,
+  requireSameOrigin,
 } from "@/lib/api";
 import { rateLimit } from "@/lib/rate-limit";
 import type { StatementExtractResult, StatementRow } from "@/types/api";
@@ -19,6 +20,9 @@ const MAX_BODY_BYTES = 7 * 1024 * 1024;
 const STATEMENT_RATE_LIMIT = { limit: 10, windowMs: 60 * 1000 };
 
 export async function POST(req: NextRequest) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   const householdId = await requireHouseholdId();
   if (householdId instanceof NextResponse) return householdId;
 
@@ -93,9 +97,10 @@ export async function POST(req: NextRequest) {
     if (status === 429) {
       return jsonError("混み合っています。少し待って再試行してください", 502);
     }
-    // extractStatement の自前エラー（拒否 / max_tokens / 空）はメッセージをそのまま返す。
-    if (!status && message) {
-      return jsonError(message, 502);
+    // SEC-9: 透過するのは抽出側の自前エラーのみ（拒否 / max_tokens / 空）。
+    // 想定外の例外（ネットワーク等）はメッセージを晒さず汎用文言に丸める。
+    if (e instanceof StatementExtractionError) {
+      return jsonError(e.message, 502);
     }
     return jsonError("明細の読み取りに失敗しました", 502);
   }

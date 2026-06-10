@@ -12,7 +12,9 @@ export async function GET(req: NextRequest) {
   const includeDisabled = scope === "all";
 
   if (includeDisabled) {
-    // 管理画面を開いたタイミングで 16 枠を揃える
+    // 管理画面を開いたタイミングで 16 枠を揃える。
+    // SEC-6: これは GET の副作用だが、欠番スロットの補充のみで冪等・無害なため
+    // 意図的に許容する（CSRF 観点でも書き込みは createMany の冪等補充に限られる）。
     await ensureCategorySlots(householdId);
   }
 
