@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { jsonReq } from "@/test/route-helpers";
+import { resetRateLimit } from "@/lib/rate-limit";
 
 // session は HOUSEHOLD_COOKIE と getHouseholdId を auth から import する。
 const { getHouseholdId } = vi.hoisted(() => ({ getHouseholdId: vi.fn() }));
@@ -15,6 +16,11 @@ const URL = "http://localhost/api/session";
 beforeEach(() => {
   getHouseholdId.mockReset();
   findUnique.mockReset();
+  resetRateLimit(); // IP バケットを毎テスト初期化（モジュール状態の持ち越し防止）
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("GET /api/session", () => {
@@ -53,6 +59,35 @@ describe("POST /api/session（世帯コード保存）", () => {
     expect(await res.json()).toEqual({ ok: true, householdName: "我が家" });
     const cookie = res.cookies.get("household");
     expect(cookie?.value).toBe(encodeURIComponent("夫婦の合言葉"));
+  });
+
+  it("SEC-1: 同一 IP の試行が上限を超えると 429（Retry-After 付き）", async () => {
+    findUnique.mockResolvedValue(null);
+    // 上限 10 回までは通過（中身は 401 でもレートは消費される）
+    for (let i = 0; i < 10; i++) {
+      const ok = await POST(jsonReq(URL, { passphrase: "x" }));
+      expect(ok.status).toBe(401);
+    }
+    // 11 回目はレート制限で 429。DB 照合まで到達しない
+    findUnique.mockClear();
+    const res = await POST(jsonReq(URL, { passphrase: "x" }));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBeTruthy();
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it("SEC-2: 本番では既定コード demo-household を 401 で拒否（DB 照合しない）", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const res = await POST(jsonReq(URL, { passphrase: "demo-household" }));
+    expect(res.status).toBe(401);
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it("SEC-2: 本番以外なら demo-household も通常照合する", async () => {
+    findUnique.mockResolvedValue({ id: "demo-household", name: "ワレワレ" });
+    const res = await POST(jsonReq(URL, { passphrase: "demo-household" }));
+    expect(res.status).toBe(200);
+    expect(findUnique).toHaveBeenCalled();
   });
 });
 
