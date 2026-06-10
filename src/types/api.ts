@@ -7,10 +7,14 @@
 // lib/api.ts の jsonError が返す統一エラー形。
 export type ApiError = { error: string };
 
+// 入力者（夫/妻）。1=♂ / 2=♀ / null=未設定。
+export type EnteredBy = 1 | 2;
+
 // GET /api/session: 保存状態。
 export type SessionStatus = {
   unlocked: boolean;
   householdName?: string | null;
+  enteredBy?: EnteredBy | null;
 };
 
 // POST /api/session: 世帯コード保存の結果。

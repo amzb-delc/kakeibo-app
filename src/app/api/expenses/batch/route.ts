@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getDemoUserId } from "@/lib/auth";
+import { getDemoUserId, getEnteredBy } from "@/lib/auth";
 import { validateExpenseInput } from "@/lib/expenses";
 import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
 import type { BatchExpenseResult } from "@/types/api";
@@ -22,6 +22,10 @@ export async function POST(req: NextRequest) {
   if (rows.length > MAX_ROWS) {
     return jsonError(`一度に登録できるのは${MAX_ROWS}件までです`, 400);
   }
+
+  // 入力者は端末設定（cookie）から付与する。未設定の端末では取り込めない。
+  const enteredBy = await getEnteredBy();
+  if (enteredBy == null) return jsonError("enteredByRequired", 400);
 
   const createdByUserId = await getDemoUserId();
 
@@ -70,6 +74,7 @@ export async function POST(req: NextRequest) {
           spentAt: v.spentAt,
           storeName: v.storeName,
           memo: v.memo,
+          enteredBy,
           createdByUserId,
         },
       })
