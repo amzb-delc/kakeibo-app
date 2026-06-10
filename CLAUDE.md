@@ -24,8 +24,9 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 **Prismaクライアント:** `src/lib/prisma.ts` にシングルトンで定義。dev環境ではホットリロード対応。
 
 **認証（世帯コード）:** ユーザー管理は持たず、**夫婦で共有する「世帯コード」= `household.id`** を入力・保存した端末だけが家計データを見られる方式。
-- 保存: `/api/session` に世帯コードを POST → 一致する世帯があれば `household` cookie（httpOnly・長期・**署名なし**）を発行（＝端末に「保存」）。DELETE で「クリア」。
-- スコープ: 各データ API は `getHouseholdId()`（`src/lib/auth.ts`、cookie から取得）で世帯を特定。**cookie 無し＝未保存なら 401**（データを返さない）。`middleware` は使わず API 側でガード。
+- 保存: `/api/session` に世帯コードを POST → 一致する世帯があれば `household` cookie（httpOnly・長期・**HMAC 署名付き**）を発行（＝端末に「保存」）。DELETE で「クリア」。レート制限あり（同一 IP 60 秒 10 回）。
+- スコープ: 各データ API は `getHouseholdId()`（`src/lib/auth.ts`、cookie から取得）で世帯を特定。`getHouseholdId` は cookie の **HMAC 署名を検証**（`src/lib/cookie-sign.ts`）し、未署名・改竄は未保存扱い（401）。`middleware` は使わず API 側でガード。
+- **`SESSION_SECRET`（env）**: cookie 署名鍵。**本番は必須**（未設定だと署名検証で 500）。dev/test は固定フォールバックで動作。**署名鍵を変える／導入すると既存 cookie は無効化され、全端末で世帯コードの再保存が必要**。
 - 世帯コードはアプリから変更しない（仕様）。変更は `npm run db:set-passphrase -- "世帯コード"`（既存世帯の id を付け替え）。
 - 保存UIは設定モーダル（`SettingsModalProvider` / フッタ「設定」）、未保存のときは `/` が未保存画面。`SessionProvider` がクライアントの保存状態を保持。
 - cookie は端末（ブラウザ／PWA）ごとに別物。**iOSでは Safari とホーム画面PWAでストレージが分離**されるため、保存状態は両者で共有されない（片方でクリアしてももう片方には残る）。MVPの軽量な保護として許容する仕様。

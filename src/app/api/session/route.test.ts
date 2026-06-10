@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { jsonReq } from "@/test/route-helpers";
 import { resetRateLimit } from "@/lib/rate-limit";
+import { verifySession } from "@/lib/cookie-sign";
 
 // session は cookie 定数と getHouseholdId / getEnteredBy を auth から import する。
 const { getHouseholdId, getEnteredBy } = vi.hoisted(() => ({
@@ -83,13 +84,15 @@ describe("POST /api/session（世帯コード保存）", () => {
     expect(res.status).toBe(401);
   });
 
-  it("一致すれば 200・household cookie を発行", async () => {
+  it("一致すれば 200・署名付き household cookie を発行", async () => {
     findUnique.mockResolvedValue({ id: "夫婦の合言葉", name: "我が家" });
     const res = await POST(jsonReq(URL, { passphrase: "夫婦の合言葉" }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, householdName: "我が家" });
     const cookie = res.cookies.get("household");
-    expect(cookie?.value).toBe(encodeURIComponent("夫婦の合言葉"));
+    // 署名付き（素の値ではない）。検証すると元の世帯コードに戻る（SEC-3）。
+    expect(cookie?.value).not.toBe(encodeURIComponent("夫婦の合言葉"));
+    expect(verifySession(decodeURIComponent(cookie!.value))).toBe("夫婦の合言葉");
   });
 
   it("SEC-1: 同一 IP の試行が上限を超えると 429（Retry-After 付き）", async () => {
