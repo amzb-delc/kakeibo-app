@@ -4,13 +4,14 @@ import { HOUSEHOLD_COOKIE, getHouseholdId } from "@/lib/auth";
 import { jsonError, parseJsonBody } from "@/lib/api";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { DEFAULT_HOUSEHOLD_ID } from "@/lib/household-defaults";
+import { signSession } from "@/lib/cookie-sign";
 import type { SessionStatus, SessionUnlockResult } from "@/types/api";
 
 // 世帯コード照合（保存）のブルートフォース抑止: 同一 IP から 60 秒で 10 回まで。
 // 正規利用は数回で足りる一方、辞書攻撃には桁違いに足りない閾値（SEC-1）。
 const UNLOCK_RATE_LIMIT = { limit: 10, windowMs: 60 * 1000 };
 
-// 世帯コード = household.id。署名なし（世帯コードを知っていること自体が認可）。
+// 世帯コード = household.id。HMAC 署名して保存（自作 cookie を弾く・SEC-3）。
 // 保存は端末で保持したいので長期 cookie（ブラウザ上限に合わせ 400 日）。
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
 
@@ -80,9 +81,10 @@ export async function POST(req: NextRequest) {
     ok: true,
     householdName: household.name,
   } satisfies SessionUnlockResult);
+  // SEC-3: HMAC 署名してから保存（自作 cookie を弾く）
   res.cookies.set(
     HOUSEHOLD_COOKIE,
-    encodeURIComponent(household.id),
+    encodeURIComponent(signSession(household.id)),
     cookieOptions(COOKIE_MAX_AGE)
   );
   return res;
