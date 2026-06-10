@@ -74,8 +74,12 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 - 日付入力: `ExpenseForm` の年月日は**縦ホイール**（`src/components/wheel.tsx`、汎用ドラム）で選ぶ。**月・日は端で巡回**（`loop`）、年は範囲（今年〜5年前＋OCR等で外れた年も内包）。年月変更時は日を月末でクランプ（`clampDay`）。無効日付は保存をブロック（クライアント）＋サーバも弾く（`parseJstDate` は 2/30・4/31 等をロールオーバーせず null）。登録/編集の保存時も `onSuccess` の年月でホーム表示月を同期する。
 - 連続入力（ロック）トグル: 支出モーダル**新規時のヘッダー**にスイッチ（`src/components/ui/switch.tsx`、base-ui）を置き、ON のとき保存後もシートを閉じず年月＋日＋カテゴリを残して続けて入力する。状態は `expense-modal` が保持し `ExpenseForm` に渡す。錠アイコンはスイッチのトラック内（ON=閉錠・OFF=開錠）。
 - フッター（`footer-nav.tsx`）: ホームは唯一のページなのでサマリータブは廃止。**左=設定／中央=登録FAB（手入力）／右=レシートOCRカメラ**。FAB とカメラは未保存（`unlocked` でない）のときは出さない（OCR API も 401）。
-- クレカ明細の一括取り込みは実装済み（`POST /api/statement` + `src/lib/statement.ts`、Claude の document(PDF) 抽出。既定モデルは `STATEMENT_MODEL`＝`claude-sonnet-4-6`、env で切替可）。動線は**ホームのヘッダ左「フォルダ」アイコン**（`StatementImportButton`）→ PDF ピッカー → 抽出 → **プレビューシート**（`statement-preview-sheet.tsx`、行ごとに金額・日付・店名・カテゴリを編集／除外）→ `POST /api/expenses/batch` で一括登録。
-  - **重複候補**: 抽出行を対象期間の既存支出と突合し（`src/lib/duplicate.ts`、同日×同額×店名近似）`duplicateLikely` を立てるが、**除外はせずユーザー判断**（プレビューで警告表示）。
+- クレカ明細の一括取り込みは実装済み（`POST /api/statement` + `src/lib/statement.ts`、Claude の document(PDF) 抽出。既定モデルは `STATEMENT_MODEL`＝`claude-sonnet-4-6`、env で切替可）。動線は**ホームのヘッダ左「フォルダ」アイコン**（`StatementImportButton`）→ PDF ピッカー → 抽出 → **プレビューシート**（`statement-preview-sheet.tsx`）→ `POST /api/expenses/batch` で一括登録。
+  - **プレビューUI**: 各明細は**1行**（行頭ドット・日付 `M/D`・金額・カテゴリ・店名・チェック）。**金額・日付・カテゴリ・登録ON/OFFは編集可、店名は表示のみ**（`title` にフル表示）。金額は**6桁上限**（最大 ¥999,999）。行頭ドットの色で状態を示す（未入力=赤 / 重複=amber / 返金=gray）。ヘッダに**読み取り期間**、上部に「**選択行のみ**」フィルタ・**カテゴリ一括選択**メニュー・「**別のPDFを選び直す**」リンク。
+  - **memo に PDF ファイル名を自動入力**: 取り込んだ各支出の `memo` に元 PDF のファイル名を入れる（`fileName`）。
+  - **重複候補**: 抽出行を対象期間の既存支出と突合し（`src/lib/duplicate.ts`、同日×同額×店名近似。店名は **NFKC 正規化**で全角/半角ゆれを吸収）`duplicateLikely` を立てる。**重複候補・返金（負）・金額なしは既定 OFF**で取り込むが、**除外はせずユーザー判断**（行頭ドット＋凡例で明示・手動 ON 可）。
+  - **取り込みデータの保持**: ×（キャンセル）後も `StatementImportProvider` が rows を**15分メモリ保持**し、フォルダアイコンに**件数バッジ**を出す。再タップで**再抽出なしで開き直す**（`reopen`）。登録成功で破棄。
+  - **抽出中の表示**: 抽出中（`importing`）はホーム右ヘッダのキャラに「**考え中…**」吹き出し（`ThinkingBubble` / `HeaderCharacter` の `thinking` prop）。
   - **PDFは保存しない**（抽出のみ、base64 は送信後破棄）。`ANTHROPIC_API_KEY` 必須（未設定なら 503）。状態は `StatementImportProvider`（`ExpenseModalProvider` の内側でカテゴリ先読み・登録後の一覧再取得 `notifyBatch` を借りる）。
 - 通知機能は未実装（`notificationDay`, `notificationTime` フィールドのみ存在）
 - カテゴリの**追加・削除・並び替えは未対応**（16スロット固定）。名前変更・有効/無効の管理UIは実装済み（`category-manager.tsx`、設定モーダル内）

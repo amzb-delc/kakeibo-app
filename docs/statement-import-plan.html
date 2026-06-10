@@ -230,7 +230,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 <ul>
   <li><strong>一括登録後のホーム再取得</strong>: <code>ExpenseModalProvider.handleSuccess</code>（<code>expense-modal.tsx:185-203</code>）が <code>mutationVersion</code> を増分。ホーム <code>page.tsx</code> の <code>useMonthlySummary({ mutationVersion, ... })</code> が deps で反応し <code>fetchSummary()</code> 再実行。→ <strong>一括登録完了時に同じ <code>notify</code>/mutation 経路を呼べば自動で一覧更新</strong>。</li>
   <li><strong>カテゴリSelect</strong>は <code>ExpenseForm</code>（<code>expense-form.tsx:244-270</code>）の実装を流用。<code>useExpenseModal().categories</code> は無効カテゴリも含むので<strong>プレビューでは有効のみにフィルタ</strong>。</li>
-  <li><strong>金額入力</strong>は <code>expense-form.tsx:275-296</code> の数字フィルタ（<code>replace(/[^0-9]/g)</code>・最大9桁）を流用。</li>
+  <li><strong>金額入力</strong>は <code>expense-form.tsx:275-296</code> の数字フィルタ（<code>replace(/[^0-9]/g)</code>）を流用。<strong>実装ではプレビュー専用に上限を 6 桁（最大 ¥999,999）に変更</strong>（<code>AMOUNT_MAX_DIGITS=6</code>。expense-form 本体の桁数は据え置き）。</li>
 </ul>
 
 <h2>データ契約</h2>

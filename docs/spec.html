@@ -308,7 +308,7 @@ hr {
   </ul>
   <h2>API</h2>
   <ul>
-    <li><a href="#api-session">GET/POST/DELETE /api/session</a></li>
+    <li><a href="#api-session">GET/POST/PATCH/DELETE /api/session</a></li>
     <li><a href="#api-categories">GET /api/categories</a></li>
     <li><a href="#api-categories-patch">PATCH /api/categories/[id]</a></li>
     <li><a href="#api-expenses-create">POST /api/expenses</a></li>
@@ -337,7 +337,7 @@ hr {
 <tr><td>利用者</td><td>夫婦2人（1世帯）</td></tr>
 <tr><td>主要デバイス</td><td>iPhone（Safari、PWAインストール想定）</td></tr>
 <tr><td>目的</td><td>支出の即時記録 + 月次の使い方の可視化</td></tr>
-<tr><td>認証</td><td>ユーザー管理なし。<strong>夫婦で共有する「世帯コード」＝ <code>household.id</code></strong> を入力・保存した端末だけがデータを見られる方式。保存すると <code>household</code> cookie（httpOnly・署名なし・長期）を発行し、各 API は cookie 無し（未保存）なら 401。UI 表現は「保存／この端末からクリア」（識別子・cookie名・API は <code>unlock/lock/passphrase</code> のまま）</td></tr>
+<tr><td>認証</td><td>ユーザー管理なし。<strong>夫婦で共有する「世帯コード」＝ <code>household.id</code></strong> を入力・保存した端末だけがデータを見られる方式。保存すると <code>household</code> cookie（httpOnly・<strong>HMAC 署名付き（SEC-3、<code>SESSION_SECRET</code>）</strong>・長期）を発行し、各 API は cookie 無し（未保存）・署名不正なら 401。UI 表現は「保存／この端末からクリア」（識別子・cookie名・API は <code>unlock/lock/passphrase</code> のまま）</td></tr>
 <tr><td>タイムゾーン</td><td>JST（Asia/Tokyo）固定</td></tr>
 </table>
 </section>
@@ -454,7 +454,8 @@ hr {
 <tr><td>amount</td><td>Int</td><td>円単位整数。0〜100,000,000（0円も可）</td></tr>
 <tr><td>spentAt</td><td>DateTime</td><td>JSTの「日」を表す（JST 00:00 を UTC で格納）</td></tr>
 <tr><td>storeName</td><td>String?</td><td>任意。最大100文字</td></tr>
-<tr><td>memo</td><td>String?</td><td>任意。最大500文字</td></tr>
+<tr><td>memo</td><td>String?</td><td>任意。最大500文字。明細取り込みでは取り込み元 PDF のファイル名を自動入力</td></tr>
+<tr><td>enteredBy</td><td>Int?</td><td>入力者。<code>1=♂(夫) / 2=♀(妻)</code>。端末ごとの cookie 設定から<strong>新規登録時のみサーバが付与</strong>（編集は据え置き）。未設定の既存行は null。一覧表示は未実装</td></tr>
 <tr><td>receiptImageUrl</td><td>String?</td><td>将来のレシート画像URL</td></tr>
 <tr><td>ocrRawText</td><td>String?</td><td>将来のOCR生テキスト</td></tr>
 <tr><td>createdByUserId</td><td>String</td><td>FK → User（onDelete: Restrict）</td></tr>
@@ -626,12 +627,13 @@ hr {
 <p>データ系エンドポイントは世帯（<code>household</code> cookie）にスコープされる。<strong>cookie 無し（未保存）は 401</strong>。<code>/api/session</code> のみ保存前でも叩ける。各ルートの定型処理（<code>requireHouseholdId</code> の 401 ガード・<code>parseJsonBody</code>・<code>jsonError</code>）は <code>src/lib/api.ts</code> に集約し、全ルートで共通化している。</p>
 
 <div class="endpoint" id="api-session">
-<h4><span class="method method-get">GET</span> / <span class="method method-post">POST</span> / <span class="method method-delete">DELETE</span> /api/session</h4>
-<p>世帯コードの保存・クリア・状態取得。世帯コード = <code>household.id</code>、cookie は<strong>署名なし</strong>（世帯コードを知っていること自体が認可）。コード識別子は <code>unlock/lock/passphrase</code> のまま（UI 表現のみ「保存／クリア」）。</p>
+<h4><span class="method method-get">GET</span> / <span class="method method-post">POST</span> / <span class="method method-patch">PATCH</span> / <span class="method method-delete">DELETE</span> /api/session</h4>
+<p>世帯コードの保存・クリア・状態取得＋<strong>入力者（夫/妻）の端末保存</strong>。世帯コード = <code>household.id</code>、cookie は <strong>HMAC 署名付き（SEC-3、<code>SESSION_SECRET</code>）</strong>。コード識別子は <code>unlock/lock/passphrase</code> のまま（UI 表現のみ「保存／クリア」）。</p>
 <ul>
-  <li><strong>GET</strong> — 現在の保存状態。<code>{ unlocked: boolean, householdName: string | null }</code>。cookie はあるが世帯が存在しない場合は<strong>無効 cookie を破棄</strong>して返す</li>
-  <li><strong>POST</strong> <code>{ passphrase }</code> — 世帯コードに一致する世帯があれば <code>household</code> cookie（httpOnly / SameSite=lax / 約400日 / 本番のみ secure）を発行して <code>{ ok: true }</code>。無ければ 401</li>
-  <li><strong>DELETE</strong> — cookie を破棄（この端末からクリア）</li>
+  <li><strong>GET</strong> — 現在の保存状態。<code>{ unlocked: boolean, householdName?: string | null, enteredBy: 1 | 2 | null }</code>。cookie はあるが世帯が存在しない場合は<strong>無効 cookie を破棄</strong>して返す。<strong>入力者 cookie が無ければ既定値 <code>2=♀</code> を発行</strong>（妻がメイン利用の想定。夫は設定で <code>1=♂</code> に切替）</li>
+  <li><strong>POST</strong> <code>{ passphrase }</code> — 世帯コードに一致する世帯があれば <code>household</code> cookie（httpOnly / SameSite=lax / 約400日 / 本番のみ secure / HMAC 署名）を発行して <code>{ ok: true }</code>。無ければ 401。<strong>同一 IP 60 秒 10 回のレート制限（SEC-1）</strong>、本番は既定世帯コードでの解錠を拒否（SEC-2）</li>
+  <li><strong>PATCH</strong> <code>{ enteredBy }</code> — 入力者を端末に保存。<code>1</code>/<code>2</code> のみ受理し <code>enteredBy</code> cookie を発行（それ以外は 400）</li>
+  <li><strong>DELETE</strong> — 世帯コードと入力者の cookie を<strong>両方</strong>破棄（この端末からクリア）</li>
 </ul>
 </div>
 
@@ -660,6 +662,7 @@ hr {
 <p>支出を新規作成。</p>
 <p><strong>必須:</strong> <code>amount</code>（0〜100,000,000の整数。0円可）、<code>spentAt</code>（<code>YYYY-MM-DD</code>）、<code>categoryId</code>（世帯のカテゴリ）</p>
 <p><strong>任意:</strong> <code>storeName</code>（≤100）、<code>memo</code>（≤500）、<code>receiptImageUrl</code></p>
+<p><strong>入力者:</strong> <code>enteredBy</code> はボディでは受け取らず、<strong>サーバが端末の cookie（<code>getEnteredBy()</code>）から付与</strong>する（編集 PATCH は据え置き）。<code>batch</code> も同様。</p>
 <p><strong>レスポンス:</strong> <code>201</code> + 作成された <code>Expense</code> / <code>400</code> + <code>{ error }</code></p>
 <pre><code>{
   "amount": 1280,
