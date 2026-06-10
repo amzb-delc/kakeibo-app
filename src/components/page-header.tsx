@@ -11,10 +11,13 @@ type Props = {
   subtitle?: React.ReactNode;
   /** "/" 始まり以外は呼び出し元責任で弾く想定。PageHeader 内ではバリデーションしない。 */
   backHref?: string;
+  /** 左スロットに置く要素（backHref が無いページ用。例: ホームの明細取り込みボタン）。
+   *  backHref があるときは戻るボタンを優先し left は描画しない。 */
+  left?: React.ReactNode;
   right?: React.ReactNode;
 };
 
-export function PageHeader({ title, subtitle, backHref, right }: Props) {
+export function PageHeader({ title, subtitle, backHref, left, right }: Props) {
   return (
     <header
       className="sticky top-0 z-10 bg-background border-b border-border/50"
@@ -37,7 +40,9 @@ export function PageHeader({ title, subtitle, backHref, right }: Props) {
             >
               <ChevronLeft size={26} strokeWidth={2.25} aria-hidden="true" />
             </Link>
-          ) : null}
+          ) : (
+            (left ?? null)
+          )}
         </div>
         <div className="flex-1 text-center min-w-0">
           {typeof title === "string" ? (

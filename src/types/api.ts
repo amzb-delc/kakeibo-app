@@ -27,3 +27,30 @@ export type OcrResult = {
   spentAt: string | null; // YYYY-MM-DD
   categoryId: string | null;
 };
+
+// POST /api/statement: クレカ明細PDFの抽出結果。
+// 各行は categoryId に解決済み、重複候補は duplicateLikely でフラグ。
+export type StatementRow = {
+  amount: number | null; // 円・整数。返金/キャンセルは負
+  spentAt: string | null; // YYYY-MM-DD
+  storeName: string | null;
+  categoryId: string | null;
+  duplicateLikely: boolean;
+};
+export type StatementExtractResult = {
+  rows: StatementRow[];
+};
+
+// POST /api/expenses/batch: 一括登録のリクエスト/結果。
+export type BatchExpenseRow = {
+  amount: number;
+  spentAt: string; // YYYY-MM-DD
+  categoryId: string;
+  storeName?: string | null;
+  memo?: string | null;
+};
+export type BatchExpenseRequest = { rows: BatchExpenseRow[] };
+export type BatchExpenseResult = {
+  created: number;
+  errors: Array<{ index: number; message: string }>;
+};
