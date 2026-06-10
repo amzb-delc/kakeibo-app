@@ -7,7 +7,7 @@ vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ get })) }));
 const { findUnique } = vi.hoisted(() => ({ findUnique: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique } } }));
 
-import { getHouseholdId, getDemoUserId } from "./auth";
+import { getHouseholdId, getDemoUserId, getEnteredBy } from "./auth";
 import { signSession } from "./cookie-sign";
 
 beforeEach(() => {
@@ -31,6 +31,27 @@ describe("getHouseholdId", () => {
   it("未署名の旧 cookie は null（要再保存・SEC-3）", async () => {
     get.mockReturnValue({ value: encodeURIComponent("夫婦の合言葉") });
     expect(await getHouseholdId()).toBeNull();
+  });
+});
+
+describe("getEnteredBy", () => {
+  it("cookie 無しは null", async () => {
+    get.mockReturnValue(undefined);
+    expect(await getEnteredBy()).toBeNull();
+  });
+
+  it('"1"→1 / "2"→2 を返す', async () => {
+    get.mockReturnValue({ value: "1" });
+    expect(await getEnteredBy()).toBe(1);
+    get.mockReturnValue({ value: "2" });
+    expect(await getEnteredBy()).toBe(2);
+  });
+
+  it("不正値（範囲外・非数値）は null", async () => {
+    get.mockReturnValue({ value: "3" });
+    expect(await getEnteredBy()).toBeNull();
+    get.mockReturnValue({ value: "x" });
+    expect(await getEnteredBy()).toBeNull();
   });
 });
 

@@ -5,19 +5,41 @@ import {
   OCR_ALLOWED_MEDIA_TYPES,
   type OcrMediaType,
 } from "@/lib/ocr";
-import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
+import {
+  requireHouseholdId,
+  parseJsonBody,
+  jsonError,
+  checkContentLength,
+} from "@/lib/api";
+import { rateLimit } from "@/lib/rate-limit";
 import type { OcrResult } from "@/types/api";
 
 // 画像はクライアントで縮小済み前提。base64 文字列の上限（おおよそ 7MB ぶん）。
 const MAX_BASE64_LENGTH = 7 * 1024 * 1024;
+// JSON ボディ全体の上限（base64 + 包み）。Content-Length 事前チェック用（SEC-4）。
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
+// 世帯単位のコスト/DoS 上限。連写しても 60 秒 30 回まで（SEC-4）。
+const OCR_RATE_LIMIT = { limit: 30, windowMs: 60 * 1000 };
 
 export async function POST(req: NextRequest) {
   const householdId = await requireHouseholdId();
   if (householdId instanceof NextResponse) return householdId;
 
+  // SEC-4: 世帯単位でレート制限（API コスト爆発の抑止）
+  const limit = rateLimit(`ocr:${householdId}`, OCR_RATE_LIMIT);
+  if (!limit.ok) {
+    const res = jsonError("混み合っています。少し待って再試行してください", 429);
+    res.headers.set("Retry-After", String(limit.retryAfterSec));
+    return res;
+  }
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return jsonError("レシート読み取りは未設定です（ANTHROPIC_API_KEY）", 503);
   }
+
+  // SEC-4: 巨大ボディを parse 前に弾く
+  const tooLarge = checkContentLength(req, MAX_BODY_BYTES);
+  if (tooLarge) return tooLarge;
 
   const body = await parseJsonBody(req);
   if (body instanceof NextResponse) return body;

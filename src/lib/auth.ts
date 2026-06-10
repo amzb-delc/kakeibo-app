@@ -7,6 +7,9 @@ import { verifySession } from "@/lib/cookie-sign";
 // 各 API は cookie から世帯を特定する。cookie 無し＝未保存＝データを返さない。
 export const HOUSEHOLD_COOKIE = "household";
 
+// 入力者（夫/妻）の端末ごと設定。1=♂ / 2=♀。設定モーダルで選び、新規登録時に付与する。
+export const ENTERED_BY_COOKIE = "enteredBy";
+
 // getDemoUserId が引くデモユーザーの email。seed が作成するユーザーと一致させる。
 const DEMO_USER_EMAIL = "demo@example.com";
 
@@ -18,6 +21,13 @@ export async function getHouseholdId(): Promise<string | null> {
   if (!raw) return null;
   // 署名検証（SEC-3）。改竄・未署名の旧 cookie は null（＝未保存扱い、要再保存）。
   return verifySession(decodeURIComponent(raw));
+}
+
+// 入力者 cookie を取り出す。未設定・不正値は null（"1"→1 / "2"→2 のみ）。
+export async function getEnteredBy(): Promise<1 | 2 | null> {
+  const store = await cookies();
+  const raw = store.get(ENTERED_BY_COOKIE)?.value;
+  return raw === "1" ? 1 : raw === "2" ? 2 : null;
 }
 
 let cachedDemoUserId: string | null = null;

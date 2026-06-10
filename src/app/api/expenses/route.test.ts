@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { jsonReq } from "@/test/route-helpers";
 
-const { getHouseholdId, getDemoUserId } = vi.hoisted(() => ({
+const { getHouseholdId, getDemoUserId, getEnteredBy } = vi.hoisted(() => ({
   getHouseholdId: vi.fn(),
   getDemoUserId: vi.fn(),
+  getEnteredBy: vi.fn(),
 }));
-vi.mock("@/lib/auth", () => ({ getHouseholdId, getDemoUserId }));
+vi.mock("@/lib/auth", () => ({ getHouseholdId, getDemoUserId, getEnteredBy }));
 
 // validateExpenseInput は実関数のまま使い、その中の category 照合だけ prisma をモック。
 const { findFirst, create } = vi.hoisted(() => ({
@@ -24,6 +25,7 @@ const valid = { amount: 1280, spentAt: "2026-06-08", categoryId: "cat-1" };
 beforeEach(() => {
   getHouseholdId.mockReset().mockResolvedValue("hh-1");
   getDemoUserId.mockReset().mockResolvedValue("u-1");
+  getEnteredBy.mockReset().mockResolvedValue(1); // 入力者は設定済みが既定
   findFirst.mockReset().mockResolvedValue({ id: "cat-1" }); // 自世帯にカテゴリ存在
   create.mockReset();
 });
@@ -49,7 +51,16 @@ describe("POST /api/expenses", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("正常時は 201・自世帯/デモユーザーで作成", async () => {
+  it("入力者が未設定（cookie 無し）は 400・保存しない", async () => {
+    getEnteredBy.mockResolvedValue(null);
+    const res = await POST(jsonReq(URL, valid));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "enteredByRequired" });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("正常時は 201・自世帯/デモユーザー/入力者で作成", async () => {
+    getEnteredBy.mockResolvedValue(2);
     create.mockResolvedValue({ id: "e1", ...valid, category: { id: "cat-1", name: "食費" } });
     const res = await POST(jsonReq(URL, valid));
     expect(res.status).toBe(201);
@@ -58,6 +69,7 @@ describe("POST /api/expenses", () => {
     const data = create.mock.calls[0][0].data;
     expect(data.householdId).toBe("hh-1");
     expect(data.createdByUserId).toBe("u-1");
+    expect(data.enteredBy).toBe(2);
     expect(data.categoryId).toBe("cat-1");
     // category 照合は自世帯スコープで行う
     expect(findFirst).toHaveBeenCalledWith(
