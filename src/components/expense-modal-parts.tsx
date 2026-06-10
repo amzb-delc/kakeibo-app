@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { ReceiptCaptureButton } from "@/components/receipt-capture-button";
 import type { ExpenseFormValues } from "@/components/expense-form";
 import { formatYen } from "@/lib/format";
+import { splitYmd } from "@/lib/date";
 import type { Category } from "@/types";
 import type { OcrResult } from "@/types/api";
 
@@ -53,7 +54,7 @@ export function DeleteConfirmDetail({
   expense: ExpenseFormValues;
   categories: Category[];
 }) {
-  const [, m, d] = expense.spentAt.split("-").map(Number);
+  const [, m, d] = splitYmd(expense.spentAt);
   const catName =
     categories.find((c) => c.id === expense.categoryId)?.name ?? "未分類";
   return (
