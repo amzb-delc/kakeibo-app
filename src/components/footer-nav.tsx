@@ -9,16 +9,7 @@ import { ReceiptCaptureButton } from "@/components/receipt-capture-button";
 export function FooterNav() {
   const { openCreate, notify } = useExpenseModal();
   const { openSettings } = useSettingsModal();
-  const { unlocked, enteredBy } = useSession();
-
-  // 入力者が未設定なら登録に進ませず設定モーダルへ誘導（登録前に必須）。
-  const startCreate = (opts?: Parameters<typeof openCreate>[0]) => {
-    if (enteredBy == null) {
-      openSettings();
-      return;
-    }
-    openCreate(opts);
-  };
+  const { unlocked } = useSession();
 
   return (
     <nav
@@ -49,7 +40,7 @@ export function FooterNav() {
         {/* 右: レシート撮影でOCR → 抽出結果入り・連続入力ONで登録モーダルを開く
             （まとめ入力動線）。未保存（cookie 無し）は OCR API も 401 なので出さない。
             アイコンは“重ねカメラ”で連続入力モードを表す。 */}
-        {unlocked && enteredBy != null ? (
+        {unlocked ? (
           <ReceiptCaptureButton
             onResult={(r) => openCreate({ ocr: r, keepOpen: true })}
             onError={notify}
@@ -66,19 +57,6 @@ export function FooterNav() {
               </span>
             }
           />
-        ) : unlocked ? (
-          // 保存済みだが入力者が未設定: 撮影前に設定モーダルへ誘導する。
-          <button
-            type="button"
-            onClick={openSettings}
-            aria-label="レシートで支出を登録（先に入力者の設定が必要）"
-            className="flex-1 flex items-center justify-center h-full min-h-[72px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <span className="relative inline-block size-11" aria-hidden="true">
-              <Camera className="absolute inset-0 m-auto size-9 opacity-50 translate-x-[3px] -translate-y-[3px]" />
-              <Camera className="absolute inset-0 m-auto size-9 fill-card -translate-x-[3px] translate-y-[3px]" />
-            </span>
-          </button>
         ) : (
           <div className="flex-1" aria-hidden="true" />
         )}
@@ -87,7 +65,7 @@ export function FooterNav() {
         {unlocked && (
           <button
             type="button"
-            onClick={() => startCreate()}
+            onClick={() => openCreate()}
             aria-label="支出を登録"
             className="absolute left-1/2 -translate-x-1/2 -top-11 w-[88px] h-[88px] rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-primary-foreground ring-8 ring-card shadow-[0_12px_28px_-6px_rgba(37,99,235,0.55),0_4px_8px_-2px_rgba(37,99,235,0.35)] flex items-center justify-center transition-all duration-200 ease-out active:scale-90 active:duration-75 active:shadow-[0_4px_10px_-2px_rgba(37,99,235,0.5)] active:translate-y-0.5 hover:from-blue-400 hover:to-blue-700 will-change-transform"
           >

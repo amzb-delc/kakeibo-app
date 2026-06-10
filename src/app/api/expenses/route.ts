@@ -17,9 +17,8 @@ export async function POST(req: NextRequest) {
   });
   if (error) return jsonError(error.message, 400);
 
-  // 入力者は端末設定（cookie）から付与する。未設定の端末では登録できない。
+  // 入力者は端末設定（cookie）から付与する。未設定でも既定値が起動時に入るため必須にはしない。
   const enteredBy = await getEnteredBy();
-  if (enteredBy == null) return jsonError("enteredByRequired", 400);
 
   const createdByUserId = await getDemoUserId();
 

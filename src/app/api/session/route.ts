@@ -19,6 +19,10 @@ const UNLOCK_RATE_LIMIT = { limit: 10, windowMs: 60 * 1000 };
 // 保存は端末で保持したいので長期 cookie（ブラウザ上限に合わせ 400 日）。
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
 
+// 入力者の既定値（2=♀ 妻）。妻がメイン利用のため、未設定の端末は起動時にこの値で
+// cookie を発行する。夫の端末は設定モーダルで 1=♂ に切り替える。
+const DEFAULT_ENTERED_BY = 2;
+
 function cookieOptions(maxAge: number) {
   return {
     httpOnly: true,
@@ -30,29 +34,34 @@ function cookieOptions(maxAge: number) {
 }
 
 // 現在の保存状態（クライアントの未保存表示用）。入力者 cookie も合わせて返す。
+// 入力者が未設定の端末は、起動時のこの GET で既定値（2=♀）を発行する。
 export async function GET() {
-  const enteredBy = await getEnteredBy();
+  let enteredBy = await getEnteredBy();
+  const needsDefault = enteredBy == null;
+  if (needsDefault) enteredBy = DEFAULT_ENTERED_BY;
+
   const id = await getHouseholdId();
-  if (!id)
-    return NextResponse.json({ unlocked: false, enteredBy } satisfies SessionStatus);
-  const household = await prisma.household.findUnique({
-    where: { id },
-    select: { name: true },
-  });
-  if (!household) {
-    // cookie はあるが世帯が無い（世帯コード変更・再seed 後など）→ 無効 cookie を破棄
-    const res = NextResponse.json({
-      unlocked: false,
-      enteredBy,
-    } satisfies SessionStatus);
-    res.cookies.set(HOUSEHOLD_COOKIE, "", cookieOptions(0));
-    return res;
-  }
-  return NextResponse.json({
-    unlocked: true,
-    householdName: household.name,
-    enteredBy,
-  } satisfies SessionStatus);
+  const household = id
+    ? await prisma.household.findUnique({
+        where: { id },
+        select: { name: true },
+      })
+    : null;
+
+  const body: SessionStatus = household
+    ? { unlocked: true, householdName: household.name, enteredBy }
+    : { unlocked: false, enteredBy };
+  const res = NextResponse.json(body);
+  // cookie はあるが世帯が無い（世帯コード変更・再seed 後など）→ 無効 cookie を破棄
+  if (id && !household) res.cookies.set(HOUSEHOLD_COOKIE, "", cookieOptions(0));
+  // 未設定の端末に既定の入力者 cookie を発行（永続化）
+  if (needsDefault)
+    res.cookies.set(
+      ENTERED_BY_COOKIE,
+      String(DEFAULT_ENTERED_BY),
+      cookieOptions(COOKIE_MAX_AGE)
+    );
+  return res;
 }
 
 // 入力者（夫/妻）を端末に保存。1=♂ / 2=♀ のみ受け付ける。

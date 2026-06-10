@@ -3,8 +3,6 @@
 import { useRef } from "react";
 import { FolderInput } from "lucide-react";
 import { useStatementImportPreview } from "@/components/statement-import-provider";
-import { useSession } from "@/components/session-provider";
-import { useSettingsModal } from "@/components/settings-modal";
 import { cn } from "@/lib/utils";
 
 // フォルダタップ → 先に案内トーストを出し、少し間を置いてからピッカーを開く。
@@ -16,14 +14,11 @@ const PICKER_DELAY_MS = 700;
 // タップで PDF ファイルピッカー → 抽出 → プレビューシートを開く。
 // 保持中の取り込みデータがある（pendingCount > 0）ときは再抽出せずプレビューを開き直し、
 // 件数バッジを表示する。抽出中の「考え中」表示は右ヘッダのキャラ側で出す。
-// 入力者（夫/妻）が未設定なら取り込みに進ませず設定モーダルへ誘導する（登録前に必須）。
 // 未保存（unlocked でない）ときは呼び出し側（page.tsx）で非表示にする。
 export function StatementImportButton({ className }: { className?: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { importFile, pendingCount, reopen, notify } =
     useStatementImportPreview();
-  const { enteredBy } = useSession();
-  const { openSettings } = useSettingsModal();
   const hasPending = pendingCount > 0;
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,11 +29,6 @@ export function StatementImportButton({ className }: { className?: string }) {
   };
 
   const handleClick = () => {
-    // 入力者が未設定なら取り込みに進ませず設定モーダルへ誘導（登録前に必須）。
-    if (enteredBy == null) {
-      openSettings();
-      return;
-    }
     // 保持データがあれば再抽出せず開き直す（誤操作×からの復帰）。
     if (hasPending) {
       reopen();

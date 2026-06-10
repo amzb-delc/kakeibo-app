@@ -40,14 +40,6 @@ describe("POST /api/expenses/batch", () => {
     expect($transaction).not.toHaveBeenCalled();
   });
 
-  it("入力者が未設定（cookie 無し）は 400・何も作らない", async () => {
-    getEnteredBy.mockResolvedValue(null);
-    const res = await POST(jsonReq(URL, { rows: [validRow] }));
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "enteredByRequired" });
-    expect($transaction).not.toHaveBeenCalled();
-  });
-
   it("rows が空配列なら 400", async () => {
     const res = await POST(jsonReq(URL, { rows: [] }));
     expect(res.status).toBe(400);

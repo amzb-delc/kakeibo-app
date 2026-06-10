@@ -33,23 +33,25 @@ afterEach(() => {
 });
 
 describe("GET /api/session", () => {
-  it("cookie 無しは unlocked:false（enteredBy も返す）", async () => {
+  it("入力者 cookie 無しは既定値 2 を返し、enteredBy cookie を発行", async () => {
     getHouseholdId.mockResolvedValue(null);
     const res = await GET();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ unlocked: false, enteredBy: null });
+    expect(await res.json()).toEqual({ unlocked: false, enteredBy: 2 });
+    expect(res.cookies.get("enteredBy")?.value).toBe("2");
   });
 
-  it("保存済みは unlocked:true + 世帯名 + enteredBy", async () => {
+  it("入力者 cookie 済みはその値を返し、既定 cookie は発行しない", async () => {
     getHouseholdId.mockResolvedValue("夫婦の合言葉");
-    getEnteredBy.mockResolvedValue(2);
+    getEnteredBy.mockResolvedValue(1);
     findUnique.mockResolvedValue({ name: "我が家" });
     const res = await GET();
     expect(await res.json()).toEqual({
       unlocked: true,
       householdName: "我が家",
-      enteredBy: 2,
+      enteredBy: 1,
     });
+    expect(res.cookies.get("enteredBy")).toBeUndefined();
   });
 });
 

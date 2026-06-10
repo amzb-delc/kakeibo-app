@@ -51,14 +51,6 @@ describe("POST /api/expenses", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("入力者が未設定（cookie 無し）は 400・保存しない", async () => {
-    getEnteredBy.mockResolvedValue(null);
-    const res = await POST(jsonReq(URL, valid));
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "enteredByRequired" });
-    expect(create).not.toHaveBeenCalled();
-  });
-
   it("正常時は 201・自世帯/デモユーザー/入力者で作成", async () => {
     getEnteredBy.mockResolvedValue(2);
     create.mockResolvedValue({ id: "e1", ...valid, category: { id: "cat-1", name: "食費" } });
