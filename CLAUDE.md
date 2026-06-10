@@ -43,7 +43,7 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 
 | エンドポイント | 概要 |
 |------|------|
-| `GET/POST/PATCH/DELETE /api/session` | 保存状態の取得（世帯＋入力者） / 世帯コードを保存（cookie発行） / **入力者(1=♂/2=♀)を端末に保存（PATCH）** / クリア（両cookie破棄） |
+| `GET/POST/PATCH/DELETE /api/session` | 保存状態の取得（世帯＋入力者。**入力者cookie が無ければ既定2=♀を発行**） / 世帯コードを保存（cookie発行） / **入力者(1=♂/2=♀)を端末に保存（PATCH）** / クリア（両cookie破棄） |
 | `GET /api/categories` | カテゴリ一覧（sortOrder順）。`?scope=all` で無効含む全16スロット（管理画面用） |
 | `PATCH /api/categories/[id]` | カテゴリの名前変更・有効/無効トグル（`Category.enabled`） |
 | `POST /api/expenses` | 支出登録（amount, spentAt, categoryId 必須） |
@@ -58,7 +58,7 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 ## データモデルの補足
 
 - `Expense.amount` は円単位の整数
-- `Expense.enteredBy` は**入力者**（`1=♂(夫) / 2=♀(妻) / null=未設定`）。**端末ごとの設定**（設定モーダルで選択 → `ENTERED_BY_COOKIE`）で、**新規登録（POST `/api/expenses`・batch）時にサーバが cookie から付与**する。**編集 PATCH は触らない（据え置き）**ため、`expense-form` / `validateExpenseInput` には乗せない。未設定の端末は新規登録をサーバが 400 `enteredByRequired` で弾き、UI（FAB・レシートカメラ・明細取り込み）も設定モーダルへ誘導する（＝登録前に必須）。`getEnteredBy()`（`src/lib/auth.ts`）で取得。**一覧での入力者表示は未実装**（別途）
+- `Expense.enteredBy` は**入力者**（`1=♂(夫) / 2=♀(妻)`）。**端末ごとの設定**（設定モーダルで選択 → `ENTERED_BY_COOKIE`）で、**新規登録（POST `/api/expenses`・batch）時にサーバが cookie から付与**する。**編集 PATCH は触らない（据え置き）**ため、`expense-form` / `validateExpenseInput` には乗せない。**未設定の端末は起動時の GET `/api/session` で既定値 2=♀ を発行**（妻がメイン利用の想定。夫は設定で 1=♂ に切替）するので、登録の必須ゲートは設けない。`getEnteredBy()`（`src/lib/auth.ts`）で取得。**一覧での入力者表示は未実装**（別途）
 - `Category` は `householdId` ごとにユニーク。**16スロット固定**（seedで生成）。追加・削除・並び替えは不可だが、**名前変更・有効/無効トグルは実装済み**（設定モーダル内 `category-manager.tsx` ＋ `PATCH /api/categories/[id]`、`Category.enabled` 列）
 - トレンド判定ロジックは `src/lib/trend.ts` に集約
 

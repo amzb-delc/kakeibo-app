@@ -8,10 +8,7 @@ const h = vi.hoisted(() => ({
   openCreate: vi.fn(),
   openSettings: vi.fn(),
   notify: vi.fn(),
-  session: {
-    unlocked: true as boolean | null,
-    enteredBy: 1 as 1 | 2 | null,
-  },
+  session: { unlocked: true as boolean | null },
   ocr: { amount: 500, storeName: null, spentAt: "2026-05-01", categoryId: null },
 }));
 
@@ -22,10 +19,7 @@ vi.mock("@/components/settings-modal", () => ({
   useSettingsModal: () => ({ openSettings: h.openSettings }),
 }));
 vi.mock("@/components/session-provider", () => ({
-  useSession: () => ({
-    unlocked: h.session.unlocked,
-    enteredBy: h.session.enteredBy,
-  }),
+  useSession: () => ({ unlocked: h.session.unlocked }),
 }));
 vi.mock("@/components/receipt-capture-button", () => ({
   ReceiptCaptureButton: ({
@@ -49,7 +43,6 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   h.session.unlocked = true;
-  h.session.enteredBy = 1;
 });
 
 describe("FooterNav", () => {
@@ -64,27 +57,6 @@ describe("FooterNav", () => {
     render(<FooterNav />);
     fireEvent.click(screen.getByRole("button", { name: CAMERA }));
     expect(h.openCreate).toHaveBeenCalledWith({ ocr: h.ocr, keepOpen: true });
-  });
-
-  it("入力者が未設定: FAB は登録せず設定モーダルへ誘導", () => {
-    h.session.enteredBy = null;
-    render(<FooterNav />);
-    fireEvent.click(screen.getByRole("button", { name: "支出を登録" }));
-    expect(h.openCreate).not.toHaveBeenCalled();
-    expect(h.openSettings).toHaveBeenCalled();
-  });
-
-  it("入力者が未設定: カメラは撮影せず設定モーダルへ誘導", () => {
-    h.session.enteredBy = null;
-    render(<FooterNav />);
-    expect(screen.queryByRole("button", { name: CAMERA })).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "レシートで支出を登録（先に入力者の設定が必要）",
-      })
-    );
-    expect(h.openCreate).not.toHaveBeenCalled();
-    expect(h.openSettings).toHaveBeenCalled();
   });
 
   it("未保存: 設定のみ（カメラ・FABは出さない・設定にバッジ文言）", () => {

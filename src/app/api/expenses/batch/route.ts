@@ -23,9 +23,8 @@ export async function POST(req: NextRequest) {
     return jsonError(`一度に登録できるのは${MAX_ROWS}件までです`, 400);
   }
 
-  // 入力者は端末設定（cookie）から付与する。未設定の端末では取り込めない。
+  // 入力者は端末設定（cookie）から付与する。未設定でも既定値が起動時に入るため必須にはしない。
   const enteredBy = await getEnteredBy();
-  if (enteredBy == null) return jsonError("enteredByRequired", 400);
 
   const createdByUserId = await getDemoUserId();
 
