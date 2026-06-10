@@ -16,7 +16,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ReceiptCaptureButton } from "@/components/receipt-capture-button";
 import { formatYen } from "@/lib/format";
-import { todayJst, lastDayOfMonth, parseReceiptDate } from "@/lib/date";
+import { todayJst, lastDayOfMonth, parseReceiptDate, splitYmd } from "@/lib/date";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
 import { useToast, Toast } from "@/components/toast";
 import { useCategoryCache } from "@/components/use-category-cache";
@@ -124,7 +124,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
 
   const openCreate = useCallback(
     (opts?: { ocr?: OcrResult | null; keepOpen?: boolean }) => {
-      const [ty, tm, td] = todayJst().split("-").map(Number);
+      const [ty, tm, td] = splitYmd(todayJst());
       const ctx = composeRef.current;
       let year = ctx?.year ?? ty;
       let month = ctx?.month ?? tm;
@@ -209,7 +209,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
 
   let initial: ExpenseFormInitial | null = null;
   if (active?.mode === "edit") {
-    const [y, m, d] = active.expense.spentAt.split("-").map(Number);
+    const [y, m, d] = splitYmd(active.expense.spentAt);
     initial = {
       id: active.expense.id,
       year: y,

@@ -46,6 +46,13 @@ export function parseJstDate(value: string): Date | null {
 // 数値を2桁ゼロ詰め（例: 3 → "03"）。
 export const pad2 = (n: number) => String(n).padStart(2, "0");
 
+// "YYYY-MM-DD" を [年, 月, 日] の数値タプルに分解する。形式の妥当性は検証しない
+// （実在チェックが要る場面は parseJstDate / parseReceiptDate を使う）。
+export function splitYmd(s: string): [number, number, number] {
+  const [year, month, day] = s.split("-").map(Number);
+  return [year, month, day];
+}
+
 // 指定月（month は 1-12）の末日。Date.UTC の day=0 は前月末＝当月末日になる。
 export function lastDayOfMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -62,7 +69,7 @@ export function parseReceiptDate(
   spentAt: string | null | undefined
 ): { year: number; month: number; day: number } | null {
   if (!spentAt || !/^\d{4}-\d{2}-\d{2}$/.test(spentAt)) return null;
-  const [year, month, day] = spentAt.split("-").map(Number);
+  const [year, month, day] = splitYmd(spentAt);
   if (month < 1 || month > 12 || day < 1 || day > lastDayOfMonth(year, month)) {
     return null;
   }
@@ -93,7 +100,7 @@ const WEEKDAYS_JA = ["日", "月", "火", "水", "木", "金", "土"];
 
 export function formatJstDateLabel(date: Date): string {
   const s = formatJstDate(date); // JST の YYYY-MM-DD
-  const [y, mo, d] = s.split("-").map(Number);
+  const [y, mo, d] = splitYmd(s);
   // 曜日は JST の暦日から算出する。UTC midnight として扱えば曜日はその暦日と一致する
   // （`new Date("...T00:00:00+09:00").getUTCDay()` だと UTC では前日になり曜日が1日ずれる）。
   const day = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
