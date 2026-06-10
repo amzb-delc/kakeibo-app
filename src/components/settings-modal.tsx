@@ -141,16 +141,9 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
             {/* 入力者: 保存済みのときのみ。端末ごとに夫/妻を選び、新規登録に付与する。 */}
             {unlocked && (
               <section className="bg-muted/30 rounded-2xl border border-border/50 p-4">
-                <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
-                  入力者
-                  {enteredBy == null && (
-                    <span className="inline-flex items-center rounded-full bg-red-500 text-white text-[10px] font-bold px-2 py-0.5">
-                      未選択
-                    </span>
-                  )}
-                </h3>
+                <h3 className="text-sm font-semibold mb-1">入力者</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                  この端末で登録する人を選んでください。新しく登録する支出に自動で記録されます（登録前に必須）。
+                  この端末で登録する人を選んでください。新しく登録する支出に自動で記録されます（初期値は妻。いつでも切り替えられます）。
                 </p>
                 <div className="flex gap-3">
                   {(
