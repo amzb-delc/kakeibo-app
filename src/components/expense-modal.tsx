@@ -14,7 +14,12 @@ import {
   type ExpenseFormValues,
   type ExpenseFormInitial,
 } from "@/components/expense-form";
-import { todayJst, lastDayOfMonth, parseReceiptDate } from "@/lib/date";
+import {
+  todayJst,
+  lastDayOfMonth,
+  parseReceiptDate,
+  splitYmd,
+} from "@/lib/date";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
 import { useToast, Toast } from "@/components/toast";
 import { useCategoryCache } from "@/components/use-category-cache";
