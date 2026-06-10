@@ -43,19 +43,22 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 
 | エンドポイント | 概要 |
 |------|------|
-| `GET/POST/DELETE /api/session` | 保存状態の取得 / 世帯コードを保存（cookie発行） / クリア（cookie破棄） |
+| `GET/POST/PATCH/DELETE /api/session` | 保存状態の取得（世帯＋入力者） / 世帯コードを保存（cookie発行） / **入力者(1=♂/2=♀)を端末に保存（PATCH）** / クリア（両cookie破棄） |
 | `GET /api/categories` | カテゴリ一覧（sortOrder順）。`?scope=all` で無効含む全16スロット（管理画面用） |
 | `PATCH /api/categories/[id]` | カテゴリの名前変更・有効/無効トグル（`Category.enabled`） |
 | `POST /api/expenses` | 支出登録（amount, spentAt, categoryId 必須） |
+| `POST /api/expenses/batch` | 支出の一括登録（明細取り込み用）。全行バリデーション→1件でも失敗なら何も作らず errors を返す（全成功か全失敗）。上限500件 |
 | `GET/PATCH/DELETE /api/expenses/[id]` | 支出の取得 / 編集 / 削除 |
 | `GET /api/monthly-summary?year=&month=` | 月次集計（当月・前月合計、カテゴリ別） |
 | `POST /api/ocr` | レシート画像（base64）から金額・店名・日付・カテゴリ候補を抽出（Claude ビジョン） |
+| `POST /api/statement` | クレカ明細PDF（base64）から利用明細行を一括抽出（Claude document）。自世帯カテゴリに解決し、重複候補に `duplicateLikely` を付与 |
 
 `/api/session` 以外のデータ API は**未保存（cookie 無し）だと 401**。
 
 ## データモデルの補足
 
 - `Expense.amount` は円単位の整数
+- `Expense.enteredBy` は**入力者**（`1=♂(夫) / 2=♀(妻) / null=未設定`）。**端末ごとの設定**（設定モーダルで選択 → `ENTERED_BY_COOKIE`）で、**新規登録（POST `/api/expenses`・batch）時にサーバが cookie から付与**する。**編集 PATCH は触らない（据え置き）**ため、`expense-form` / `validateExpenseInput` には乗せない。未設定の端末は新規登録をサーバが 400 `enteredByRequired` で弾き、UI（FAB・レシートカメラ・明細取り込み）も設定モーダルへ誘導する（＝登録前に必須）。`getEnteredBy()`（`src/lib/auth.ts`）で取得。**一覧での入力者表示は未実装**（別途）
 - `Category` は `householdId` ごとにユニーク。**16スロット固定**（seedで生成）。追加・削除・並び替えは不可だが、**名前変更・有効/無効トグルは実装済み**（設定モーダル内 `category-manager.tsx` ＋ `PATCH /api/categories/[id]`、`Category.enabled` 列）
 - トレンド判定ロジックは `src/lib/trend.ts` に集約
 
@@ -70,6 +73,8 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 - 日付入力: `ExpenseForm` の年月日は**縦ホイール**（`src/components/wheel.tsx`、汎用ドラム）で選ぶ。**月・日は端で巡回**（`loop`）、年は範囲（今年〜5年前＋OCR等で外れた年も内包）。年月変更時は日を月末でクランプ（`clampDay`）。無効日付は保存をブロック（クライアント）＋サーバも弾く（`parseJstDate` は 2/30・4/31 等をロールオーバーせず null）。登録/編集の保存時も `onSuccess` の年月でホーム表示月を同期する。
 - 連続入力（ロック）トグル: 支出モーダル**新規時のヘッダー**にスイッチ（`src/components/ui/switch.tsx`、base-ui）を置き、ON のとき保存後もシートを閉じず年月＋日＋カテゴリを残して続けて入力する。状態は `expense-modal` が保持し `ExpenseForm` に渡す。錠アイコンはスイッチのトラック内（ON=閉錠・OFF=開錠）。
 - フッター（`footer-nav.tsx`）: ホームは唯一のページなのでサマリータブは廃止。**左=設定／中央=登録FAB（手入力）／右=レシートOCRカメラ**。FAB とカメラは未保存（`unlocked` でない）のときは出さない（OCR API も 401）。
-- クレカ明細の一括取り込みは未実装（Phase2 予定。iPhone での CSV/PDF 取り回しが課題のため後回し）
+- クレカ明細の一括取り込みは実装済み（`POST /api/statement` + `src/lib/statement.ts`、Claude の document(PDF) 抽出。既定モデルは `STATEMENT_MODEL`＝`claude-sonnet-4-6`、env で切替可）。動線は**ホームのヘッダ左「フォルダ」アイコン**（`StatementImportButton`）→ PDF ピッカー → 抽出 → **プレビューシート**（`statement-preview-sheet.tsx`、行ごとに金額・日付・店名・カテゴリを編集／除外）→ `POST /api/expenses/batch` で一括登録。
+  - **重複候補**: 抽出行を対象期間の既存支出と突合し（`src/lib/duplicate.ts`、同日×同額×店名近似）`duplicateLikely` を立てるが、**除外はせずユーザー判断**（プレビューで警告表示）。
+  - **PDFは保存しない**（抽出のみ、base64 は送信後破棄）。`ANTHROPIC_API_KEY` 必須（未設定なら 503）。状態は `StatementImportProvider`（`ExpenseModalProvider` の内側でカテゴリ先読み・登録後の一覧再取得 `notifyBatch` を借りる）。
 - 通知機能は未実装（`notificationDay`, `notificationTime` フィールドのみ存在）
 - カテゴリの**追加・削除・並び替えは未対応**（16スロット固定）。名前変更・有効/無効の管理UIは実装済み（`category-manager.tsx`、設定モーダル内）

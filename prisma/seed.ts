@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 // 16スロット定数はアプリ本体と共有する（@/ エイリアスは ts-node で解決されないため相対 import）。
 import { CATEGORY_SLOTS, slotName } from "../src/lib/category-constants";
+import { DEFAULT_HOUSEHOLD_ID } from "../src/lib/household-defaults";
 
 const prisma = new PrismaClient();
 
@@ -55,10 +56,10 @@ async function main() {
 
   // デモ用世帯
   const household = await prisma.household.upsert({
-    where: { id: "demo-household" },
+    where: { id: DEFAULT_HOUSEHOLD_ID },
     update: {},
     create: {
-      id: "demo-household",
+      id: DEFAULT_HOUSEHOLD_ID,
       name: "ワレワレ",
       notificationDay: 25,
       notificationTime: "09:00",

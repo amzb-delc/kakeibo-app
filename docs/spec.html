@@ -312,11 +312,13 @@ hr {
     <li><a href="#api-categories">GET /api/categories</a></li>
     <li><a href="#api-categories-patch">PATCH /api/categories/[id]</a></li>
     <li><a href="#api-expenses-create">POST /api/expenses</a></li>
+    <li><a href="#api-expenses-batch">POST /api/expenses/batch</a></li>
     <li><a href="#api-expenses-get">GET /api/expenses/[id]</a></li>
     <li><a href="#api-expenses-patch">PATCH /api/expenses/[id]</a></li>
     <li><a href="#api-expenses-delete">DELETE /api/expenses/[id]</a></li>
     <li><a href="#api-monthly-summary">GET /api/monthly-summary</a></li>
     <li><a href="#api-ocr">POST /api/ocr</a></li>
+    <li><a href="#api-statement">POST /api/statement</a></li>
   </ul>
 </nav>
 
@@ -324,7 +326,7 @@ hr {
 
 <header class="title">
   <h1>家計簿アプリ — MVP仕様書</h1>
-  <div class="meta">最終更新: 2026-06-09（UX改善〈トースト位置/削除確認/iOSスクロール/ヘッダキャラ〉 + 連続入力スイッチ + 年月日ホイール化 + OCRまとめ入力動線。先行: 明細並び替え・全体カード件数・レシートOCR・世帯コード保護・カテゴリ管理・リファクタ Tier 5〜7）</div>
+  <div class="meta">最終更新: 2026-06-10（クレカ明細PDF取り込み〈抽出→プレビュー編集→一括登録・重複候補フラグ〉。先行: UX改善・連続入力スイッチ・年月日ホイール化・OCRまとめ入力動線・明細並び替え・レシートOCR・世帯コード保護・カテゴリ管理・リファクタ Tier 5〜7）</div>
 </header>
 
 <section id="overview">
@@ -364,12 +366,18 @@ hr {
 │       ├── categories/route.ts
 │       ├── categories/[id]/route.ts
 │       ├── expenses/route.ts
+│       ├── expenses/batch/route.ts  # 明細の一括登録（全成功か全失敗・上限500件）
 │       ├── expenses/[id]/route.ts
 │       ├── monthly-summary/route.ts
-│       └── ocr/route.ts          # レシート画像 → 構造化抽出（Claude ビジョン）
+│       ├── ocr/route.ts          # レシート画像 → 構造化抽出（Claude ビジョン）
+│       └── statement/route.ts    # クレカ明細PDF → 一括抽出＋重複フラグ（Claude document）
 ├── components/
 │   ├── page-header.tsx       # 共通ヘッダ（全ページに sticky）
 │   ├── footer-nav.tsx        # 共通フッタ（設定 / ＋FAB / レシートOCRカメラ）
+│   ├── statement-import-button.tsx   # ヘッダ左フォルダアイコン（PDFピッカー→抽出→プレビュー）
+│   ├── statement-import-provider.tsx # StatementImportProvider（プレビューシート開閉）
+│   ├── statement-preview-sheet.tsx   # 明細プレビュー（行ごと編集／除外・重複警告→一括登録）
+│   ├── use-statement-import.ts       # useStatementImport（PDF base64化→/api/statement）
 │   ├── bottom-sheet.tsx      # useBottomSheet + BottomSheet（シート共通基盤）
 │   ├── expense-modal.tsx     # ExpenseModalProvider（モーダル状態/削除/mutation）
 │   ├── toast.tsx             # useToast + Toast（トースト通知）
@@ -394,6 +402,8 @@ hr {
 │   ├── date.ts               # JSTヘルパ + pad2 / lastDayOfMonth / shiftMonth / ymKey
 │   ├── format.ts             # formatYen / formatDiff（金額表示）
 │   ├── ocr.ts                # extractReceipt（Claude ビジョンで構造化抽出）
+│   ├── statement.ts          # extractStatement（Claude document でクレカ明細PDFを構造化抽出）
+│   ├── duplicate.ts          # markDuplicates / findDuplicateFlags（明細の重複候補判定・純関数）
 │   ├── expenses.ts           # validateExpenseInput（支出入力の検証）
 │   ├── expense-sort.ts       # 明細の並び替え（日付/更新日/金額・純関数）
 │   ├── categories.ts         # ensureCategorySlots + validateCategoryPatch
@@ -660,6 +670,14 @@ hr {
 }</code></pre>
 </div>
 
+<div class="endpoint" id="api-expenses-batch">
+<h4><span class="method method-post">POST</span> /api/expenses/batch</h4>
+<p>明細取り込み用の<strong>一括登録</strong>。<code>rows[]</code> を全件 <code>validateExpenseInput</code>（POSTと同じガード・世帯スコープのカテゴリ照合）で検証し、<strong>1件でも失敗したら何も作らず errors を返す</strong>（部分コミットせず「全成功か全失敗」）。成功時は <code>prisma.$transaction</code> で一括 create。</p>
+<p><strong>各行:</strong> <code>amount</code> / <code>spentAt</code> / <code>categoryId</code>（必須）、<code>storeName</code> / <code>memo</code>（任意）</p>
+<p><strong>上限:</strong> 500件（超過は <code>400</code>）。空配列も <code>400</code>。</p>
+<p><strong>レスポンス:</strong> <code>201</code> + <code>{ created, errors: [] }</code> / <code>400</code> + <code>{ created: 0, errors: [{ index, message }] }</code></p>
+</div>
+
 <div class="endpoint" id="api-expenses-get">
 <h4><span class="method method-get">GET</span> /api/expenses/[id]</h4>
 <p>1件取得。他世帯のIDは <code>404</code>。</p>
@@ -734,6 +752,16 @@ hr {
 <p><strong>処理:</strong> 自世帯の<strong>有効カテゴリ名</strong>を Claude に渡し、返った <code>categoryName</code> を完全一致で id に解決。</p>
 <p><strong>レスポンス:</strong> <code>{ amount: number|null, storeName: string|null, spentAt: "YYYY-MM-DD"|null, categoryId: string|null }</code></p>
 <p><strong>エラー:</strong> 残高不足/認証/混雑(429)を切り分けて <code>502</code> + <code>{ error }</code>（クライアントに原因を表示）。</p>
+</div>
+
+<div class="endpoint" id="api-statement">
+<h4><span class="method method-post">POST</span> /api/statement</h4>
+<p>クレジットカードの<strong>利用明細PDF</strong>から利用明細行を<strong>一括で構造化抽出</strong>（Claude の document ブロック）。<strong>PDFは保存しない</strong>（抽出のみ、送信後 base64 を破棄）。<code>src/lib/statement.ts</code> の <code>extractStatement()</code> が structured outputs で <code>rows[]</code>（<code>amount</code> / <code>spentAt</code> / <code>storeName</code> / <code>categoryName</code>）を返す。明細は数十〜100行になるため <code>max_tokens: 8192</code>。</p>
+<p><strong>必須環境変数:</strong> <code>ANTHROPIC_API_KEY</code>（未設定は <code>503</code>）。モデルは <code>STATEMENT_MODEL</code>（既定 <code>claude-sonnet-4-6</code>。表抽出の安定性を優先。Haiku でコスト比較も可）。</p>
+<p><strong>ボディ:</strong> <code>{ pdfBase64 }</code>（上限 6MB 相当。超過は <code>413</code>、欠落は <code>400</code>）</p>
+<p><strong>処理:</strong> 自世帯の<strong>有効カテゴリ名</strong>を渡して <code>categoryName</code> を id に解決し、対象期間の既存支出と突合して<strong>重複候補</strong>に <code>duplicateLikely</code> を付与（<code>src/lib/duplicate.ts</code>、同日×同額×店名近似。<strong>除外はせずユーザー判断</strong>）。</p>
+<p><strong>レスポンス:</strong> <code>{ rows: [{ amount, spentAt, storeName, categoryId, duplicateLikely }] }</code></p>
+<p><strong>エラー:</strong> OCR と同様に残高不足/認証/混雑(429)、および抽出側の拒否・<code>max_tokens</code>（明細が長すぎ）・空応答を切り分けて <code>502</code> + <code>{ error }</code>。集計/管理行（請求額合計・繰越・手数料等）はプロンプトで除外指示。</p>
 </div>
 </section>
 
@@ -857,7 +885,7 @@ hr {
   <li><strong>認証・複数ユーザー</strong>:
     個人アカウントは持たず、保護は<strong>世帯共有の世帯コード</strong>のみ（<code>src/lib/auth.ts</code> の <code>getHouseholdId()</code> に集約）。</li>
   <li><strong>OCR レシート読み取り</strong>: <strong>実装済み</strong>（<code>POST /api/ocr</code> + <code>src/lib/ocr.ts</code>、Claude ビジョン）。<strong>画像は保存しない</strong>方針のため <code>Expense.receiptImageUrl</code> / <code>ocrRawText</code> は引き続き未使用。</li>
-  <li><strong>クレカ明細の一括取り込み</strong>: 未実装（Phase2 予定）。iPhone での CSV/PDF 取り回しが課題のため後回し。抽出土台（<code>lib/ocr.ts</code>）は再利用可能。</li>
+  <li><strong>クレカ明細の一括取り込み</strong>: <strong>実装済み</strong>（<code>POST /api/statement</code> + <code>src/lib/statement.ts</code>、Claude の document(PDF) 抽出。既定モデル <code>STATEMENT_MODEL</code>＝<code>claude-sonnet-4-6</code>）。ホームのヘッダ左「フォルダ」アイコン → PDF ピッカー → 抽出 → プレビューシート（行ごとに編集／除外、重複候補は <code>duplicateLikely</code> で警告）→ <code>POST /api/expenses/batch</code> で一括登録。<strong>PDFは保存しない</strong>。重複判定は <code>src/lib/duplicate.ts</code>（同日×同額×店名近似、除外せずユーザー判断）。</li>
   <li><strong>通知</strong>: <code>Household.notificationDay</code> / <code>notificationTime</code> はフィールドのみ。送信ロジックなし。</li>
   <li><strong>カテゴリの追加・削除・並び替え</strong>: <strong>16スロット固定</strong>のため不可。名前変更・有効/無効の切替は実装済み（設定モーダル）。</li>
   <li><strong>予算機能</strong>: 未実装。</li>
@@ -868,6 +896,18 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-06-10 — クレカ明細PDF取り込み（抽出→プレビュー編集→一括登録）</h3>
+<p><span class="badge badge-major">major</span> Phase2 として保留していたクレカ明細の一括取り込みを実装。PR #48。</p>
+<ul>
+  <li><strong>抽出</strong>: <code>POST /api/statement</code> + <code>src/lib/statement.ts</code>（<code>extractStatement</code>）。PDF base64 を Claude の document ブロックに渡し、利用明細行を structured outputs で抽出（既定 <code>STATEMENT_MODEL</code>＝<code>claude-sonnet-4-6</code>、<code>max_tokens 8192</code>）。<strong>PDFは保存しない</strong></li>
+  <li><strong>重複候補</strong>: <code>src/lib/duplicate.ts</code>（<code>markDuplicates</code> / <code>findDuplicateFlags</code>）。対象期間の既存支出と同日×同額×店名近似で突合し <code>duplicateLikely</code> を付与。<strong>除外せずユーザー判断</strong>（プレビューで警告）</li>
+  <li><strong>一括登録</strong>: <code>POST /api/expenses/batch</code>。全行を <code>validateExpenseInput</code> で検証し<strong>1件でも失敗なら何も作らず errors を返す</strong>（全成功か全失敗）。成功時は <code>prisma.$transaction</code> で一括 create、上限500件</li>
+  <li><strong>動線/UI</strong>: ホームのヘッダ左「フォルダ」アイコン（<code>statement-import-button.tsx</code>）→ PDFピッカー → 抽出 → プレビューシート（<code>statement-preview-sheet.tsx</code>、行ごとに金額・日付・店名・カテゴリを編集／除外）→ 一括登録。状態は <code>StatementImportProvider</code>（<code>ExpenseModalProvider</code> の内側でカテゴリ先読み・登録後の一覧再取得を借りる）</li>
+  <li>テスト: <code>statement.test.ts</code>（SDKモック）/ <code>api/statement</code>・<code>api/expenses/batch</code> のルートテスト / <code>duplicate.test.ts</code></li>
+</ul>
+
+<hr>
 
 <h3>2026-06-09 — UX改善まとめ（トースト位置 / 削除確認 / iOSスクロール / ヘッダキャラ）</h3>
 <p><span class="badge badge-minor">minor</span> 細かな使い勝手の改善をまとめて反映。コミット 2fac447 / e8b949d。</p>

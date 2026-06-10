@@ -14,12 +14,7 @@ import {
   type ExpenseFormValues,
   type ExpenseFormInitial,
 } from "@/components/expense-form";
-import {
-  todayJst,
-  lastDayOfMonth,
-  parseReceiptDate,
-  splitYmd,
-} from "@/lib/date";
+import { todayJst, lastDayOfMonth, parseReceiptDate, splitYmd } from "@/lib/date";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
 import { useToast, Toast } from "@/components/toast";
 import { useCategoryCache } from "@/components/use-category-cache";
@@ -86,7 +81,7 @@ export function useExpenseModal(): ContextValue {
 function buildFormInitial(active: ActiveState): ExpenseFormInitial {
   if (active.mode === "edit") {
     const e = active.expense;
-    const [y, m, d] = e.spentAt.split("-").map(Number);
+    const [y, m, d] = splitYmd(e.spentAt);
     return {
       id: e.id,
       year: y,

@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 // 各 API は cookie から世帯を特定する。cookie 無し＝未保存＝データを返さない。
 export const HOUSEHOLD_COOKIE = "household";
 
+// 入力者（夫/妻）の端末ごと設定。1=♂ / 2=♀。設定モーダルで選び、新規登録時に付与する。
+export const ENTERED_BY_COOKIE = "enteredBy";
+
 // getDemoUserId が引くデモユーザーの email。seed が作成するユーザーと一致させる。
 const DEMO_USER_EMAIL = "demo@example.com";
 
@@ -15,6 +18,13 @@ export async function getHouseholdId(): Promise<string | null> {
   const store = await cookies();
   const raw = store.get(HOUSEHOLD_COOKIE)?.value;
   return raw ? decodeURIComponent(raw) : null;
+}
+
+// 入力者 cookie を取り出す。未設定・不正値は null（"1"→1 / "2"→2 のみ）。
+export async function getEnteredBy(): Promise<1 | 2 | null> {
+  const store = await cookies();
+  const raw = store.get(ENTERED_BY_COOKIE)?.value;
+  return raw === "1" ? 1 : raw === "2" ? 2 : null;
 }
 
 let cachedDemoUserId: string | null = null;

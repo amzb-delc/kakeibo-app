@@ -1,6 +1,13 @@
-import { describe, it, expect } from "vitest";
-import { markDuplicates } from "@/lib/duplicate";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { StatementRow } from "@/types/api";
+
+// findDuplicateFlags は prisma.expense.findMany を使う（markDuplicates は prisma 非依存）。
+const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
+vi.mock("@/lib/prisma", () => ({
+  prisma: { expense: { findMany } },
+}));
+
+import { markDuplicates, findDuplicateFlags } from "@/lib/duplicate";
 
 function row(p: Partial<StatementRow>): StatementRow {
   return {
@@ -77,5 +84,51 @@ describe("markDuplicates", () => {
     );
     expect(res[0].duplicateLikely).toBe(false);
     expect(res[1].duplicateLikely).toBe(false);
+  });
+});
+
+describe("findDuplicateFlags（prisma 突合）", () => {
+  beforeEach(() => {
+    findMany.mockReset();
+  });
+
+  it("有効な日付が1件も無ければ prisma を呼ばず全件 false", async () => {
+    const res = await findDuplicateFlags("hh-1", [
+      row({ spentAt: "" }),
+      row({ spentAt: "2026-13-40" }), // 実在しない日付 → parseReceiptDate が null
+    ]);
+    expect(findMany).not.toHaveBeenCalled();
+    expect(res.every((r) => r.duplicateLikely === false)).toBe(true);
+  });
+
+  it("対象期間の既存支出と突合して重複フラグを付ける（世帯スコープ＋日付範囲でクエリ）", async () => {
+    findMany.mockResolvedValue([
+      // JST のいずれかの瞬間。formatJstDate で "2026-05-03" になる。
+      { amount: 1000, spentAt: new Date("2026-05-03T12:00:00+09:00"), storeName: "セブン" },
+    ]);
+    const rows = [
+      row({ spentAt: "2026-05-03", amount: 1000, storeName: "セブン" }), // 重複
+      row({ spentAt: "2026-05-04", amount: 2000, storeName: "ローソン" }), // 非重複
+    ];
+    const res = await findDuplicateFlags("hh-1", rows);
+    expect(res[0].duplicateLikely).toBe(true);
+    expect(res[1].duplicateLikely).toBe(false);
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    const arg = findMany.mock.calls[0][0];
+    expect(arg.where.householdId).toBe("hh-1");
+    expect(arg.where.spentAt.gte).toBeInstanceOf(Date);
+    expect(arg.where.spentAt.lt).toBeInstanceOf(Date);
+    // 期間は [min 00:00(JST), max+1日 00:00(JST)) なので lt > gte。
+    expect(arg.where.spentAt.lt.getTime()).toBeGreaterThan(
+      arg.where.spentAt.gte.getTime()
+    );
+  });
+
+  it("既存支出が無ければ全件 false（クエリは走る）", async () => {
+    findMany.mockResolvedValue([]);
+    const res = await findDuplicateFlags("hh-1", [row({ spentAt: "2026-05-03" })]);
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(res[0].duplicateLikely).toBe(false);
   });
 });

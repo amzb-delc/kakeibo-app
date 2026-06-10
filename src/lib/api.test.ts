@@ -6,7 +6,12 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 import { getHouseholdId } from "@/lib/auth";
-import { jsonError, parseJsonBody, requireHouseholdId } from "./api";
+import {
+  jsonError,
+  parseJsonBody,
+  requireHouseholdId,
+  checkContentLength,
+} from "./api";
 
 const mockGetHouseholdId = vi.mocked(getHouseholdId);
 
@@ -41,6 +46,26 @@ describe("parseJsonBody", () => {
     const result = await parseJsonBody(makeReq("5"));
     expect(result).toBeInstanceOf(Response);
     expect((result as Response).status).toBe(400);
+  });
+});
+
+describe("checkContentLength", () => {
+  const reqWith = (headers: Record<string, string>) =>
+    new Request("http://test/api", { method: "POST", headers });
+
+  it("Content-Length が上限超なら 413", () => {
+    const res = checkContentLength(reqWith({ "content-length": "2000" }), 1000);
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(413);
+  });
+
+  it("上限以下なら null（素通し）", () => {
+    expect(checkContentLength(reqWith({ "content-length": "500" }), 1000)).toBeNull();
+  });
+
+  it("ヘッダ欠落・非数値は null（後段チェックに委ねる）", () => {
+    expect(checkContentLength(reqWith({}), 1000)).toBeNull();
+    expect(checkContentLength(reqWith({ "content-length": "abc" }), 1000)).toBeNull();
   });
 });
 
