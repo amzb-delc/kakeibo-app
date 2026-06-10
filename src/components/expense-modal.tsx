@@ -4,23 +4,25 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
 } from "react";
-import { Lock, Trash2, Unlock } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import {
   ExpenseForm,
   type ExpenseFormValues,
   type ExpenseFormInitial,
 } from "@/components/expense-form";
-import { Switch } from "@/components/ui/switch";
-import { ReceiptCaptureButton } from "@/components/receipt-capture-button";
-import { formatYen } from "@/lib/format";
-import { todayJst, lastDayOfMonth, parseReceiptDate, splitYmd } from "@/lib/date";
+import { todayJst, lastDayOfMonth, parseReceiptDate } from "@/lib/date";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
 import { useToast, Toast } from "@/components/toast";
 import { useCategoryCache } from "@/components/use-category-cache";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  CreateHeaderActions,
+  DeleteConfirmDetail,
+} from "@/components/expense-modal-parts";
 import type { Category } from "@/types";
 import type { OcrResult } from "@/types/api";
 
@@ -70,6 +72,48 @@ export function useExpenseModal(): ContextValue {
     throw new Error("useExpenseModal は ExpenseModalProvider の内側で使ってください");
   }
   return ctx;
+}
+
+// active から ExpenseForm の初期値を導出する純関数。
+function buildFormInitial(active: ActiveState): ExpenseFormInitial {
+  if (active.mode === "edit") {
+    const e = active.expense;
+    const [y, m, d] = e.spentAt.split("-").map(Number);
+    return {
+      id: e.id,
+      year: y,
+      month: m,
+      day: d,
+      categoryId: e.categoryId,
+      amount: String(e.amount),
+      storeName: e.storeName ?? "",
+      memo: e.memo ?? "",
+    };
+  }
+  return {
+    year: active.year,
+    month: active.month,
+    day: active.day,
+    categoryId: active.categoryId,
+    amount: "",
+    storeName: "",
+    memo: "",
+  };
+}
+
+// フォームの選択肢を導出する純関数。新規は有効カテゴリのみ。編集は現カテゴリが
+// 無効化済みでも選択肢に残す（過去の支出を編集してもカテゴリが消えない＝表示を変えないため）。
+function resolveFormCategories(
+  categories: Category[],
+  active: ActiveState
+): Category[] {
+  const enabled = categories.filter((c) => c.enabled);
+  if (active.mode !== "edit") return enabled;
+  const current = categories.find((c) => c.id === active.expense.categoryId);
+  if (current && !current.enabled) {
+    return [...enabled, current].sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+  return enabled;
 }
 
 export function ExpenseModalProvider({ children }: { children: React.ReactNode }) {
@@ -207,43 +251,16 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
   const isEditMode = active?.mode === "edit";
   const title = isEditMode ? "支出を編集" : "支出を登録";
 
-  let initial: ExpenseFormInitial | null = null;
-  if (active?.mode === "edit") {
-    const [y, m, d] = splitYmd(active.expense.spentAt);
-    initial = {
-      id: active.expense.id,
-      year: y,
-      month: m,
-      day: d,
-      categoryId: active.expense.categoryId,
-      amount: String(active.expense.amount),
-      storeName: active.expense.storeName ?? "",
-      memo: active.expense.memo ?? "",
-    };
-  } else if (active?.mode === "create") {
-    initial = {
-      year: active.year,
-      month: active.month,
-      day: active.day,
-      categoryId: active.categoryId,
-      amount: "",
-      storeName: "",
-      memo: "",
-    };
-  }
-
-  // フォームの選択肢: 新規は有効カテゴリのみ。編集は現カテゴリが無効化済みでも
-  // 選択肢に残す（過去の支出を編集してもカテゴリが消えない＝表示を変えないため）。
-  const enabledCategories = categories.filter((c) => c.enabled);
-  let formCategories = enabledCategories;
-  if (active?.mode === "edit") {
-    const current = categories.find((c) => c.id === active.expense.categoryId);
-    if (current && !current.enabled) {
-      formCategories = [...enabledCategories, current].sort(
-        (a, b) => a.sortOrder - b.sortOrder
-      );
-    }
-  }
+  // ExpenseForm の初期値・選択肢は active から純関数で導出する（導出ロジックは
+  // モジュールスコープの buildFormInitial / resolveFormCategories にまとめてある）。
+  const initial = useMemo(
+    () => (active ? buildFormInitial(active) : null),
+    [active]
+  );
+  const formCategories = useMemo(
+    () => (active ? resolveFormCategories(categories, active) : []),
+    [categories, active]
+  );
 
   return (
     <ExpenseModalContext.Provider
@@ -282,29 +299,12 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
                 <Trash2 className="w-5 h-5" />
               </button>
             ) : (
-              // 新規時: レシート撮影（カメラ）＋ 連続入力（ロック）トグル。
-              // 錠アイコンはスイッチのトラック内・サムの反対側の余白に描く
-              // （OFF=右に開錠 Unlock / ON=左に閉錠 Lock）。
-              <div className="flex items-center gap-0.5">
-                <ReceiptCaptureButton
-                  onResult={applyHeaderOcr}
-                  onError={showToast}
-                />
-                <Switch
-                  checked={keepOpen}
-                  onCheckedChange={setKeepOpen}
-                  aria-label="連続入力（保存後も続けて入力）"
-                >
-                  <Lock
-                    className="pointer-events-none absolute left-1.5 top-1/2 size-4 -translate-y-1/2 text-white group-data-[unchecked]:hidden"
-                    aria-hidden="true"
-                  />
-                  <Unlock
-                    className="pointer-events-none absolute right-1.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground group-data-[checked]:hidden"
-                    aria-hidden="true"
-                  />
-                </Switch>
-              </div>
+              <CreateHeaderActions
+                keepOpen={keepOpen}
+                onKeepOpenChange={setKeepOpen}
+                onOcrResult={applyHeaderOcr}
+                onError={showToast}
+              />
             )
           }
         >
@@ -330,18 +330,9 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
       {/* 削除確認ダイアログ（シートより前面）。対象の具体情報（日付・カテゴリ・金額・店名）を掲出。 */}
       {active?.mode === "edit" && confirmingDelete && (
         <ConfirmDialog
-          detail={(() => {
-            const e = active.expense;
-            const [, m, d] = e.spentAt.split("-").map(Number);
-            const catName =
-              categories.find((c) => c.id === e.categoryId)?.name ?? "未分類";
-            return (
-              <span className="font-medium">
-                {m}月{d}日・{catName}・{formatYen(e.amount)}
-                {e.storeName ? `（${e.storeName}）` : ""}
-              </span>
-            );
-          })()}
+          detail={
+            <DeleteConfirmDetail expense={active.expense} categories={categories} />
+          }
           title="この支出を削除しますか？"
           description="削除すると元に戻せません。"
           confirmLabel="削除する"
