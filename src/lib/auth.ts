@@ -19,8 +19,16 @@ export async function getHouseholdId(): Promise<string | null> {
   const store = await cookies();
   const raw = store.get(HOUSEHOLD_COOKIE)?.value;
   if (!raw) return null;
+  // SEC-7: 不正な %エンコーディング（例 "household=%"）は decodeURIComponent が
+  // URIError を投げる → 全データ API が未捕捉 500 になるので null（未保存扱い）に倒す。
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
   // 署名検証（SEC-3）。改竄・未署名の旧 cookie は null（＝未保存扱い、要再保存）。
-  return verifySession(decodeURIComponent(raw));
+  return verifySession(decoded);
 }
 
 // 入力者 cookie を取り出す。未設定・不正値は null（"1"→1 / "2"→2 のみ）。

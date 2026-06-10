@@ -127,7 +127,7 @@ describe("POST /api/session（世帯コード保存）", () => {
 
 describe("DELETE /api/session（クリア）", () => {
   it("世帯コードと入力者の cookie を両方破棄する（maxAge=0）", async () => {
-    const res = await DELETE();
+    const res = await DELETE(jsonReq(URL, {}, "DELETE"));
     expect(await res.json()).toEqual({ ok: true });
     const household = res.cookies.get("household");
     expect(household?.value).toBe("");

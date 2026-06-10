@@ -3,11 +3,19 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { validateCategoryPatch } from "@/lib/categories";
 import { isRequiredSlot } from "@/lib/category-constants";
-import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
+import {
+  requireHouseholdId,
+  parseJsonBody,
+  jsonError,
+  requireSameOrigin,
+} from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   const householdId = await requireHouseholdId();
   if (householdId instanceof NextResponse) return householdId;
 

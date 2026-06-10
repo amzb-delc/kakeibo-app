@@ -6,7 +6,7 @@ import {
   getHouseholdId,
   getEnteredBy,
 } from "@/lib/auth";
-import { jsonError, parseJsonBody } from "@/lib/api";
+import { jsonError, parseJsonBody, requireSameOrigin } from "@/lib/api";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { DEFAULT_HOUSEHOLD_ID } from "@/lib/household-defaults";
 import { signSession } from "@/lib/cookie-sign";
@@ -67,6 +67,9 @@ export async function GET() {
 
 // 入力者（夫/妻）を端末に保存。1=♂ / 2=♀ のみ受け付ける。
 export async function PATCH(req: NextRequest) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   const body = await parseJsonBody(req);
   if (body instanceof NextResponse) return body;
 
@@ -84,6 +87,9 @@ export async function PATCH(req: NextRequest) {
 
 // 保存: 世帯コード（= household.id）を照合し、一致すれば cookie を発行
 export async function POST(req: NextRequest) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   // SEC-1: 同一 IP からの試行をレート制限（DB 照合の前に弾く）
   const limit = rateLimit(`session:${getClientIp(req)}`, UNLOCK_RATE_LIMIT);
   if (!limit.ok) {
@@ -128,7 +134,10 @@ export async function POST(req: NextRequest) {
 }
 
 // クリア: 世帯コードと入力者の cookie をどちらも破棄（端末リセットを一貫させる）
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   const res = NextResponse.json({ ok: true });
   res.cookies.set(HOUSEHOLD_COOKIE, "", cookieOptions(0));
   res.cookies.set(ENTERED_BY_COOKIE, "", cookieOptions(0));

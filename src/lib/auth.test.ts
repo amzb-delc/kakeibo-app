@@ -32,6 +32,11 @@ describe("getHouseholdId", () => {
     get.mockReturnValue({ value: encodeURIComponent("夫婦の合言葉") });
     expect(await getHouseholdId()).toBeNull();
   });
+
+  it("不正な %エンコーディングは throw せず null（SEC-7）", async () => {
+    get.mockReturnValue({ value: "%" }); // decodeURIComponent が URIError を投げる値
+    expect(await getHouseholdId()).toBeNull();
+  });
 });
 
 describe("getEnteredBy", () => {

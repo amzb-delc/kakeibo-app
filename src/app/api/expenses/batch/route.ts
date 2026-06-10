@@ -2,13 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDemoUserId, getEnteredBy } from "@/lib/auth";
 import { validateExpenseInput } from "@/lib/expenses";
-import { requireHouseholdId, parseJsonBody, jsonError } from "@/lib/api";
+import {
+  requireHouseholdId,
+  parseJsonBody,
+  jsonError,
+  requireSameOrigin,
+} from "@/lib/api";
 import type { BatchExpenseResult } from "@/types/api";
 
 // 一括登録は明細取り込み用。1リクエストの上限（暴発防止）。
 const MAX_ROWS = 500;
 
 export async function POST(req: NextRequest) {
+  const csrf = requireSameOrigin(req); // SEC-6
+  if (csrf) return csrf;
+
   const householdId = await requireHouseholdId();
   if (householdId instanceof NextResponse) return householdId;
 
