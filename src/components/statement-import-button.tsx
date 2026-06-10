@@ -12,11 +12,14 @@ const PICKER_DELAY_MS = 700;
 
 // ホームのヘッダ左に置く「フォルダ」アイコンボタン。
 // タップで PDF ファイルピッカー → 抽出 → プレビューシートを開く。
-// 抽出中の「考え中」表示は右ヘッダのキャラ（HeaderCharacter）側で出す。
+// 保持中の取り込みデータがある（pendingCount > 0）ときは再抽出せずプレビューを開き直し、
+// 件数バッジを表示する。抽出中の「考え中」表示は右ヘッダのキャラ側で出す。
 // 未保存（unlocked でない）ときは呼び出し側（page.tsx）で非表示にする。
 export function StatementImportButton({ className }: { className?: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const { importFile, importing, notify } = useStatementImportPreview();
+  const { importFile, pendingCount, reopen, notify } =
+    useStatementImportPreview();
+  const hasPending = pendingCount > 0;
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -26,6 +29,11 @@ export function StatementImportButton({ className }: { className?: string }) {
   };
 
   const handleClick = () => {
+    // 保持データがあれば再抽出せず開き直す（誤操作×からの復帰）。
+    if (hasPending) {
+      reopen();
+      return;
+    }
     notify("PDFヲエランデクダサイ");
     // トーストを一瞬見せてからピッカーを開く（iOS では開かない可能性あり・要実機確認）
     setTimeout(() => inputRef.current?.click(), PICKER_DELAY_MS);
@@ -40,18 +48,31 @@ export function StatementImportButton({ className }: { className?: string }) {
         className="hidden"
         onChange={handleFile}
       />
-      <button
-        type="button"
-        aria-label="クレジットカード明細を取り込む"
-        disabled={importing}
-        onClick={handleClick}
-        className={cn(
-          "w-11 h-11 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50",
-          className
+      <span className="relative inline-flex">
+        <button
+          type="button"
+          aria-label={
+            hasPending
+              ? `取り込み中の明細を開く（${pendingCount}件）`
+              : "クレジットカード明細を取り込む"
+          }
+          onClick={handleClick}
+          className={cn(
+            "w-11 h-11 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors",
+            className
+          )}
+        >
+          <FolderInput className="size-6" aria-hidden="true" />
+        </button>
+        {hasPending && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0.5 right-0.5 min-w-[1.05rem] h-[1.05rem] px-1 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-none tabular-nums"
+          >
+            {pendingCount}
+          </span>
         )}
-      >
-        <FolderInput className="size-6" aria-hidden="true" />
-      </button>
+      </span>
     </>
   );
 }
