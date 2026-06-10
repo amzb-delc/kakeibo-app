@@ -9,6 +9,7 @@ import {
   formatJstDateLabel,
   parseReceiptDate,
   clampDay,
+  splitYmd,
 } from "./date";
 
 describe("pad2", () => {
@@ -16,6 +17,13 @@ describe("pad2", () => {
     expect(pad2(0)).toBe("00");
     expect(pad2(3)).toBe("03");
     expect(pad2(12)).toBe("12");
+  });
+});
+
+describe("splitYmd", () => {
+  it("YYYY-MM-DD を [年, 月, 日] の数値タプルに分解する", () => {
+    expect(splitYmd("2026-06-10")).toEqual([2026, 6, 10]);
+    expect(splitYmd("2026-01-03")).toEqual([2026, 1, 3]);
   });
 });
 

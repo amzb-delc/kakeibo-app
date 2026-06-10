@@ -168,7 +168,7 @@ export function ExpenseModalProvider({ children }: { children: React.ReactNode }
 
   const openCreate = useCallback(
     (opts?: { ocr?: OcrResult | null; keepOpen?: boolean }) => {
-      const [ty, tm, td] = todayJst().split("-").map(Number);
+      const [ty, tm, td] = splitYmd(todayJst());
       const ctx = composeRef.current;
       let year = ctx?.year ?? ty;
       let month = ctx?.month ?? tm;

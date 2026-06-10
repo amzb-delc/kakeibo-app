@@ -42,3 +42,6 @@ next-env.d.ts
 
 # obsidian (local notes config)
 .obsidian/
+
+# クレカ明細など個人の取り込み元PDF（OCR検証用にローカルに置くが、コミットしない）
+/statement_*.pdf

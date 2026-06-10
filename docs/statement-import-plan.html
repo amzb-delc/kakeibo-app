@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿アプリ — クレカ明細PDF取り込み 実装プラン</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+  --decide-bg: #fee2e2;
+  --decide-fg: #991b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+    --decide-bg: #450a0a;
+    --decide-fg: #fca5a5;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+.backlink {
+  display: inline-block; margin-bottom: 16px; color: var(--primary);
+  text-decoration: none; font-size: 13px;
+}
+.backlink:hover { text-decoration: underline; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 8px 0; }
+a { color: var(--primary); }
+code {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+pre {
+  background: var(--code-bg); padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 12px 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--primary);
+  background: var(--card); border-radius: 0 8px 8px 0; color: var(--muted);
+  font-size: 14px;
+}
+blockquote strong { color: var(--fg); }
+ul { margin: 8px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px;
+  background: var(--card); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); font-weight: 600; white-space: nowrap; }
+td.c { text-align: center; white-space: nowrap; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-todo { background: var(--todo-bg); color: var(--todo-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.b-decide { background: var(--decide-bg); color: var(--decide-fg); }
+.rec { color: var(--success); font-weight: 600; }
+.muted { color: var(--muted); }
+del { color: var(--muted); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+.decision {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--destructive); border-radius: 0 8px 8px 0;
+  padding: 12px 16px; margin: 14px 0;
+}
+.decision h3 { margin-top: 0; }
+.decision.decided { border-left-color: var(--success); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="backlink" href="spec.html">← MVP仕様書へ戻る</a>
+<h1>クレカ明細PDF取り込み — 実装プラン</h1>
+
+<blockquote>
+作成: 2026-06-09。<strong>ステータス: 設計中（実装未着手）</strong>。<br>
+レシートOCRパイプライン（<code>lib/ocr.ts</code>）を踏襲し、<strong>カード明細PDFをClaudeで構造化抽出 → プレビュー編集 → 一括登録</strong>する。CLAUDE.md で Phase2 に後回しだった機能。<br>
+<strong>3論点 確定済み（2026-06-09）</strong>: 入口=設定モーダル内＋ピッカー自動オープン / 返金マイナス行=取込OFF既定で除外 / 一括登録=全行ロールバック＋プレビュー行トグル。末尾「決定事項」参照。<strong>実装に入れる状態。</strong>
+</blockquote>
+
+<h2>Context（なぜ作るか）</h2>
+<p>日々の支出はレシートOCR・手入力でカバーできているが、<strong>クレジットカード払いは明細が後からまとめて来る</strong>ため取りこぼしやすい。月次でカード明細PDFを丸ごと取り込めれば、記録漏れが大幅に減る。当初は「iPhoneでのCSV/PDF取り回しが課題」で Phase2 送りだったが、<strong>ただのファイルピッカー（<code>&lt;input type="file" accept="application/pdf"&gt;</code>）で iOS Safari / PWA から明細PDFを選べる</strong>ことが確認できたため着手する（iOS は Web Share Target 非対応なので共有シート連携はしない）。</p>
+
+<h2>確定要件（ヒアリング済み）</h2>
+<table>
+<thead><tr><th>項目</th><th>決定</th></tr></thead>
+<tbody>
+<tr><td>入力形式</td><td><strong>PDFのみ</strong>（初版）。パスワードなし前提。</td></tr>
+<tr><td>入力UI</td><td><strong>ホームのヘッダ左のフォルダアイコン</strong>からファイルピッカー（<code>accept="application/pdf"</code>）。既存 <code>receipt-capture-button.tsx</code> 構造を流用。<code>capture</code> 属性は付けない。</td></tr>
+<tr><td>発行元</td><td><strong>複数社混在</strong> → 社別パーサは作らず、PDFをClaudeに渡して汎用抽出。</td></tr>
+<tr><td>パース</td><td>Anthropic API の <strong>document(PDF)ブロック</strong>でPDFを直接渡し、<strong>structured outputs（json_schema）</strong>で明細行の配列を抽出。<code>lib/ocr.ts</code> の <code>extractReceipt</code> を踏襲。</td></tr>
+<tr><td>登録フロー</td><td>抽出結果を<strong>一覧プレビュー → 各行を確認・編集（金額/日付/カテゴリ/取込ON-OFF）→ 一括登録</strong>。</td></tr>
+<tr><td>重複対応</td><td><strong>警告表示のみ</strong>（既存支出と日付×金額×店名が近い行に「重複かも」バッジ。除外はせずユーザー判断）。</td></tr>
+</tbody>
+</table>
+
+<h2>全体フロー</h2>
+<pre><code>ファイル選択              クライアント                  サーバ                      Claude
+&lt;input pdf&gt;  ──▶ StatementImportButton
+                  File → base64（縮小なし）
+                  ▼
+                useStatementImport.read(file)
+                  POST /api/statement ──────▶ /api/statement/route.ts
+                                               requireHouseholdId() 401
+                                               ANTHROPIC_API_KEY チェック
+                                               有効カテゴリ取得
+                                               extractStatement() ───────▶ messages.create
+                                                 document(PDF)+json_schema     PDF base64 + schema
+                                               ◀──────────────────────────── rows[] (JSON)
+                                               categoryName→categoryId 解決
+                                               findDuplicateFlags(既存と突合)
+                  ◀──────────────────────────  StatementExtractResult
+                StatementPreviewSheet（BottomSheet・90vh）
+                  各行: 取込トグル / 金額 / 日付 / カテゴリ / 重複バッジ
+                  ▼ 「一括登録」
+                  POST /api/expenses/batch ─▶ /api/expenses/batch/route.ts
+                    {rows: 取込ON行のみ}        requireHouseholdId()
+                                               各行 validateExpenseInput()
+                                               prisma.$transaction で一括 create
+                  ◀──────────────────────────  {created, errors}
+                mutationVersion++ → ホーム月次サマリー自動再取得 → トースト → シート閉じ</code></pre>
+
+<h2>入口の置き場所</h2>
+<p>現状フッタは <strong>左=設定 / 中央=FAB / 右=レシートOCRカメラ</strong>で3スロット埋まっている。一方、<strong>ホームのヘッダは左スロットが空いている</strong>（ホームは戻るボタンが無いため <code>backHref</code> 無し＝左 <code>w-11</code> が空き、<code>page-header.tsx:31-41</code>）。ここを使う。</p>
+<p><span class="badge b-done">✅ 決定</span> <strong>ホームのヘッダ左スロットに「フォルダ」アイコン</strong>（<code>page-header.tsx</code> に <code>left?</code> プロップ追加）。タップで<strong>ファイルピッカー → プレビュー</strong>。<strong>未保存（<code>unlocked</code> でない）ときは非表示</strong>（FAB/カメラと同じガード）。右スロットの <code>HeaderCharacter</code> と左右バランスも取れる。</p>
+<p class="muted"><strong>iOS制約メモ:</strong> 「指定フォルダを自動で読む」（File System Access API）は iOS Safari / PWA 非対応のため不可。iOSの手数下限は「ピッカーで1タップ選択」。将来の自動取り込み（iOSショートカット→<code>/api/statement</code> POST、またはクラウドフォルダのバックエンド監視）は <code>/api/statement</code> を再利用できる形にしておき、別フェーズ・ホスティング決定後に検討。</p>
+
+<h2>新規 / 変更ファイル</h2>
+<h3>新規（lib）</h3>
+<table>
+<thead><tr><th>パス</th><th>役割</th></tr></thead>
+<tbody>
+<tr><td><code>src/lib/statement.ts</code></td><td><code>extractStatement({pdfBase64, categoryNames})</code>。<code>lib/ocr.ts:52-107</code> の <code>extractReceipt</code> を踏襲し、document(PDF)ブロック + <code>output_config</code> json_schema で明細行配列を抽出。<code>STATEMENT_SCHEMA</code>・<code>StatementExtraction</code> 型・refusal/空/<code>max_tokens</code> エラー処理を内包。モデル定数 <code>STATEMENT_MODEL</code> もここ。</td></tr>
+<tr><td><code>src/lib/duplicate.ts</code></td><td><code>markDuplicates(rows, existing)</code>（純関数・prisma非依存）＋ <code>findDuplicateFlags(householdId, rows)</code>（prisma突合）。各行に <code>duplicateLikely</code> を付与。</td></tr>
+</tbody>
+</table>
+<h3>新規（API route）</h3>
+<table>
+<thead><tr><th>パス</th><th>役割</th></tr></thead>
+<tbody>
+<tr><td><code>src/app/api/statement/route.ts</code></td><td>抽出API。<code>api/ocr/route.ts</code> 踏襲: <code>requireHouseholdId()</code>・APIキーチェック・サイズ上限・カテゴリ取得 → <code>extractStatement</code> → categoryName→categoryId 解決 → <code>findDuplicateFlags</code> → 返却。Anthropic例外処理（401/credit/429→502）も流用。</td></tr>
+<tr><td><code>src/app/api/expenses/batch/route.ts</code></td><td>一括登録API。<code>requireHouseholdId()</code> → 各行 <code>validateExpenseInput(row,{partial:false,householdId})</code> → <code>prisma.$transaction</code> で一括 create → <code>{created, errors}</code>。<code>api/expenses/route.ts</code> の多行版。</td></tr>
+</tbody>
+</table>
+<h3>新規（クライアント）</h3>
+<table>
+<thead><tr><th>パス</th><th>役割</th></tr></thead>
+<tbody>
+<tr><td><code>src/components/use-statement-import.ts</code></td><td><code>use-receipt-ocr.ts</code> 踏襲。File→base64（縮小なし）→ <code>POST /api/statement</code> → 結果を返すフック（<code>loading/error/read</code>）。</td></tr>
+<tr><td><code>src/components/statement-import-button.tsx</code></td><td><code>receipt-capture-button.tsx</code> 踏襲。<strong>ヘッダ左に置く「フォルダ」アイコンボタン（44×44）</strong>＋隠し <code>&lt;input type="file" accept="application/pdf"&gt;</code>。タップ→<code>read</code>→<code>openStatementPreview(rows)</code>。読み取り中はスピナー。</td></tr>
+<tr><td><code>src/components/statement-import-provider.tsx</code></td><td>プレビューシートの開閉状態を持つ Provider。<code>useBottomSheet</code> でシート、<code>useExpenseModal()</code> から <code>openCreate</code>/mutation 通知を借りる。<code>openStatementPreview(rows)</code> を公開。</td></tr>
+<tr><td><code>src/components/statement-preview-sheet.tsx</code></td><td>プレビュー編集UI。<code>BottomSheet</code>（90vh・スクロール）。行ごとに 取込トグル / 金額（<code>inputMode="numeric"</code> 流用）/ 日付（<code>&lt;input type="date"&gt;</code> 推奨・行3ホイールは重い）/ カテゴリ（<code>Select</code> 流用・<strong>有効カテゴリのみ</strong>）/ 重複バッジ。「一括登録」で <code>/api/expenses/batch</code>。</td></tr>
+</tbody>
+</table>
+<h3>変更</h3>
+<table>
+<thead><tr><th>パス</th><th>変更</th></tr></thead>
+<tbody>
+<tr><td><code>src/types/api.ts</code></td><td><code>StatementRow</code> / <code>StatementExtractResult</code> / <code>BatchExpenseRequest</code> / <code>BatchExpenseResult</code> 型を追加。</td></tr>
+<tr><td><code>src/app/layout.tsx</code></td><td><code>StatementImportProvider</code> を <code>SettingsModalProvider</code> と同層（その内側）に追加。<code>useExpenseModal()</code> を呼べる位置。</td></tr>
+<tr><td><code>src/components/page-header.tsx</code></td><td><code>left?: React.ReactNode</code> プロップを追加し、左 <code>w-11</code> スロット（<code>:31-41</code>）に <code>backHref</code> が無いとき <code>left</code> を描画。</td></tr>
+<tr><td><code>src/app/page.tsx</code></td><td><code>&lt;PageHeader&gt;</code>（<code>:159-162</code>）に <code>left={unlocked ? &lt;StatementImportButton/&gt; : null}</code> を渡す。</td></tr>
+</tbody>
+</table>
+
+<h2>配線（Explore調査で確定）</h2>
+<pre><code>SessionProvider
+└─ ExpenseModalProvider   … mutationVersion / categories / refreshCategories / notify を提供
+   └─ SettingsModalProvider
+      └─ StatementImportProvider（新規）… useExpenseModal() を借りられる
+         └─ children（page.tsx）</code></pre>
+<ul>
+  <li><strong>一括登録後のホーム再取得</strong>: <code>ExpenseModalProvider.handleSuccess</code>（<code>expense-modal.tsx:185-203</code>）が <code>mutationVersion</code> を増分。ホーム <code>page.tsx</code> の <code>useMonthlySummary({ mutationVersion, ... })</code> が deps で反応し <code>fetchSummary()</code> 再実行。→ <strong>一括登録完了時に同じ <code>notify</code>/mutation 経路を呼べば自動で一覧更新</strong>。</li>
+  <li><strong>カテゴリSelect</strong>は <code>ExpenseForm</code>（<code>expense-form.tsx:244-270</code>）の実装を流用。<code>useExpenseModal().categories</code> は無効カテゴリも含むので<strong>プレビューでは有効のみにフィルタ</strong>。</li>
+  <li><strong>金額入力</strong>は <code>expense-form.tsx:275-296</code> の数字フィルタ（<code>replace(/[^0-9]/g)</code>・最大9桁）を流用。</li>
+</ul>
+
+<h2>データ契約</h2>
+<h3>抽出API: <code>POST /api/statement</code></h3>
+<pre><code>// リクエスト
+{ pdfBase64: string }   // mediaType は application/pdf 固定
+
+// レスポンス
+type StatementRow = {
+  amount: number | null;       // 円・整数。返金/キャンセルは負（→要決定②）
+  spentAt: string | null;      // YYYY-MM-DD
+  storeName: string | null;
+  categoryId: string | null;   // 世帯カテゴリに解決済み
+  duplicateLikely: boolean;    // サーバ判定
+};
+type StatementExtractResult = { rows: StatementRow[] };</code></pre>
+<h3>structured output schema（<code>lib/statement.ts</code> 内）</h3>
+<p>structured outputs は配列直返しより<strong>オブジェクト直下に配列</strong>が安定（全プロパティ required ＋ <code>additionalProperties:false</code> を満たすため）。<code>minItems/maxItems</code> 等の配列制約は非対応なので、行数はプロンプト指示＋サーバ側チェックで担保。</p>
+<pre><code>{ type: "object", additionalProperties: false,
+  properties: { rows: { type: "array", items: {
+    type: "object", additionalProperties: false,
+    properties: {
+      amount:       { type: ["integer","null"], description: "利用金額(円)。返金はマイナス。読めなければnull" },
+      spentAt:      { type: ["string","null"],  description: "利用日 YYYY-MM-DD" },
+      storeName:    { type: ["string","null"],  description: "利用店名・加盟店名" },
+      categoryName: { type: ["string","null"],  description: "与えたカテゴリ一覧から完全一致で1つ。なければnull" },
+    },
+    required: ["amount","spentAt","storeName","categoryName"],
+  } } },
+  required: ["rows"] }</code></pre>
+<p>ルート側で <code>categoryName → categoryId</code> を解決（<code>api/ocr/route.ts:57-59</code> と同じ <code>categories.find</code> ループ）。</p>
+<h3>一括登録API: <code>POST /api/expenses/batch</code></h3>
+<pre><code>// リクエスト
+{ rows: Array&lt;{ amount, spentAt, categoryId, storeName?, memo? }&gt; }
+// レスポンス
+type BatchExpenseResult = {
+  created: number;
+  errors: Array&lt;{ index: number; message: string }&gt;;
+};</code></pre>
+
+<h2>Anthropic PDF document ブロックの渡し方</h2>
+<p>SDK <code>@anthropic-ai/sdk</code> v0.100.1。<code>extractReceipt</code>（<code>ocr.ts:73-94</code>）の <code>image</code> ブロックを <code>document</code> ブロックに差し替えるだけ。document(PDF) と <code>output_config.format</code>（json_schema）の<strong>併用は可</strong>（PDFは入力側のvision、schemaは出力側の制約で独立）。</p>
+<pre><code>const res = await client.messages.create({
+  model: STATEMENT_MODEL,
+  max_tokens: 8192,               // 明細は数十〜100行。レシートの1024では足りない
+  messages: [{ role: "user", content: [
+    { type: "document",
+      source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
+    { type: "text", text: instruction },   // カテゴリ名リスト注入は extractReceipt と同様
+  ]}],
+  output_config: { format: { type: "json_schema", schema: STATEMENT_SCHEMA } },
+});</code></pre>
+<ul>
+  <li>応答処理は <code>extractReceipt</code> と同一（<code>refusal</code>→拒否、text→<code>JSON.parse</code>）。<strong>追加で <code>stop_reason==="max_tokens"</code> を検出</strong>し「明細が長く全件読めなかった可能性」エラーにする。</li>
+</ul>
+<h3>モデル選定</h3>
+<p>レシートOCRは <code>claude-haiku-4-5</code>。明細は<strong>長い表＋多数行の構造化抽出</strong>で取りこぼし・桁ずれが起きやすい。<span class="rec">推奨</span>: <strong><code>STATEMENT_MODEL</code> の既定を <code>claude-sonnet-4-6</code></strong>（structured outputs対応・表抽出が安定・月数回の低頻度なのでコスト影響小）。env で切替可（<code>process.env.STATEMENT_MODEL ?? "claude-sonnet-4-6"</code>）にして Haiku と実データ比較も可能に。Opus 4.8 は過剰。</p>
+<h3>サイズ / ページ上限 <span class="badge b-hold">⏸ 実装前に実機確認</span></h3>
+<ul>
+  <li>PDF base64 直渡しの公称上限は<strong>おおむね 100ページ / 32MB（リクエスト全体）</strong>。<strong>正確な値は <code>platform.claude.com/docs/en/build-with-claude/pdf-support.md</code> で確認</strong>（今回ライブ取得できず）。クレカ明細は通常数ページなので実用上は問題になりにくい。</li>
+  <li>デプロイ環境（ホスティング未決）のリクエストボディ上限に注意。超える場合は <strong>Files API 経由</strong>（<code>files.upload</code> → <code>document.source.{type:"file", file_id}</code>）へ切替余地を残す。初版は base64 直渡し＋控えめ上限（例 base64 6MB）。</li>
+</ul>
+
+<h2>重複検出</h2>
+<p><strong>サーバ側で判定</strong>（抽出API内、<code>findDuplicateFlags</code>）。クライアントに既存支出を渡さず、世帯スコープのDBクエリで安全に突合。</p>
+<ul>
+  <li>抽出行の有効日付（<code>parseReceiptDate</code>）の min/max から対象期間を <code>date.ts</code> のJST境界ユーティリティで算出 → その期間の既存支出を1クエリ取得（<code>amount/spentAt/storeName</code>）。</li>
+  <li>「重複かも」= <strong>同日 かつ 金額一致 かつ 店名が近い</strong>（店名は trim/小文字化して包含 or 一致。店名null行は日付×金額のみの弱一致）。</li>
+  <li>判定本体は純関数 <code>markDuplicates(rows, existing)</code> に分離して prisma 非依存にしテスト容易化。<strong>除外はしない</strong>（取込トグル既定ON、バッジ表示のみ）。</li>
+</ul>
+
+<h2>エッジケース</h2>
+<table>
+<thead><tr><th>ケース</th><th>対応</th></tr></thead>
+<tbody>
+<tr><td>長い明細（数十〜100行）</td><td><code>max_tokens: 8192</code>（必要なら16384）。件数が極端（&gt;300等）ならサーバで警告。</td></tr>
+<tr><td>複数ページPDF</td><td>document ブロックがそのまま受ける。上限超は <code>413</code>。</td></tr>
+<tr><td>抽出失敗・部分失敗</td><td><code>max_tokens</code>→専用エラー、<code>refusal</code>→拒否、<code>JSON.parse</code>失敗→502、rows空→「読み取れませんでした」。</td></tr>
+<tr><td>返金・キャンセル（マイナス）</td><td>schema で負を許容して抽出。登録可否は<strong>要決定②</strong>。</td></tr>
+<tr><td>合計行/手数料行の混入</td><td>プロンプトで「合計・繰越・お支払金額・手数料・ポイント等の集計行は除外、個別利用明細のみ」と指示。最終防衛線は<strong>プレビューで取込OFF</strong>。</td></tr>
+<tr><td>PDFサイズ上限</td><td>クライアントで <code>file.size</code> 事前チェック、サーバでも <code>413</code>。</td></tr>
+<tr><td>パスワード付きPDF</td><td>要件外（なし前提）。開けないPDFは「対応していないPDFです」。</td></tr>
+</tbody>
+</table>
+
+<h2>テスト計画（Vitest）</h2>
+<ul>
+  <li><strong>lib</strong>: <code>statement.test.ts</code>（SDKモック・rows配列パース/リクエスト形/refusal/空/<code>max_tokens</code>）、<code>duplicate.test.ts</code>（<code>markDuplicates</code> 純関数・同日同額同店→true 等）。</li>
+  <li><strong>API</strong>: <code>statement/route.test.ts</code>（401/503/400/413/正常時 categoryId・duplicateLikely・例外502）、<code>expenses/batch/route.test.ts</code>（401/原子性=1行不正なら全件作らない/全行正常/空rows→400）。</li>
+  <li><strong>UI</strong>（<code>// @vitest-environment jsdom</code>）: <code>use-statement-import.test.ts</code>、<code>statement-preview-sheet.test.tsx</code>（取込OFF行は送信除外・重複バッジ・編集反映）、<code>statement-import-button.test.tsx</code>。</li>
+</ul>
+
+<h2>段階実装（MVP → 拡張）</h2>
+<h3>MVP</h3>
+<ol>
+  <li><code>types/api.ts</code> に型追加</li>
+  <li><code>lib/statement.ts</code>（<code>extractStatement</code>＋schema・モデルSonnet）＋テスト</li>
+  <li><code>api/statement/route.ts</code>（重複は <code>duplicateLikely:false</code> 固定で先行）＋テスト</li>
+  <li><code>use-statement-import.ts</code> ＋ <code>statement-import-button.tsx</code></li>
+  <li><code>statement-import-provider.tsx</code> ＋ <code>statement-preview-sheet.tsx</code>（行編集＋取込トグル）</li>
+  <li><code>api/expenses/batch/route.ts</code>（全行バリデーション→原子的create）＋テスト</li>
+  <li><code>settings-modal.tsx</code> に入口、<code>layout.tsx</code> に Provider、一括登録後 mutation 通知で一覧更新</li>
+</ol>
+<h3>拡張（MVP後）</h3>
+<ol start="8">
+  <li><code>lib/duplicate.ts</code> ＋ 重複バッジ表示</li>
+  <li>返金/マイナス行の扱い（要決定②の結果次第）</li>
+  <li>大容量PDF対策（ページ分割 / Files API 経由）</li>
+  <li>合計行除外の精度改善（プロンプト＋抽出後ヒューリスティック）</li>
+</ol>
+
+<hr>
+
+<h2 id="decisions">★ 決定事項（2026-06-09 確定）</h2>
+
+<div class="decision decided">
+<h3>① 入口の置き場所 <span class="badge b-done">✅ 決定</span></h3>
+<p><strong>ホームのヘッダ左スロットにフォルダアイコン</strong>（<code>page-header.tsx</code> に <code>left?</code> 追加、ホームは <code>backHref</code> 無しで左が空き）。タップでファイルピッカー→プレビュー。<code>unlocked</code> 時のみ表示。フッタは増やさない。</p>
+<p class="muted">「指定フォルダ自動読み込み」は iOS（File System Access API 非対応）で不可のため見送り。将来の自動化（iOSショートカット→API / クラウド監視）は <code>/api/statement</code> 再利用で別フェーズ・ホスティング決定後。</p>
+</div>
+
+<div class="decision decided">
+<h3>② 返金・キャンセル行（マイナス金額） <span class="badge b-done">✅ 決定</span></h3>
+<p><strong>取込OFF既定で除外</strong>。既存 <code>validateExpenseInput</code>（<code>amount &gt;= 0</code>）を変えず、プレビューで「返金」表示・OFF（手動ONも可）。集計（ドーナツ/異常値バー）への影響を初版で抱えない。</p>
+</div>
+
+<div class="decision decided">
+<h3>③ プレビュー＆一括登録 <span class="badge b-done">✅ 決定</span></h3>
+<p><strong>全行をプレビューに読み込み、登録する行を行トグルで選ぶ</strong>（取込OFF行は送信しない）。バリデーション失敗時は<strong>全行ロールバック</strong>（<code>$transaction</code>・何も作らず <code>errors</code> 返却）。プレビューで弾けるので実害は小さい。</p>
+</div>
+
+<hr>
+
+<h2>検証（実装後）</h2>
+<ul>
+  <li><code>npm test</code> — 上記 lib/API/UI テストが緑。</li>
+  <li><code>npm run dev</code> → 設定モーダルから手元の <code>statement_202605.pdf</code> を取り込み、プレビューに明細行が並ぶ／カテゴリ・金額・日付が編集できる／取込OFF行が登録されない／一括登録後にホーム月次サマリーが更新される、を手元確認。</li>
+  <li><code>ANTHROPIC_API_KEY</code> 未設定で 503、未保存（cookie無し）で 401 を確認。</li>
+  <li>PDFページ/サイズ上限とデプロイ環境のbody上限を実機で確認（上記「サイズ/ページ上限」）。</li>
+</ul>
+
+</div>
+</body>
+</html>
