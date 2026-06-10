@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { categoryColor } from "@/lib/category-color";
 import { CATEGORY_NAME_MAX, isRequiredSlot } from "@/lib/category-constants";
 import { useExpenseModal } from "@/components/expense-modal";
+import { Switch } from "@/components/ui/switch";
 import { useImeComposition } from "@/components/use-ime-composition";
 import type { Category } from "@/types";
 
@@ -142,37 +143,22 @@ export function CategoryManager() {
                     : "border-border/50 text-muted-foreground"
                 }`}
               />
-              {/* 有効/無効トグル。必須スロット（先頭4個）は「ON固定・グレーアウト」でロック表示。
-                  inline-flex + items-center + 標準ユーティリティ(translate-x-1/6)で
-                  ノブ位置を確実に出す（任意値の絶対配置はモバイルで崩れることがあった）。 */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={required ? true : cat.enabled}
+              {/* 有効/無効トグル。共有 Switch（sm）を使う。必須スロット（先頭4個）は
+                  disabled + checked で「ON固定・グレーアウト」のロック表示にする。 */}
+              <Switch
+                size="sm"
+                checked={required ? true : cat.enabled}
+                disabled={busy || required}
+                onCheckedChange={() => {
+                  if (!required) toggleEnabled(cat);
+                }}
                 aria-label={
                   required
                     ? `${cat.name}（必須・常にオン）`
                     : `${cat.name} を${cat.enabled ? "無効" : "有効"}にする`
                 }
-                disabled={busy || required}
-                onClick={() => {
-                  if (!required) toggleEnabled(cat);
-                }}
                 title={required ? "必須カテゴリ（常にオン）" : undefined}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed ${
-                  required
-                    ? "bg-blue-600/35"
-                    : cat.enabled
-                      ? "bg-blue-600"
-                      : "bg-muted-foreground/30"
-                } ${busy && !required ? "opacity-50" : ""}`}
-              >
-                <span
-                  className={`inline-block size-4 rounded-full shadow transition-transform ${
-                    required || cat.enabled ? "translate-x-6" : "translate-x-1"
-                  } ${required ? "bg-white/80" : "bg-white"}`}
-                />
-              </button>
+              />
             </div>
             {rowError[cat.id] && (
               <p className="pl-[18px] text-xs text-destructive">{rowError[cat.id]}</p>
