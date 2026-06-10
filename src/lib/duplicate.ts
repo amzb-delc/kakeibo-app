@@ -5,9 +5,10 @@ import type { StatementRow } from "@/types/api";
 // 明細取り込みの「重複かも」判定。
 // 既存支出と、日付×金額×店名が近い行にフラグを立てる（除外はしない＝ユーザー判断）。
 
-// 店名の正規化（前後空白除去＋小文字化）。MVPは軽量に。
+// 店名の正規化。NFKC で全角/半角のゆれを吸収（全角英数字→半角、全角スペース→半角など）
+// したうえで前後空白除去＋小文字化する。OCR が同じ店名を全角/半角で揺らしても同一視できる。
 function normStore(s: string | null | undefined): string {
-  return (s ?? "").trim().toLowerCase();
+  return (s ?? "").normalize("NFKC").trim().toLowerCase();
 }
 
 // 既存支出（spentAtYmd は JST の YYYY-MM-DD）と抽出行を突合する純関数。

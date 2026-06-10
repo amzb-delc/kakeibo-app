@@ -6,6 +6,7 @@ import { MonthlySummaryView } from "@/components/monthly-summary";
 import { PageHeader } from "@/components/page-header";
 import { HeaderCharacter } from "@/components/header-character";
 import { StatementImportButton } from "@/components/statement-import-button";
+import { useStatementImportPreview } from "@/components/statement-import-provider";
 import { useExpenseModal } from "@/components/expense-modal";
 import { useSettingsModal } from "@/components/settings-modal";
 import { useSession } from "@/components/session-provider";
@@ -23,6 +24,7 @@ export default function SummaryPage() {
   } = useExpenseModal();
   const { openSettings } = useSettingsModal();
   const { unlocked } = useSession();
+  const { importing } = useStatementImportPreview();
   const swipeRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -160,7 +162,9 @@ export default function SummaryPage() {
       <PageHeader
         title={monthSwitcher}
         left={unlocked ? <StatementImportButton /> : null}
-        right={<HeaderCharacter onPress={goToCurrentMonth} />}
+        right={
+          <HeaderCharacter onPress={goToCurrentMonth} thinking={importing} />
+        }
       />
       <div>
         {!summary && loading ? (

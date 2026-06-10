@@ -148,3 +148,28 @@
 .animate-character-wiggle {
   animation: header-character-wiggle 0.55s ease-in-out;
 }
+/* 明細PDF取り込み中の連続ローディング（控えめに揺れ続ける） */
+@keyframes character-loading {
+  0% { transform: rotate(-7deg) scale(1); }
+  50% { transform: rotate(7deg) scale(1.08); }
+  100% { transform: rotate(-7deg) scale(1); }
+}
+.animate-character-loading {
+  animation: character-loading 0.9s ease-in-out infinite;
+}
+/* 明細取り込み中の「考え中…」モクモク吹き出し（本体がふわっと膨らむ） */
+@keyframes thinking-puff {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+.animate-thinking-puff {
+  animation: thinking-puff 1.8s ease-in-out infinite;
+}
+/* 吹き出し内の3点ドットが順番に弾む */
+@keyframes thinking-dot {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+  40% { transform: translateY(-3px); opacity: 1; }
+}
+.animate-thinking-dot {
+  animation: thinking-dot 1.2s ease-in-out infinite;
+}

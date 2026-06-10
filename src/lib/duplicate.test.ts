@@ -53,6 +53,14 @@ describe("markDuplicates", () => {
     expect(res[0].duplicateLikely).toBe(true);
   });
 
+  it("全角/半角の英数字ゆれを吸収して重複（ＡＭＡＺＯＮ = AMAZON）", () => {
+    const res = markDuplicates(
+      [row({ storeName: "ＡＭＡＺＯＮ" })],
+      [{ amount: 1000, spentAtYmd: "2026-05-03", storeName: "AMAZON" }]
+    );
+    expect(res[0].duplicateLikely).toBe(true);
+  });
+
   it("店名が無関係なら非重複", () => {
     const res = markDuplicates(
       [row({ storeName: "ローソン" })],
