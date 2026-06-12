@@ -92,6 +92,33 @@ describe("requireSameOrigin", () => {
     const res = requireSameOrigin(reqWith({ origin: "not-a-url" }));
     expect((res as Response).status).toBe(403);
   });
+
+  // dev では req.url のホストがバインド先(localhost)に固定され Host に追従しないため、
+  // 宛先判定は Host ヘッダを正とする（LAN IP・実機アクセスの誤 403 防止）。
+  it("Host ヘッダ一致なら req.url のホストと違っても null（LAN/実機アクセス）", () => {
+    const res = requireSameOrigin(
+      reqWith({ origin: "http://192.168.1.12:3000", host: "192.168.1.12:3000" })
+    );
+    expect(res).toBeNull();
+  });
+
+  it("Host ヘッダ不一致は 403", () => {
+    const res = requireSameOrigin(
+      reqWith({ origin: "http://localhost", host: "192.168.1.12:3000" })
+    );
+    expect((res as Response).status).toBe(403);
+  });
+
+  it("x-forwarded-host があれば Host より優先（プロキシ配下）", () => {
+    const res = requireSameOrigin(
+      reqWith({
+        origin: "https://kakeibo.example.com",
+        host: "internal:3000",
+        "x-forwarded-host": "kakeibo.example.com",
+      })
+    );
+    expect(res).toBeNull();
+  });
 });
 
 describe("requireHouseholdId", () => {

@@ -41,8 +41,13 @@ export function requireSameOrigin(req: Request): NextResponse | null {
   } catch {
     return jsonError("forbidden", 403);
   }
-  // リクエスト URL のホスト（プロキシ配下では x-forwarded-host を反映した nextUrl）と比較。
-  if (originHost !== new URL(req.url).host) return jsonError("forbidden", 403);
+  // 宛先ホストは Host ヘッダ（プロキシ配下は x-forwarded-host）と比較する。
+  // req.url のホストは dev サーバではバインド先（localhost）に固定され Host に追従しないため、
+  // LAN IP・実機からの正当な同一オリジン POST まで 403 になる（req.url とは比較しない）。
+  // CSRF 検知の目的にはブラウザが付ける Origin vs Host の比較で十分（どちらも偽装時はブラウザ外）。
+  const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = forwardedHost || req.headers.get("host") || new URL(req.url).host;
+  if (originHost !== host) return jsonError("forbidden", 403);
   return null;
 }
 
