@@ -311,8 +311,11 @@ export function MonthlySummaryView({
               }}
             >
               {/* === 単月ペイン（ドーナツ＋レジェンド）。右辺にスライドUI === */}
+              {/* 非表示側ペインは inert で配下のボタン群ごとフォーカス不可にする（WCAG 4.1.2）。
+                  aria-hidden は jsdom（テスト）の role 除外用に併記 */}
               <div
                 className="w-1/2 shrink-0 pr-1"
+                inert={cardMode === "sixMonths" ? true : undefined}
                 aria-hidden={cardMode === "sixMonths"}
               >
                 <div className="flex items-stretch gap-2">
@@ -395,6 +398,7 @@ export function MonthlySummaryView({
               {/* === 6ヶ月ペイン（積み上げ棒）。左辺にスライドUI === */}
               <div
                 className="w-1/2 shrink-0 pl-1"
+                inert={cardMode !== "sixMonths" ? true : undefined}
                 aria-hidden={cardMode !== "sixMonths"}
               >
                 <div className="flex items-stretch gap-2">
