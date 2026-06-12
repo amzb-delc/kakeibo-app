@@ -51,7 +51,13 @@ function order(): string[] {
 
 function view() {
   return render(
-    <MonthlySummaryView summary={summary} openCategoryId="c1" onToggleCategory={vi.fn()} />
+    <MonthlySummaryView
+      summary={summary}
+      openCategoryId="c1"
+      onToggleCategory={vi.fn()}
+      tag={null}
+      onTagChange={vi.fn()}
+    />
   );
 }
 
@@ -113,6 +119,8 @@ describe("MonthlySummaryView 「その他」表示", () => {
         summary={big}
         openCategoryId={OTHERS_CATEGORY_ID}
         onToggleCategory={vi.fn()}
+        tag={null}
+        onTagChange={vi.fn()}
       />
     );
     // ソートヘッダ（日付ボタン）は全カード共通で1つ

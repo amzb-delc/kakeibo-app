@@ -47,4 +47,37 @@ describe("GET /api/monthly-summary", () => {
     }
     expect(findMany).not.toHaveBeenCalled();
   });
+
+  it("有効な tag 指定で 3つの findMany すべての where に tags フィルタを適用", async () => {
+    getHouseholdId.mockResolvedValue("hh-1");
+    // 過去月を見ることで比較クエリも走る（findMany が3回）
+    const res = await GET(
+      getReq("http://localhost/api/monthly-summary?year=2025&month=1&tag=spouse:1")
+    );
+    expect(res.status).toBe(200);
+    expect(findMany).toHaveBeenCalledTimes(3);
+    for (const call of findMany.mock.calls) {
+      expect(call[0].where.tags).toEqual({ has: "spouse:1" });
+    }
+  });
+
+  it("不正な tag は 400（DB 照合しない）", async () => {
+    getHouseholdId.mockResolvedValue("hh-1");
+    const res = await GET(
+      getReq("http://localhost/api/monthly-summary?year=2026&month=6&tag=bogus")
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid tag");
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it("tag 未指定なら where に tags フィルタを含めない", async () => {
+    getHouseholdId.mockResolvedValue("hh-1");
+    const res = await GET(getReq("http://localhost/api/monthly-summary?year=2026&month=6"));
+    expect(res.status).toBe(200);
+    for (const call of findMany.mock.calls) {
+      expect(call[0].where.tags).toBeUndefined();
+    }
+  });
 });

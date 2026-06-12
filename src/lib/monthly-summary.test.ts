@@ -115,6 +115,21 @@ describe("buildMonthlySummary", () => {
     expect(r.boxStats).toBeNull();
   });
 
+  it("明細アイテムに tags をそのままパススルーする", () => {
+    const e = exp({ id: "e1", amount: 1000, categoryId: "food", name: "食費", sortOrder: 0 });
+    e.tags = ["spouse:2", "card:楽天カード"];
+    const r = buildMonthlySummary({
+      year: 2026,
+      month: 4,
+      expenses: [e],
+      compareExpenses: [],
+      sixMonthExpenses: [],
+      sixMonthKeys: SIX_KEYS,
+      hasCompare: false,
+    });
+    expect(r.categories[0].expenses[0].tags).toEqual(["spouse:2", "card:楽天カード"]);
+  });
+
   it("boxStats: 月別合計に散らばりがあれば算出される", () => {
     const six: SixMonthExpense[] = [
       { amount: 10000, categoryId: "food", spentAt: d("2026-01-10") },

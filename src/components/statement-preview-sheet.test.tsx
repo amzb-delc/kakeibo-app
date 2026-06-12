@@ -56,6 +56,7 @@ function renderSheet(
   const props = {
     rows: ROWS,
     fileName: "5月明細.pdf",
+    cardName: null,
     categories: CATEGORIES,
     panelStyle: {},
     backdropStyle: {},
