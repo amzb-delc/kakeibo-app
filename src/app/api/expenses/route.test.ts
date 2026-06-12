@@ -61,7 +61,7 @@ describe("POST /api/expenses", () => {
     const data = create.mock.calls[0][0].data;
     expect(data.householdId).toBe("hh-1");
     expect(data.createdByUserId).toBe("u-1");
-    expect(data.enteredBy).toBe(2);
+    expect(data.tags).toEqual(["spouse:2"]);
     expect(data.categoryId).toBe("cat-1");
     // category 照合は自世帯スコープで行う
     expect(findFirst).toHaveBeenCalledWith(
