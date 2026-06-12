@@ -68,7 +68,8 @@ export function buildMonthlySummary(params: {
   expenses: SummaryExpense[]; // 表示月（spentAt 降順で渡す前提。並びは保持する）
   compareExpenses: CompareExpense[];
   sixMonthExpenses: SixMonthExpense[];
-  sixMonthKeys: string[]; // 表示月含む過去6ヶ月の "YYYY-MM"
+  sixMonthKeys: string[]; // 偏差値用: 表示月含む過去6ヶ月の "YYYY-MM"
+  chartKeys: string[]; // グラフ窓: 6本の "YYYY-MM"（過去月閲覧時は未来側へ最大3ヶ月ずれる）
   allCategories: Array<{ id: string; name: string; sortOrder: number }>; // 世帯の全カテゴリ（16枠）
   hasCompare: boolean; // 過去月閲覧時のみ true（当月は比較しない）
 }): MonthlySummaryResult {
@@ -79,6 +80,7 @@ export function buildMonthlySummary(params: {
     compareExpenses,
     sixMonthExpenses,
     sixMonthKeys,
+    chartKeys,
     allCategories,
     hasCompare,
   } = params;
@@ -163,10 +165,10 @@ export function buildMonthlySummary(params: {
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // 6ヶ月比較グラフ用に月別の積み上げデータを整形（sixMonthKeys は古い月→表示月の順）。
+  // 6ヶ月比較グラフ用に月別の積み上げデータを整形（chartKeys は古い月→新しい月の順）。
   // データのない月も total=0 で 6 本固定にする（棒の本数・位置を安定させる）。
   const categoryMeta = new Map(allCategories.map((c) => [c.id, c]));
-  const sixMonths: SixMonthSummary[] = sixMonthKeys.map((ym) => {
+  const sixMonths: SixMonthSummary[] = chartKeys.map((ym) => {
     const inner = monthlyCategoryTotals.get(ym);
     const byCategory = inner
       ? Array.from(inner.entries())

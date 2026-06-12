@@ -55,6 +55,7 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: [],
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: [],
       hasCompare: false,
     });
@@ -80,6 +81,7 @@ describe("buildMonthlySummary", () => {
       compareExpenses,
       sixMonthExpenses: [],
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: [],
       hasCompare: true,
     });
@@ -96,6 +98,7 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: [],
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: [],
       hasCompare: true,
     });
@@ -113,6 +116,7 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: six,
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: [],
       hasCompare: false,
     });
@@ -129,6 +133,7 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: [],
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: [],
       hasCompare: false,
     });
@@ -149,6 +154,7 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: six,
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: [],
       hasCompare: false,
     });
@@ -178,6 +184,7 @@ describe("buildMonthlySummary sixMonths（6ヶ月比較グラフ）", () => {
       compareExpenses: [],
       sixMonthExpenses: six,
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: ALL_CATS,
       hasCompare: false,
     });
@@ -209,6 +216,7 @@ describe("buildMonthlySummary sixMonths（6ヶ月比較グラフ）", () => {
       compareExpenses: [],
       sixMonthExpenses: six,
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: ALL_CATS,
       hasCompare: false,
     });
@@ -236,6 +244,7 @@ describe("buildMonthlySummary sixMonths（6ヶ月比較グラフ）", () => {
       compareExpenses: [],
       sixMonthExpenses: six,
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: ALL_CATS,
       hasCompare: false,
     });
@@ -257,6 +266,7 @@ describe("buildMonthlySummary sixMonths（6ヶ月比較グラフ）", () => {
       compareExpenses: [],
       sixMonthExpenses: six,
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: ALL_CATS,
       hasCompare: false,
     });
@@ -279,6 +289,7 @@ describe("buildMonthlySummary sixMonths（6ヶ月比較グラフ）", () => {
       compareExpenses: [],
       sixMonthExpenses: six,
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
       allCategories: ALL_CATS,
       hasCompare: false,
     });
