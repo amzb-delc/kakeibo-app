@@ -234,6 +234,40 @@ API は <code>GET /api/monthly-summary</code> のレスポンスに <code>sixMon
 
 <hr>
 
+<h2>実機フィードバックによる調整（2026-06-12）</h2>
+<p>初回実装（<code>f671411</code> 時点の設計）を実機で確認したところ、過去月閲覧時の窓位置やシェブロンの被り・ラベルの賑やかさに改善余地が見つかった。以下は<strong>実機フィードバックを受けて入れた調整</strong>（バックエンド <code>510a89e</code>、UI <code>9a9e05f</code> → <code>55473c9</code>）。当初設計の「6本固定・古い月→表示月＝右端」は<strong>当月閲覧時の挙動として残るが</strong>、過去月閲覧時はグラフ窓がずれるため上記④の「表示月＝右端」前提は崩れる（強調ロジックを右端固定から表示月一致判定へ変更）。</p>
+
+<h3>① グラフ窓のずれ（過去月閲覧時）</h3>
+<p>表示月が過去月のとき、6ヶ月窓を<strong>未来側へ最大3ヶ月ずらす</strong>。表示月の棒が右から 2〜4 番目に来ることで、表示月の「先」の月も見えて推移の文脈が掴みやすくなる。</p>
+<ul>
+  <li><strong>当月閲覧</strong>＝表示月が右端（従来どおり）。<strong>前月</strong>＝右から2番目／<strong>前々月</strong>＝3番目／<strong>3ヶ月以上前</strong>＝右から4番目で固定。</li>
+  <li>ずれ量 <code>forwardMonths = min(max(当月との差, 0), 3)</code>。<strong>窓が実在の当月を超えることはない</strong>（forward ≤ 当月との差のため）。</li>
+  <li><strong>偏差値（boxStats）用の「表示月含む過去6ヶ月」窓（<code>sixMonthKeys</code>）は据え置き</strong>。グラフ専用に <code>chartKeys</code> を新設し、両者を分離した。DB 取得範囲は両窓の<strong>和集合</strong>（<code>sixMonthKeys</code> の最古 〜 <code>chartKeys</code> の末尾）。</li>
+  <li>API の <code>sixMonths</code> は<strong>このグラフ窓（<code>chartKeys</code>）に基づく</strong>（偏差値窓ではない）。集計は <code>chartKeys.map(...)</code>、route で <code>chartKeys</code>／<code>chartEnd</code> を算出して <code>buildMonthlySummary</code> に渡す。</li>
+</ul>
+
+<h3>② シェブロンのフローティング化</h3>
+<p>シェブロン（<code>‹</code>/<code>›</code>）を<strong>ペイン内レイアウトから外し</strong>、全体カードに対する絶対配置のフローティング丸ボタンに変更。<strong>カードのボーダーを跨ぐ位置</strong>（左右端・縦中央・半分外側）に置き、コンテンツとの被りを解消した（overflow クリップ枠の外＝カード直下に配置）。</p>
+<ul>
+  <li><strong>単月表示中は右の <code>›</code> のみ</strong>、<strong>6ヶ月表示中は左の <code>‹</code> のみ</strong>を出すトグル切替。</li>
+  <li><code>inert</code> なペインの外なので常に操作可能。ペインから旧ボタン枠（<code>w-7</code>）を除去しコンテンツ幅を回復、横スライドのクリップを <code>overflow-x-clip</code> にして縦の見切れを解消。</li>
+</ul>
+
+<h3>③ 積み上げは薄い色・単独比較は濃い色</h3>
+<p>全体（積み上げ）表示時はセグメントを <strong><code>fillOpacity</code> 0.6</strong> で薄くし、密集した積み上げの可読性を上げる。<strong>カテゴリ単独比較時は濃い色（<code>fillOpacity=1</code>）</strong>のまま。</p>
+
+<h3>④ 全6本に合計額ラベル＋表示月の強調</h3>
+<p>当初は「表示月（右端）の棒のみ合計額」だったが、<strong>全6本の棒に合計額ラベル</strong>を出すよう変更。窓ずれで表示月が右端とは限らなくなったため、強調は<strong>表示月一致判定（<code>selectedYm</code>）</strong>に切替えた。</p>
+<ul>
+  <li>合計額は<strong>省略なしのカンマ区切り</strong>（実質6桁までのため崩れない）。<strong>0円の月は非表示</strong>。</li>
+  <li><strong>表示月の棒</strong>は月ラベルを<strong>太字＋下線</strong>、金額ラベルも<strong>太字</strong>で強調（右端とは限らない窓ずれに追従）。</li>
+</ul>
+
+<h3>⑤ 目盛線はグラフ縦中央に1本</h3>
+<p>金額の目盛線は<strong>グラフ縦中央に1本</strong>だけ引く（薄いグレー）。値は<strong>正規化基準＝6本中の最大合計の半分</strong>で、右端に省略なし表記の目盛値ラベルを添える（当初の上限＋半分の2本構成から簡素化）。</p>
+
+<hr>
+
 <h2>検証（実装後）</h2>
 <ul>
   <li><code>npm run lint</code> → <code>npm test</code>（<code>sixMonths</code> の集計＝6本固定・空月ゼロ詰め・タグ絞り込み適用のテストが緑）。</li>
