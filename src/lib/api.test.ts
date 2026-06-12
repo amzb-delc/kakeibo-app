@@ -109,6 +109,13 @@ describe("requireSameOrigin", () => {
     expect((res as Response).status).toBe(403);
   });
 
+  it("Host も x-forwarded-host も無ければ req.url のホストにフォールバック", () => {
+    // reqWith は Host ヘッダを明示しない限り付けないため、req.url(localhost) との比較になる
+    expect(requireSameOrigin(reqWith({ origin: "http://localhost" }))).toBeNull();
+    const res = requireSameOrigin(reqWith({ origin: "http://192.168.1.12:3000" }));
+    expect((res as Response).status).toBe(403);
+  });
+
   it("x-forwarded-host があれば Host より優先（プロキシ配下）", () => {
     const res = requireSameOrigin(
       reqWith({

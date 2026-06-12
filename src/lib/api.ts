@@ -45,6 +45,8 @@ export function requireSameOrigin(req: Request): NextResponse | null {
   // req.url のホストは dev サーバではバインド先（localhost）に固定され Host に追従しないため、
   // LAN IP・実機からの正当な同一オリジン POST まで 403 になる（req.url とは比較しない）。
   // CSRF 検知の目的にはブラウザが付ける Origin vs Host の比較で十分（どちらも偽装時はブラウザ外）。
+  // 注意: x-forwarded-host の無条件採用は「信頼できるプロキシ（Vercel 等）が上書きする」構成が
+  // 前提。プロキシ無しでオリジンサーバを直接公開する構成へ移行する場合は再評価すること。
   const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
   const host = forwardedHost || req.headers.get("host") || new URL(req.url).host;
   if (originHost !== host) return jsonError("forbidden", 403);
