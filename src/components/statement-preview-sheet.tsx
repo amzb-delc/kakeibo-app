@@ -57,6 +57,8 @@ type Props = {
   rows: StatementRow[];
   // 取り込んだ PDF のファイル名。各支出の memo に自動入力する。
   fileName: string;
+  // 抽出したカード名（1PDF=1カード）。ヘッダに表示し、batch payload に同梱して card タグ化する。
+  cardName: string | null;
   categories: Category[]; // 有効カテゴリのみ
   panelStyle: React.CSSProperties;
   backdropStyle: React.CSSProperties;
@@ -75,6 +77,7 @@ type Props = {
 export function StatementPreviewSheet({
   rows,
   fileName,
+  cardName,
   categories,
   panelStyle,
   backdropStyle,
@@ -177,7 +180,7 @@ export function StatementPreviewSheet({
       const res = await fetch("/api/expenses/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: payload }),
+        body: JSON.stringify({ rows: payload, cardName }),
       });
       const data = (await res.json().catch(() => ({}))) as Partial<
         BatchExpenseResult
@@ -222,6 +225,12 @@ export function StatementPreviewSheet({
           className="hidden"
           onChange={handleReimport}
         />
+
+        {cardName && (
+          <p className="text-sm font-medium">
+            カード: <span className="text-muted-foreground">{cardName}</span>
+          </p>
+        )}
 
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">

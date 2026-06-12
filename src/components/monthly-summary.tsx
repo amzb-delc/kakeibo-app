@@ -12,7 +12,35 @@ import { resolveSummaryView } from "@/lib/summary-view";
 import { sortExpenses, type SortField, type SortDir } from "@/lib/expense-sort";
 import { useExpenseModal } from "@/components/expense-modal";
 import { DonutChart } from "@/components/donut-chart";
+import { tagColor, SPOUSE_TAGS } from "@/lib/tags";
 import type { MonthlySummary, CategorySummary, BoxStats } from "@/types";
+
+// 支出行のタグ識別ドット。色は tags.ts の tagColor() に集約（ここで再実装しない）。
+// 色が付かない（null）タグはスキップ。装飾なので aria-hidden。
+function TagDots({ tags }: { tags: string[] }) {
+  const dots = tags
+    .map((t) => tagColor(t))
+    .filter((c): c is string => c !== null);
+  if (dots.length === 0) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-1" aria-hidden="true">
+      {dots.map((color, i) => (
+        <span
+          key={i}
+          className="size-1.5 rounded-full"
+          style={{ backgroundColor: color }}
+        />
+      ))}
+    </span>
+  );
+}
+
+// 全体カードの夫婦タグフィルタの選択肢（全体=null / ♂=spouse:1 / ♀=spouse:2）。
+const SPOUSE_FILTERS: { value: string | null; label: string }[] = [
+  { value: null, label: "全体" },
+  { value: SPOUSE_TAGS[0], label: "♂" },
+  { value: SPOUSE_TAGS[1], label: "♀" },
+];
 
 // 過去6ヶ月の異常値検出バー（フィル方式）。
 // 100% = 上フェンス(Q3+1.5*IQR)、超過時は 100% でクランプ。
@@ -160,8 +188,11 @@ function CategoryRow({
                   ? formatJstDate(new Date(exp.updatedAt)) // 2026-06-08 形式
                   : formatJstDateLabel(new Date(exp.spentAt))}
               </span>
-              <span className="flex-1 min-w-0 truncate text-xs text-muted-foreground">
-                {exp.storeName ?? exp.memo ?? ""}
+              <span className="flex-1 min-w-0 flex items-center gap-1.5">
+                <TagDots tags={exp.tags} />
+                <span className="min-w-0 truncate text-xs text-muted-foreground">
+                  {exp.storeName ?? exp.memo ?? ""}
+                </span>
               </span>
               <span className="font-medium shrink-0">{formatYen(exp.amount)}</span>
             </button>
@@ -176,9 +207,18 @@ type Props = {
   summary: MonthlySummary;
   openCategoryId: string | null;
   onToggleCategory: (categoryId: string) => void;
+  // 夫婦タグフィルタ（null=全体）。サーバ側で合計・カテゴリ・明細・比較すべて絞られる。
+  tag: string | null;
+  onTagChange: (tag: string | null) => void;
 };
 
-export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }: Props) {
+export function MonthlySummaryView({
+  summary,
+  openCategoryId,
+  onToggleCategory,
+  tag,
+  onTagChange,
+}: Props) {
   const { categories: allCategories } = useExpenseModal();
   const compareTotal = summary.compareTotal;
   const totalLevel = compareTotal !== null ? getTrendLevel(compareTotal, summary.total) : null;
@@ -222,6 +262,33 @@ export function MonthlySummaryView({ summary, openCategoryId, onToggleCategory }
     <main className="px-4 py-6 space-y-6">
         {/* 合計カード: 左にドーナツ（中央に合計金額）、右に上位7カテゴリのレジェンド（＝カテゴリ選択UI） */}
         <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50">
+          {/* 夫婦タグフィルタ（全体/♂/♀）。選択でドーナツ・合計・前月比・明細すべてが絞られる。 */}
+          <div className="mb-3 flex justify-end">
+            <div
+              role="group"
+              aria-label="入力者で絞り込み"
+              className="inline-flex rounded-lg bg-muted p-0.5"
+            >
+              {SPOUSE_FILTERS.map((f) => {
+                const active = tag === f.value;
+                return (
+                  <button
+                    key={f.label}
+                    type="button"
+                    onClick={() => onTagChange(f.value)}
+                    aria-pressed={active}
+                    className={`min-w-[2.5rem] rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="flex items-start gap-3">
             <div className="shrink-0 w-[160px]">
               <DonutChart

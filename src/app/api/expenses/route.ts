@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDemoUserId, getEnteredBy } from "@/lib/auth";
+import { spouseTagOf } from "@/lib/tags";
 import { validateExpenseInput } from "@/lib/expenses";
 import {
   requireHouseholdId,
@@ -25,8 +26,9 @@ export async function POST(req: NextRequest) {
   });
   if (error) return jsonError(error.message, 400);
 
-  // 入力者は端末設定（cookie）から付与する。未設定でも既定値が起動時に入るため必須にはしない。
+  // 入力者は端末設定（cookie）から夫婦タグとして付与する。未設定でも既定値が起動時に入るため必須にはしない。
   const enteredBy = await getEnteredBy();
+  const tags = enteredBy ? [spouseTagOf(enteredBy)] : [];
 
   const createdByUserId = await getDemoUserId();
 
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
       spentAt: data.spentAt!,
       storeName: data.storeName ?? null,
       memo: data.memo ?? null,
-      enteredBy,
+      tags,
       createdByUserId,
     },
     include: { category: { select: { id: true, name: true } } },

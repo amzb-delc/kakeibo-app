@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDemoUserId, getEnteredBy } from "@/lib/auth";
+import { cardTagOf, spouseTagOf } from "@/lib/tags";
 import { validateExpenseInput } from "@/lib/expenses";
 import {
   requireHouseholdId,
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
   const body = await parseJsonBody(req);
   if (body instanceof NextResponse) return body;
 
-  const rows = (body as { rows?: unknown }).rows;
+  const { rows, cardName } = body as { rows?: unknown; cardName?: unknown };
   if (!Array.isArray(rows) || rows.length === 0) {
     return jsonError("登録する明細がありません", 400);
   }
@@ -31,8 +32,25 @@ export async function POST(req: NextRequest) {
     return jsonError(`一度に登録できるのは${MAX_ROWS}件までです`, 400);
   }
 
-  // 入力者は端末設定（cookie）から付与する。未設定でも既定値が起動時に入るため必須にはしない。
+  // カード種別タグ（明細取込時のみ）。1PDF=1カードなのでトップレベルで受け、全行に付与する。
+  // null/未指定/空文字は「カード不明」として無視。型不正・上限超過は 400。
+  let cardTag: string | null = null;
+  if (cardName != null && cardName !== "") {
+    if (typeof cardName !== "string") {
+      return jsonError("カード名が不正です", 400);
+    }
+    cardTag = cardTagOf(cardName);
+    if (cardTag === null && cardName.trim() !== "") {
+      return jsonError("カード名が不正です", 400);
+    }
+  }
+
+  // 入力者は端末設定（cookie）から夫婦タグとして付与する。未設定でも既定値が起動時に入るため必須にはしない。
   const enteredBy = await getEnteredBy();
+  const tags = [
+    ...(enteredBy ? [spouseTagOf(enteredBy)] : []),
+    ...(cardTag ? [cardTag] : []),
+  ];
 
   const createdByUserId = await getDemoUserId();
 
@@ -81,7 +99,7 @@ export async function POST(req: NextRequest) {
           spentAt: v.spentAt,
           storeName: v.storeName,
           memo: v.memo,
-          enteredBy,
+          tags,
           createdByUserId,
         },
       })

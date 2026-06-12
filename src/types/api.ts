@@ -42,6 +42,9 @@ export type StatementRow = {
   duplicateLikely: boolean;
 };
 export type StatementExtractResult = {
+  // 明細PDFから読み取ったカード名（例: 楽天カード）。判別不能なら null。
+  // クライアントは batch 登録時に cardName として送り返し、card タグとして記録される。
+  cardName: string | null;
   rows: StatementRow[];
 };
 
@@ -53,7 +56,8 @@ export type BatchExpenseRow = {
   storeName?: string | null;
   memo?: string | null;
 };
-export type BatchExpenseRequest = { rows: BatchExpenseRow[] };
+// cardName は明細取込時のみ（1PDF=1カード）。全行に "card:<カード名>" タグが付く。
+export type BatchExpenseRequest = { rows: BatchExpenseRow[]; cardName?: string | null };
 export type BatchExpenseResult = {
   created: number;
   errors: Array<{ index: number; message: string }>;

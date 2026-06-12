@@ -30,6 +30,8 @@ export default function SummaryPage() {
   const {
     year,
     month,
+    tag,
+    setTag,
     summary,
     loading,
     isCurrentMonth,
@@ -177,6 +179,8 @@ export default function SummaryPage() {
               summary={summary}
               openCategoryId={openCategoryId}
               onToggleCategory={toggleCategory}
+              tag={tag}
+              onTagChange={setTag}
             />
           </div>
         ) : null}

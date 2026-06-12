@@ -53,6 +53,8 @@ export function StatementImportProvider({
   const [rows, setRows] = useState<StatementRow[] | null>(null);
   // 取り込んだ PDF のファイル名（各支出の memo に入れる）。
   const [fileName, setFileName] = useState("");
+  // 抽出したカード名（1PDF=1カード）。プレビュー表示＋batch の card タグ付与に使う。
+  const [cardName, setCardName] = useState<string | null>(null);
   // 登録成功で閉じたか（onClosed で rows を破棄するか保持するかの分岐）。
   const consumedRef = useRef(false);
   // 15分セッションの破棄タイマー。
@@ -120,6 +122,7 @@ export function StatementImportProvider({
         return;
       }
       setFileName(file.name);
+      setCardName(r.result.cardName);
       openPreview(r.result.rows);
     },
     [read, notify, openPreview]
@@ -144,6 +147,7 @@ export function StatementImportProvider({
         <StatementPreviewSheet
           rows={rows}
           fileName={fileName}
+          cardName={cardName}
           categories={categories.filter((c) => c.enabled)}
           panelStyle={panelStyle}
           backdropStyle={backdropStyle}

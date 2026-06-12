@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { jstMonthRange, formatJstDate, shiftMonth, ymKey } from "@/lib/date";
 import { requireHouseholdId, jsonError } from "@/lib/api";
+import { isValidTag } from "@/lib/tags";
 import { buildMonthlySummary } from "@/lib/monthly-summary";
 
 export async function GET(req: NextRequest) {
@@ -28,6 +29,14 @@ export async function GET(req: NextRequest) {
     return jsonError("invalid year/month", 400);
   }
 
+  // タグフィルタ（UI からは夫婦タグのみ来る想定だが、有効な形式のタグは何でも受ける）。
+  // 不正な形式は 400。指定時は表示月・比較月・6ヶ月の全クエリへ一貫して適用する。
+  const tag = searchParams.get("tag");
+  if (tag !== null && !isValidTag(tag)) {
+    return jsonError("invalid tag", 400);
+  }
+  const tagFilter = tag ? { tags: { has: tag } } : {};
+
   const isCurrentMonth = year === currentYear && month === currentMonth;
 
   const range = jstMonthRange(year, month);
@@ -51,6 +60,7 @@ export async function GET(req: NextRequest) {
     where: {
       householdId,
       spentAt: range,
+      ...tagFilter,
     },
     include: {
       category: { select: { id: true, name: true, sortOrder: true } },
@@ -64,6 +74,7 @@ export async function GET(req: NextRequest) {
         where: {
           householdId,
           spentAt: compareRange,
+          ...tagFilter,
         },
         include: {
           category: { select: { id: true, name: true } },
@@ -76,6 +87,7 @@ export async function GET(req: NextRequest) {
     where: {
       householdId,
       spentAt: sixMonthRange,
+      ...tagFilter,
     },
     select: { amount: true, spentAt: true, categoryId: true },
   });

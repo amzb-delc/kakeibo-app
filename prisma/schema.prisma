@@ -67,9 +67,9 @@ model Expense {
   spentAt         DateTime
   storeName       String?
   memo            String?
-  // 入力者: 端末ごとに設定モーダルで選ぶ 1=♂（夫）/ 2=♀（妻）。新規登録時のみ cookie から付与し、
-  // 編集では据え置く。未設定の既存行・端末は null。表示機能は別途。
-  enteredBy       Int?
+  // 内部タグ（複数属性）。"spouse:1"/"spouse:2"=入力者（端末cookie由来・新規登録時のみ付与）、
+  // "card:<カード名>"=クレカ明細取込時のカード種別。編集では据え置く。仕様は src/lib/tags.ts。
+  tags            String[] @default([])
   // OCR は POST /api/ocr で実装済みだが「画像は保存しない」方針のため以下2列は現在未使用。
   receiptImageUrl String? // 予約: 将来レシート画像を保存する場合に使う
   ocrRawText      String? // 予約: 抽出元の生テキストを残す案（現状は書き込まない）

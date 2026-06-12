@@ -31,8 +31,8 @@ const summary: MonthlySummary = {
       compareTotal: null,
       boxStats: null,
       expenses: [
-        { id: "a", amount: 100, spentAt: "2026-06-01T03:00:00.000Z", updatedAt: "2026-06-09T03:00:00.000Z", storeName: "AAA", memo: null },
-        { id: "b", amount: 200, spentAt: "2026-06-08T03:00:00.000Z", updatedAt: "2026-06-02T03:00:00.000Z", storeName: "BBB", memo: null },
+        { id: "a", amount: 100, spentAt: "2026-06-01T03:00:00.000Z", updatedAt: "2026-06-09T03:00:00.000Z", storeName: "AAA", memo: null, tags: [] },
+        { id: "b", amount: 200, spentAt: "2026-06-08T03:00:00.000Z", updatedAt: "2026-06-02T03:00:00.000Z", storeName: "BBB", memo: null, tags: [] },
       ],
     },
   ],
@@ -102,7 +102,7 @@ describe("MonthlySummaryView 「その他」表示", () => {
       compareTotal: null,
       boxStats: null,
       expenses: [
-        { id: `k${i + 1}-e`, amount: (8 - i) * 100, spentAt: "2026-06-01T03:00:00.000Z", updatedAt: "2026-06-01T03:00:00.000Z", storeName: null, memo: null },
+        { id: `k${i + 1}-e`, amount: (8 - i) * 100, spentAt: "2026-06-01T03:00:00.000Z", updatedAt: "2026-06-01T03:00:00.000Z", storeName: null, memo: null, tags: [] },
       ],
     })),
   };

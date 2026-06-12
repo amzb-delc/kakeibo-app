@@ -22,6 +22,7 @@ export type CategoryExpense = {
   updatedAt: string; // 更新日（最終編集日時）
   storeName: string | null;
   memo: string | null;
+  tags: string[]; // 内部タグ（src/lib/tags.ts）。識別ドット表示に使う
 };
 
 export type BoxStats = {

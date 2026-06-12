@@ -24,6 +24,7 @@ function cat(
       updatedAt: "2026-06-01",
       storeName: null,
       memo: null,
+      tags: [],
     })),
   };
 }

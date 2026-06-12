@@ -13,6 +13,7 @@ export type SummaryExpense = {
   updatedAt: Date;
   storeName: string | null;
   memo: string | null;
+  tags: string[];
   categoryId: string;
   category: { name: string; sortOrder: number };
 };
@@ -28,6 +29,7 @@ export type SummaryCategoryExpense = {
   updatedAt: Date;
   storeName: string | null;
   memo: string | null;
+  tags: string[]; // 内部タグ（src/lib/tags.ts）。識別ドット表示に使う
 };
 
 export type MonthlySummaryResult = {
@@ -72,6 +74,7 @@ export function buildMonthlySummary(params: {
       updatedAt: expense.updatedAt,
       storeName: expense.storeName,
       memo: expense.memo,
+      tags: expense.tags,
     };
     const existing = categoryMap.get(expense.categoryId);
     if (existing) {

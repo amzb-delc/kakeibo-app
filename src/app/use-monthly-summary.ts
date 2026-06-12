@@ -18,6 +18,8 @@ export function useMonthlySummary(opts: {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  // 夫婦タグフィルタ（null=全体 / "spouse:1" / "spouse:2"）。月送りしても維持する。
+  const [tag, setTag] = useState<string | null>(null);
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [fade, setFade] = useState(false);
@@ -38,7 +40,9 @@ export function useMonthlySummary(opts: {
       }
     }
     try {
-      const res = await fetch(`/api/monthly-summary?year=${year}&month=${month}`);
+      const params = new URLSearchParams({ year: String(year), month: String(month) });
+      if (tag) params.set("tag", tag);
+      const res = await fetch(`/api/monthly-summary?${params.toString()}`);
       if (res.ok) setSummary(await res.json());
     } finally {
       setLoading(false);
@@ -59,7 +63,7 @@ export function useMonthlySummary(opts: {
       }
       pendingNavDir.current = 0;
     }
-  }, [year, month]);
+  }, [year, month, tag]);
 
   // 保存済みのときだけ取得。year/month・mutationVersion（支出CRUD）・
   // categoriesVersion（カテゴリ名変更等）の変化に加え、保存された瞬間にも取得する。
@@ -112,6 +116,8 @@ export function useMonthlySummary(opts: {
   return {
     year,
     month,
+    tag,
+    setTag,
     summary,
     loading,
     isCurrentMonth,

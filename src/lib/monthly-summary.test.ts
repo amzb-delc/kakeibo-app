@@ -35,6 +35,7 @@ function exp(p: {
     updatedAt: p.updatedAt ?? spentAt,
     storeName: null,
     memo: null,
+    tags: [],
     categoryId: p.categoryId,
     category: { name: p.name, sortOrder: p.sortOrder },
   };
