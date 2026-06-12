@@ -134,7 +134,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 作成: 2026-06-10。<strong>ステータス: ✅ 実装完了（2026-06-10・PR #58 → #63）</strong>。
 支出ごとに<strong>「どちらが登録したか（入力者）」</strong>を記録する。夫婦の2人だけなので値は <strong>1=♂（夫）/ 2=♀（妻）</strong>。<br>
 入力者は<strong>端末ごとの設定</strong>（世帯コードと同じ cookie 方式）で持ち、<strong>新規登録時にサーバが cookie から付与</strong>する。<strong>編集では据え置き</strong>。<br>
-<strong>方針の変遷</strong>: #58 では「登録前に必須」ゲート付きで実装 → #63 で<strong>既定値＝妻(2) を起動時に発行</strong>し、必須ゲートは撤去した（下記「決定事項」参照）。<strong>一覧での入力者表示（男女アイコン）は別フェーズ。</strong>
+<strong>方針の変遷</strong>: #58 では「登録前に必須」ゲート付きで実装 → #63 で<strong>既定値＝妻(2) を起動時に発行</strong>し、必須ゲートは撤去した（下記「決定事項」参照）。<strong>一覧での入力者表示（男女アイコン）は別フェーズ。</strong><br>
+<strong>2026-06-12 更新</strong>: <code>enteredBy</code> は <code>Expense.tags String[]</code> の<strong>夫婦タグ <code>spouse:N</code> へ移行</strong>（列は削除・バックフィル済み）。本ページは当時の設計記録として残す。最新仕様・識別ドット・夫婦フィルタは <a href="expense-tags-plan.html">支出タグプラン</a>を参照。
 </blockquote>
 
 <h2>Context（なぜ作るか）</h2>

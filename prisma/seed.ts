@@ -143,7 +143,17 @@ async function main() {
     spentAt: Date;
     storeName: string | null;
     memo: string | null;
+    tags: string[];
     createdByUserId: string;
+  };
+
+  // デモ用の内部タグ（src/lib/tags.ts の仕様）。識別ドット・夫婦フィルタの実機確認が
+  // サンプルデータだけで成立するよう、夫婦タグを半々＋約2割にカードタグを付ける。
+  const DEMO_CARDS = ["楽天カード", "三井住友カード"];
+  const demoTags = (): string[] => {
+    const tags = [rng() < 0.5 ? "spouse:1" : "spouse:2"];
+    if (rng() < 0.2) tags.push(`card:${pick(DEMO_CARDS)}`);
+    return tags;
   };
 
   const data: ExpenseInput[] = [];
@@ -163,6 +173,7 @@ async function main() {
       spentAt: dateAt(y, m, d),
       storeName,
       memo,
+      tags: demoTags(),
       createdByUserId: user.id,
     });
   };

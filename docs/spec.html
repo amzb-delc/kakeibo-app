@@ -457,7 +457,7 @@ hr {
 <tr><td>spentAt</td><td>DateTime</td><td>JSTの「日」を表す（JST 00:00 を UTC で格納）</td></tr>
 <tr><td>storeName</td><td>String?</td><td>任意。最大100文字</td></tr>
 <tr><td>memo</td><td>String?</td><td>任意。最大500文字。明細取り込みでは取り込み元 PDF のファイル名を自動入力</td></tr>
-<tr><td>enteredBy</td><td>Int?</td><td>入力者。<code>1=♂(夫) / 2=♀(妻)</code>。端末ごとの cookie 設定から<strong>新規登録時のみサーバが付与</strong>（編集は据え置き）。未設定の既存行は null。一覧表示は未実装</td></tr>
+<tr><td>tags</td><td>String[]</td><td>内部タグ（<code>@default([])</code>）。<strong>夫婦タグ <code>spouse:1</code>(♂)/<code>spouse:2</code>(♀)</strong>＝端末の入力者 cookie 由来、<strong>カードタグ <code>card:&lt;カード名&gt;</code></strong>＝クレカ明細取込由来。<strong>新規登録時のみサーバが付与</strong>（編集は据え置き）。種別は名前空間プレフィックスで判定（<code>src/lib/tags.ts</code>）。画面に <code>#xxx</code> 形式は出さない内部仕様。旧 <code>enteredBy Int?</code> を <code>spouse:N</code> へバックフィルして置換（<a href="expense-tags-plan.html">支出タグプラン</a>）</td></tr>
 <tr><td>receiptImageUrl</td><td>String?</td><td>将来のレシート画像URL</td></tr>
 <tr><td>ocrRawText</td><td>String?</td><td>将来のOCR生テキスト</td></tr>
 <tr><td>createdByUserId</td><td>String</td><td>FK → User（onDelete: Restrict）</td></tr>
@@ -551,11 +551,12 @@ hr {
 <tr><td>翌月ボタン</td><td>当月なら disabled（スワイプでも当月より先には進めない）</td></tr>
 <tr><td>スワイプ月送り</td><td>検知レイヤー（<code>swipeRef</code>）を<strong>画面全体に張る</strong>。横移動が縦より優位かつ <strong><code>SWIPE_MIN=36px</code> 超</strong>で発火（PWA 想定で感度高め、<code>touchmove</code> は <code>passive:false</code>）。演出は<strong>方向付きスライド＋クロスフェード</strong>: 不透明 0 の間にデータを差し替え、反対側（<code>SLIDE_OFFSET=48px</code>）からスライドイン</td></tr>
 <tr><td>ヘッダキャラ</td><td><strong>当月表示時のみ</strong>ヘッダに小さなキャラ（<code>header-character.tsx</code>、28px、<code>aria-hidden</code>）。タップで一度だけ「ぴょこっ」と揺れる（<code>animate-character-wiggle</code>）。過去月では出さない</td></tr>
+<tr><td>夫婦タグフィルタ</td><td>全体カード上部に<strong>「全体 / ♂ / ♀」セグメント</strong>。選択すると <code>GET /api/monthly-summary?tag=spouse:N</code> を叩き、<strong>合計・ドーナツ・前月比・明細すべてサーバ側で絞られる</strong>。<strong>月送りをまたいでも選択を維持</strong>。card タグはフィルタに出さない（夫婦タグのみ絞り込み対象）。タグ仕様は <a href="expense-tags-plan.html">支出タグプラン</a></td></tr>
 <tr><td>合計カード</td><td>flex 横並びレイアウト: <strong>左にドーナツチャート</strong>（<code>src/components/donut-chart.tsx</code>、自前 SVG、外側コンテナ <code>w-[160px]</code> 固定 / ringWidth 22）、<strong>右にレジェンド（＝カテゴリ選択UI）</strong>（<code>flex-1 min-w-0</code>、カテゴリ色のタグ風表示 <code>category-color.ts</code> の <code>tag</code>、長いカテゴリ名は <code>truncate</code>、<strong>カテゴリ名の隣に当月件数（「N件」）</strong>、タグ右に金額を <code>text-xs</code> muted で表示。件数の「その他」はバケツ内の合算）。<strong>各タグはタップ可能</strong>で、タップしたカテゴリを下の「明細」に表示する。<strong>「解除なし」設計</strong>: 選択は常に切替のみで再タップでも解除せず（<code>aria-pressed</code>、選択中は <code>ring-2 ring-current</code>）。<strong>レジェンド／ドーナツは「上位6件＋その他」</strong>（<code>TOP_N=6</code>）: カテゴリが<strong>8件以上のときだけ</strong>残りを「その他」（グレー <code>OTHERS_COLOR</code>、擬似ID <code>__others__</code>）に集約し、<strong>7件以下は全件を個別表示</strong>（「その他」が必ず2件以上を束ねるよう <code>OTHERS_THRESHOLD=7</code>）。「その他」もタップで選択でき、明細はバケツ内の全カテゴリを名前タグ付きで表示する。ドーナツ中央に「合計」ラベル → 表示月合計（<code>text-xl whitespace-nowrap</code>）→ 差額（過去月閲覧時のみ、トレンド色）を配置。ドーナツのセグメントは<strong>金額の大きい順（降順）</strong>、カテゴリ色で塗り、レジェンドと 1:1 対応。<strong>選択中セグメントは強調</strong>（該当を僅かに太く <code>SELECTED_BUMP</code> ＋他を <code>strokeOpacity 0.28</code> で減光、未選択時は <code>dimAll</code> で全体減光）。合計カードの異常値バーは廃止（カテゴリ行のバーは継続）</td></tr>
 <tr><td>明細セクション</td><td>見出しは<strong>「明細」</strong>で、その右に<strong>選択中カテゴリのラベル</strong>（カテゴリ色タグ）を表示。当月にそのカテゴリの記録が無い（キロクナシ）場合も <code>useExpenseModal().categories</code>（先読み全カテゴリ）から名前を解決し<strong>ラベルは出し続ける</strong>。明細カードは合計カードのレジェンドで<strong>選択中の1カテゴリのみ</strong>を表示（<code>visibleCategories</code>）。<strong>「その他」選択時はバケツ内の全カテゴリ</strong>を表示し、各カードに<strong>カテゴリ名タグを付ける</strong>（<code>showName</code>。どのカテゴリか区別するため）。個別カテゴリ選択時は<strong>カード内のカテゴリ名タグを廃止</strong>し、右側に金額＋差額（過去月閲覧時のみ、トレンド色）の縦並び、下に異常値バー（フィル長＝支出量、バー色はカテゴリ色）。<strong>開閉トグルは持たず常時展開</strong>（単一選択表示のため）。選択状態はサマリーページが保持（制御コンポーネント）。未選択(null)時のみ最大カテゴリへ自動フォールバック</td></tr>
 <tr><td>異常値バー</td><td>過去6ヶ月（表示月含む）の box stats から「いつもの幅」を算出し、<strong>上フェンス（Q3+1.5×IQR）を 100%</strong> としてフィル長で支出量を可視化。やたら使った月＝バーが長い、やたら使わなかった月＝バーが短い。サンプル不足（N&lt;2 or IQR=0）の月は<strong>斜めストライプ表示</strong>（「判定なし」を視覚的に区別、<code>aria-label</code> に明示）。値ありの月は <code>role="progressbar"</code> + <code>aria-valuenow</code> を付与。カテゴリの異常値サンプルは<strong>そのカテゴリの支出があった月のみ</strong>から採る（ゼロ埋めしない）。初回マウントでも 0%→target にトランジションするよう <code>requestAnimationFrame</code> で1フレーム遅延</td></tr>
 <tr><td>明細の並び替え</td><td>明細リスト上部に<strong>全カード共通のソートヘッダ</strong>（<code>日付 / 店名 / 金額</code>、明細行と3カラム整列）を1つ表示（「その他」で複数カードでもヘッダは1つ）。<strong>日付ボタンは1タップで循環</strong>（日付↓→日付↑→更新日↓→更新日↑）、<strong>金額ボタンは↓↑トグル</strong>。アクティブ列は上下三角を青く点灯。並び替えは純関数 <code>lib/expense-sort.ts</code>（日付＝ISO文字列、金額＝数値で比較）</td></tr>
-<tr><td>明細行</td><td>選択カテゴリの支出を一行表示（<strong>日付 ／ 店名 or メモ ／ 金額</strong>の3カラム整列、日付は固定幅）。日付表示は<strong>発生日＝<code>M/D(曜)</code> ／ 更新日＝<code>YYYY-MM-DD</code></strong>。既定は発生日の降順。明細は <code>monthly-summary</code> API が各カテゴリに同梱（<code>updatedAt</code> 含む）するため追加通信なし</td></tr>
+<tr><td>明細行</td><td>選択カテゴリの支出を一行表示（<strong>日付 ／ 店名 or メモ ／ 金額</strong>の3カラム整列、日付は固定幅）。日付表示は<strong>発生日＝<code>M/D(曜)</code> ／ 更新日＝<code>YYYY-MM-DD</code></strong>。既定は発生日の降順。明細は <code>monthly-summary</code> API が各カテゴリに同梱（<code>updatedAt</code> 含む）するため追加通信なし。<strong>店名/メモの前にタグごとの識別色ドット</strong>を並べる（<code>tagColor</code>：<code>spouse:1</code>=青 <code>#3b82f6</code> / <code>spouse:2</code>=ローズ <code>#f43f5e</code> / card はカード名ハッシュで6色パレットから安定選択）。これで「一覧での入力者表示」が実現（旧 <code>enteredBy</code> の別フェーズ項目を解消）</td></tr>
 <tr><td>明細タップ</td><td>編集用ボトムシートを開く（<code>useExpenseModal().openEdit(...)</code>）</td></tr>
 <tr><td>更新反映</td><td>登録・編集・削除の成功で <code>ExpenseModalProvider</code> の <code>mutationVersion</code> が増分し、サマリーを自動再取得。画面遷移しないため<strong>選択月・選択カテゴリは保持</strong>される。選択カテゴリは<strong>月切り替えをまたいでも維持</strong>し、切替先の月にそのカテゴリの記録が無ければ「キロクナシ」を表示（記録のある月に戻れば再表示）。<strong>登録/更新後は確定したカテゴリを選択状態に同期</strong>し、<strong>CRUD 後はトップへスムーズスクロール</strong>。カテゴリ名変更も即時反映する（Provider の <code>categoriesVersion</code> をホームの取得 deps に含め、<code>refreshCategories</code> 時にサマリーも再取得）</td></tr>
 <tr><td>空状態</td><td><strong>選択カテゴリが当月に無い（<code>visibleCategories</code> が空）</strong>ときはキャラクター（<code>public/character.png</code>、112px）を中央に置き、「キロクナシ」を表示（当月にデータが1件も無いケースも含む。ワレワレ宇宙人のカタコト感に合わせたコピー）</td></tr>
@@ -664,7 +665,7 @@ hr {
 <p>支出を新規作成。</p>
 <p><strong>必須:</strong> <code>amount</code>（0〜100,000,000の整数。0円可）、<code>spentAt</code>（<code>YYYY-MM-DD</code>）、<code>categoryId</code>（世帯のカテゴリ）</p>
 <p><strong>任意:</strong> <code>storeName</code>（≤100）、<code>memo</code>（≤500）、<code>receiptImageUrl</code></p>
-<p><strong>入力者:</strong> <code>enteredBy</code> はボディでは受け取らず、<strong>サーバが端末の cookie（<code>getEnteredBy()</code>）から付与</strong>する（編集 PATCH は据え置き）。<code>batch</code> も同様。</p>
+<p><strong>タグ（入力者）:</strong> ボディでは受け取らず、<strong>サーバが端末の入力者 cookie（<code>getEnteredBy()</code>）から夫婦タグ <code>spouse:1</code>(♂)/<code>spouse:2</code>(♀) を <code>tags</code> に付与</strong>する（編集 PATCH は据え置き）。<code>batch</code> も同様（＋下記の <code>card:</code> タグ）。タグ仕様は <a href="expense-tags-plan.html">支出タグプラン</a>参照。</p>
 <p><strong>レスポンス:</strong> <code>201</code> + 作成された <code>Expense</code> / <code>400</code> + <code>{ error }</code></p>
 <pre><code>{
   "amount": 1280,
@@ -679,6 +680,7 @@ hr {
 <h4><span class="method method-post">POST</span> /api/expenses/batch</h4>
 <p>明細取り込み用の<strong>一括登録</strong>。<code>rows[]</code> を全件 <code>validateExpenseInput</code>（POSTと同じガード・世帯スコープのカテゴリ照合）で検証し、<strong>1件でも失敗したら何も作らず errors を返す</strong>（部分コミットせず「全成功か全失敗」）。成功時は <code>prisma.$transaction</code> で一括 create。</p>
 <p><strong>各行:</strong> <code>amount</code> / <code>spentAt</code> / <code>categoryId</code>（必須）、<code>storeName</code> / <code>memo</code>（任意）</p>
+<p><strong>タグ:</strong> 各行に入力者 cookie 由来の <code>spouse:N</code> を付与。さらにトップレベルに任意の <strong><code>cardName?: string</code></strong> を受理し、<code>cardTagOf(cardName)</code> が非 null（trim 後1〜30文字・制御文字なし）なら全行に <strong><code>card:&lt;カード名&gt;</code></strong> を付与。<code>cardName</code> が string 以外は <code>400</code>。</p>
 <p><strong>上限:</strong> 500件（超過は <code>400</code>）。空配列も <code>400</code>。</p>
 <p><strong>レスポンス:</strong> <code>201</code> + <code>{ created, errors: [] }</code> / <code>400</code> + <code>{ created: 0, errors: [{ index, message }] }</code></p>
 </div>
@@ -711,7 +713,7 @@ hr {
 <div class="endpoint" id="api-monthly-summary">
 <h4><span class="method method-get">GET</span> /api/monthly-summary</h4>
 <p>表示月のカテゴリ別集計と、比較用の「今月」集計、そして直近6ヶ月（表示月含む）の box stats（中央値・四分位・フェンス）を返す。当月閲覧時は <code>compareTotal: null</code>。box stats はサマリーの「異常値バー」のフィル基準として使う。各カテゴリに表示月の支出明細（<code>spentAt</code> 降順）を同梱するため、サマリー画面は追加通信なしで明細を展開できる。</p>
-<p><strong>クエリ:</strong> <code>year</code>, <code>month</code>（未指定なら当月）</p>
+<p><strong>クエリ:</strong> <code>year</code>, <code>month</code>（未指定なら当月）、<code>tag</code>（任意の夫婦タグ <code>spouse:1</code>/<code>spouse:2</code> による絞り込み。<code>isValidTag</code> を通らない値は <strong>400</strong>）。<code>tag</code> 指定時は<strong>表示月・比較月・直近6ヶ月の全クエリへ一貫適用</strong>（<code>{ tags: { has: tag } }</code>）＝合計・ドーナツ・前月比・明細すべてが絞られる。</p>
 <p><strong>レスポンス（過去月閲覧時）:</strong></p>
 <pre><code>{
   "year": 2026,
@@ -739,7 +741,8 @@ hr {
           "amount": 1280,
           "spentAt": "2026-04-20T15:00:00.000Z",
           "storeName": "スーパー〇〇",
-          "memo": null
+          "memo": null,
+          "tags": ["spouse:2"]
         }
       ]
     },
@@ -761,11 +764,11 @@ hr {
 
 <div class="endpoint" id="api-statement">
 <h4><span class="method method-post">POST</span> /api/statement</h4>
-<p>クレジットカードの<strong>利用明細PDF</strong>から利用明細行を<strong>一括で構造化抽出</strong>（Claude の document ブロック）。<strong>PDFは保存しない</strong>（抽出のみ、送信後 base64 を破棄）。<code>src/lib/statement.ts</code> の <code>extractStatement()</code> が structured outputs で <code>rows[]</code>（<code>amount</code> / <code>spentAt</code> / <code>storeName</code> / <code>categoryName</code>）を返す。明細は数十〜100行になるため <code>max_tokens: 8192</code>。</p>
+<p>クレジットカードの<strong>利用明細PDF</strong>から利用明細行を<strong>一括で構造化抽出</strong>（Claude の document ブロック）。<strong>PDFは保存しない</strong>（抽出のみ、送信後 base64 を破棄）。<code>src/lib/statement.ts</code> の <code>extractStatement()</code> が structured outputs で <strong><code>cardName</code></strong>（明細のカード名/ブランド名。例「楽天カード」。判別不能は null・30文字以内）と <code>rows[]</code>（<code>amount</code> / <code>spentAt</code> / <code>storeName</code> / <code>categoryName</code>）を返す。明細は数十〜100行になるため <code>max_tokens: 8192</code>。</p>
 <p><strong>必須環境変数:</strong> <code>ANTHROPIC_API_KEY</code>（未設定は <code>503</code>）。モデルは <code>STATEMENT_MODEL</code>（既定 <code>claude-sonnet-4-6</code>。表抽出の安定性を優先。Haiku でコスト比較も可）。</p>
 <p><strong>ボディ:</strong> <code>{ pdfBase64 }</code>（上限 6MB 相当。超過は <code>413</code>、欠落は <code>400</code>）</p>
 <p><strong>処理:</strong> 自世帯の<strong>有効カテゴリ名</strong>を渡して <code>categoryName</code> を id に解決し、対象期間の既存支出と突合して<strong>重複候補</strong>に <code>duplicateLikely</code> を付与（<code>src/lib/duplicate.ts</code>、同日×同額×店名近似。<strong>除外はせずユーザー判断</strong>）。</p>
-<p><strong>レスポンス:</strong> <code>{ rows: [{ amount, spentAt, storeName, categoryId, duplicateLikely }] }</code></p>
+<p><strong>レスポンス:</strong> <code>{ cardName: string | null, rows: [{ amount, spentAt, storeName, categoryId, duplicateLikely }] }</code>。<code>cardName</code> はプレビューに「カード: 〇〇」として表示し、確定時に <code>batch</code> のトップレベル <code>cardName</code> として送ると全行に <code>card:&lt;カード名&gt;</code> タグが付く（<a href="expense-tags-plan.html">支出タグプラン</a>）。</p>
 <p><strong>エラー:</strong> OCR と同様に残高不足/認証/混雑(429)、および抽出側の拒否・<code>max_tokens</code>（明細が長すぎ）・空応答を切り分けて <code>502</code> + <code>{ error }</code>。集計/管理行（請求額合計・繰越・手数料等）はプロンプトで除外指示。</p>
 </div>
 </section>
@@ -901,6 +904,20 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-06-12 — 支出タグ（<code>enteredBy</code> → <code>tags String[]</code>）＋ SEC-6 修正</h3>
+<p><span class="badge badge-major">major</span> 入力者専用列 <code>Expense.enteredBy Int?</code> を汎用の内部タグ配列 <code>Expense.tags String[]</code> へ一般化。設計記録は <a href="expense-tags-plan.html">支出タグプラン</a>。PR #69（実装本体）・PR #70（テスト/SEC-6修正/docs/seed）。</p>
+<ul>
+  <li><strong>タグ内部仕様</strong>: <code>src/lib/tags.ts</code> が単一ソース。夫婦タグ <code>spouse:1</code>(♂)/<code>spouse:2</code>(♀)、カードタグ <code>card:&lt;カード名&gt;</code>（trim 後1〜30文字・制御文字不可）。種別は名前空間プレフィックスで判定。画面に <code>#xxx</code> 形式は出さない</li>
+  <li><strong>マイグレーション</strong> <code>20260612051542_replace_entered_by_with_tags</code>: <code>tags</code> 列追加 → 旧 <code>enteredBy</code> を <code>spouse:N</code> へバックフィル → <code>enteredBy</code> 列削除（ロスレス）</li>
+  <li><strong>付与</strong>: 新規登録（<code>POST /api/expenses</code> / <code>batch</code>）時にサーバが入力者 cookie から <code>spouse:N</code> を付与。編集 PATCH は据え置き。設定の夫/妻選択・cookie・<code>/api/session</code> は従来どおり存続</li>
+  <li><strong>明細取込</strong>: <code>extractStatement()</code> に <code>cardName</code> 抽出を追加 → <code>POST /api/statement</code> レスポンスに <code>cardName: string|null</code>（プレビューに「カード: 〇〇」） → <code>batch</code> のトップレベル <code>cardName</code> → 全行に <code>card:&lt;カード名&gt;</code> タグ</li>
+  <li><strong>UI</strong>: 明細行に <code>tagColor</code> ベースの識別色ドット（<code>spouse:1</code>=青 / <code>spouse:2</code>=ローズ / card はカード名ハッシュで6色から安定選択）。全体カード上部に「全体/♂/♀」夫婦タグフィルタ（<code>GET /api/monthly-summary?tag=spouse:N</code> で合計・ドーナツ・前月比・明細をサーバ側で絞り、月送りでも維持）</li>
+  <li><strong>API</strong>: <code>GET /api/monthly-summary</code> に <code>?tag=</code>（不正タグは 400）、明細レスポンス行に <code>tags: string[]</code> を追加</li>
+  <li><strong>SEC-6 バグ修正</strong>（同梱・コミット 4cc5109）: <code>requireSameOrigin</code> が Origin を <code>req.url</code> のホストと比較していたため、LAN IP・スマホ実機からの正当な同一オリジン POST が全 API で 403 になっていた。宛先判定を <code>x-forwarded-host</code> → <code>Host</code> ヘッダ → <code>req.url</code> の順に修正（<code>src/lib/api.ts</code>）</li>
+</ul>
+
+<hr>
 
 <h3>2026-06-10 — クレカ明細PDF取り込み（抽出→プレビュー編集→一括登録）</h3>
 <p><span class="badge badge-major">major</span> Phase2 として保留していたクレカ明細の一括取り込みを実装。PR #48。</p>

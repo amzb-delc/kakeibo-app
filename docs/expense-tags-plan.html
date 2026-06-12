@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿アプリ — 支出タグ（enteredBy → tags）実装プラン</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+  --decide-bg: #fee2e2;
+  --decide-fg: #991b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+    --decide-bg: #450a0a;
+    --decide-fg: #fca5a5;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+.backlink {
+  display: inline-block; margin-bottom: 16px; color: var(--primary);
+  text-decoration: none; font-size: 13px;
+}
+.backlink:hover { text-decoration: underline; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 8px 0; }
+a { color: var(--primary); }
+code {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+pre {
+  background: var(--code-bg); padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 12px 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--primary);
+  background: var(--card); border-radius: 0 8px 8px 0; color: var(--muted);
+  font-size: 14px;
+}
+blockquote strong { color: var(--fg); }
+ul { margin: 8px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px;
+  background: var(--card); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); font-weight: 600; white-space: nowrap; }
+td.c { text-align: center; white-space: nowrap; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-todo { background: var(--todo-bg); color: var(--todo-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.b-decide { background: var(--decide-bg); color: var(--decide-fg); }
+.rec { color: var(--success); font-weight: 600; }
+.muted { color: var(--muted); }
+del { color: var(--muted); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+.dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 999px;
+  vertical-align: middle; margin-right: 4px;
+}
+.decision {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--destructive); border-radius: 0 8px 8px 0;
+  padding: 12px 16px; margin: 14px 0;
+}
+.decision h3 { margin-top: 0; }
+.decision.decided { border-left-color: var(--success); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="backlink" href="index.html">← ドキュメント一覧へ</a>
+<h1>支出タグ（enteredBy → tags）— 実装プラン</h1>
+
+<blockquote>
+作成: 2026-06-12。<strong>ステータス: ✅ 実装完了（2026-06-12・実装本体 PR #69／フォローアップ PR #70）</strong>。
+支出ごとの <code>Expense.enteredBy Int?</code>（入力者 1=♂/2=♀）を廃止し、<strong>汎用的な内部タグ配列 <code>Expense.tags String[]</code></strong> へ一般化する。<br>
+入力者は <strong>夫婦タグ <code>spouse:1</code>(♂)/<code>spouse:2</code>(♀)</strong> として、クレカ明細のカードは <strong>カードタグ <code>card:&lt;カード名&gt;</code></strong> として記録する。<strong>タグは内部仕様</strong>（画面に <code>#xxx</code> 形式は出さない）。<br>
+付与・据え置きの方針は <a href="entered-by-plan.html">入力者プラン</a>を踏襲（<strong>新規登録時にサーバが付与・編集 PATCH は据え置き</strong>）。設定の夫/妻選択・cookie・<code>/api/session</code> は従来どおり存続。新たに<strong>明細行の識別ドット</strong>と<strong>全体カードの夫婦タグフィルタ</strong>を追加。
+</blockquote>
+
+<h2>Context（なぜ tags へ一般化するか）</h2>
+<p><a href="entered-by-plan.html">入力者プラン</a>で導入した <code>Expense.enteredBy Int?</code> は「夫/妻のどちらが登録したか」専用の単一列だった。その後、クレカ明細取込で<strong>どのカード由来の支出か</strong>も残したくなったが、列を増やすたびにスキーマ・API・フォームに分岐が増える。そこで<strong>「支出に複数の機械可読ラベルを付けられる」汎用の <code>tags String[]</code></strong> に一般化し、入力者もカードもこの上に乗せる。</p>
+<p><strong>タグは内部仕様</strong>で、画面に <code>#xxx</code> 形式のチップは出さない。種別は<strong>名前空間プレフィックス</strong>（<code>spouse:</code> / <code>card:</code>）で機械判定し、UI では識別ドットや絞り込みなど用途ごとの表現に変換する。これにより「タグ機能のUIを作り込む」コストを掛けずに、データだけ先に汎用化できる。</p>
+
+<h2>タグの内部形式（<code>src/lib/tags.ts</code> が単一ソース）</h2>
+<p>タグの形式・検証・色付けはすべて <code>src/lib/tags.ts</code> に集約する（コード/メモリに散らさない）。</p>
+<table>
+<thead><tr><th>種別</th><th>形式</th><th>由来</th><th>制約</th></tr></thead>
+<tbody>
+<tr><td>夫婦タグ</td><td><code>spouse:1</code>(♂) / <code>spouse:2</code>(♀)</td><td>設定の入力者 cookie（<code>getEnteredBy()</code>）</td><td>2値のみ（<code>spouseTagOf(1|2)</code>）。<code>isSpouseTag</code> で判定</td></tr>
+<tr><td>カードタグ</td><td><code>card:&lt;カード名&gt;</code></td><td>クレカ明細抽出の <code>cardName</code></td><td>trim 後 1〜<strong>30文字</strong>（<code>MAX_CARD_NAME_LENGTH</code>）・<strong>制御文字(C0/DEL)不可</strong>。空・超過・不正は <strong>null＝タグ化しない</strong>（<code>cardTagOf</code>）</td></tr>
+</tbody>
+</table>
+<ul>
+  <li><code>isValidTag(tag)</code> = <code>isSpouseTag || isCardTag</code>。<code>isCardTag</code> は <code>cardTagOf</code> との<strong>往復一致</strong>で「trim 済み・上限内・制御文字なし」を保証（不正タグの混入を弾く）。</li>
+  <li><code>tagColor(tag)</code> = 識別ドットの色（hex）。<strong>spouse は固定色</strong>（<code>spouse:1</code>=青 <code>#3b82f6</code> / <code>spouse:2</code>=ローズ <code>#f43f5e</code>）、<strong>card はカード名の djb2 ハッシュで6色パレットから安定選択</strong>（同じカード名は常に同じ色）。</li>
+</ul>
+
+<h2>記録タイミング（入力者プランを踏襲）</h2>
+<pre><code>新規登録（FAB / レシート / 明細一括）
+  POST /api/expenses ───────────────▶ tags = [ spouseTagOf(getEnteredBy()) ]      ← cookie 由来
+  POST /api/expenses/batch ─────────▶ tags = [ spouseTagOf(...), card:&lt;cardName&gt; ]  ← cookie + リクエストの cardName
+
+編集
+  PATCH /api/expenses/[id] ─────────▶ tags は data に含めない＝据え置き（enteredBy 時代と同じ）</code></pre>
+<p>cookie・設定モーダルの夫/妻選択・<code>PATCH /api/session</code>・既定値2(♀)発行は<strong>すべて従来どおり存続</strong>。違いは「cookie の値を <code>enteredBy</code> 列ではなく <code>tags</code> の <code>spouse:N</code> として書く」点だけ。</p>
+
+<h2>データモデル / マイグレーション</h2>
+<pre><code>model Expense {
+  …
+  tags  String[]  @default([])   // 内部タグ。spouse:1|2 / card:&lt;名前&gt;
+}</code></pre>
+<p>マイグレーション <code>20260612051542_replace_entered_by_with_tags</code> は<strong>ロスレス移行</strong>:</p>
+<pre><code>-- 1) tags 列を追加
+ALTER TABLE "Expense" ADD COLUMN "tags" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+-- 2) 既存 enteredBy をバックフィル（1→spouse:1 / 2→spouse:2、NULL はタグなし）
+UPDATE "Expense" SET "tags" = ARRAY['spouse:' || "enteredBy"] WHERE "enteredBy" IS NOT NULL;
+-- 3) enteredBy 列を削除
+ALTER TABLE "Expense" DROP COLUMN "enteredBy";</code></pre>
+
+<h2>API 変更</h2>
+<table>
+<thead><tr><th>エンドポイント</th><th>変更</th></tr></thead>
+<tbody>
+<tr><td><code>POST /api/expenses</code></td><td>cookie の入力者を <code>spouse:N</code> タグとして <code>create</code> に付与（ボディでは受け取らない）。</td></tr>
+<tr><td><code>POST /api/expenses/batch</code></td><td>トップレベルに <strong><code>cardName?: string</code></strong> を受理。各行に <code>spouse:N</code> ＋（<code>cardTagOf(cardName)</code> が非 null なら）<code>card:&lt;名前&gt;</code> を付与。<code>cardName</code> が string 以外は 400。</td></tr>
+<tr><td><code>POST /api/statement</code></td><td>抽出スキーマに <code>cardName</code> を追加（カード名/ブランド名を30文字以内で。判別不能は null）。レスポンスに <strong><code>cardName: string | null</code></strong> を追加。</td></tr>
+<tr><td><code>GET /api/monthly-summary</code></td><td>クエリ <strong><code>?tag=</code></strong> を追加。<code>isValidTag</code> を通らない値は <strong>400</strong>。指定時は表示月・比較月・直近6ヶ月の全クエリへ <code>{ tags: { has: tag } }</code> を一貫適用（合計・ドーナツ・前月比・明細すべてサーバ側で絞る）。各明細行に <strong><code>tags: string[]</code></strong> を同梱。</td></tr>
+<tr><td><code>PATCH /api/expenses/[id]</code></td><td><strong>変更なし</strong>（<code>tags</code> を扱わない＝据え置き）。</td></tr>
+</tbody>
+</table>
+
+<h2>UI（識別ドット・夫婦フィルタ）</h2>
+<ul>
+  <li><strong>明細行の識別ドット</strong>: 各支出の店名/メモの前に、その行の <code>tags</code> ごとに <code>tagColor(tag)</code> の小さな丸ドットを並べる
+    （<span class="dot" style="background:#3b82f6"></span><code>spouse:1</code>=青 /
+     <span class="dot" style="background:#f43f5e"></span><code>spouse:2</code>=ローズ /
+     <span class="dot" style="background:#f59e0b"></span> card= カード名ハッシュで6色パレットから安定選択）。これにより<strong>「一覧での入力者表示」が解消</strong>（入力者プランで別フェーズだった項目）。</li>
+  <li><strong>全体カードの夫婦タグフィルタ</strong>: 全体カード上部に「全体 / ♂ / ♀」セグメントを置き、選択で <code>GET /api/monthly-summary?tag=spouse:N</code> を叩く。合計・ドーナツ・前月比・明細がすべて絞られる。<strong>月送りをまたいでも選択を維持</strong>。<strong>card タグはフィルタに出さない</strong>（夫婦タグのみ絞り込み対象）。</li>
+</ul>
+
+<h2>明細取込のカード名フロー</h2>
+<pre><code>PDF → /api/statement
+   extractStatement() が cardName + rows[] を構造化抽出
+   ─▶ レスポンス { cardName: "楽天カード" | null, rows: [...] }
+
+プレビュー画面
+   「カード: 〇〇」を表示（cardName が null なら出さない）
+
+確定 → POST /api/expenses/batch { cardName, rows }
+   各行 tags = [ spouse:N, card:楽天カード ]</code></pre>
+
+<hr>
+
+<h2 id="decisions">★ 決定事項</h2>
+
+<div class="decision decided">
+<h3>① 専用列ではなく汎用 <code>tags String[]</code> に一般化 <span class="badge b-done">✅ 決定</span></h3>
+<p>入力者もカードも「支出に付く機械可読ラベル」という同じ形。列を増やすたびにスキーマ/API/フォームへ分岐が波及するのを避け、配列1本に集約。種別は名前空間プレフィックスで判定する。</p>
+</div>
+
+<div class="decision decided">
+<h3>② タグは内部仕様（<code>#xxx</code> チップを出さない） <span class="badge b-done">✅ 決定</span></h3>
+<p>ユーザーにタグを編集させる汎用UIは作らず、用途ごとの表現（識別ドット・夫婦フィルタ・カード名表示）に変換する。フリー入力のタグ機能は今回スコープ外。</p>
+</div>
+
+<div class="decision decided">
+<h3>③ 付与・据え置きは入力者プランを踏襲 <span class="badge b-done">✅ 決定</span></h3>
+<p>新規登録時にサーバが cookie/リクエストからタグを付け、編集 PATCH は据え置き。<code>expense-form</code> / <code>validateExpenseInput</code> には乗せない（タグは payload 由来でない）。</p>
+</div>
+
+<hr>
+
+<h2>検証（実装後）</h2>
+<ul>
+  <li><code>npx prisma migrate dev</code> → <code>npm run lint</code> → <code>npm test</code>（タグ付与・<code>cardTagOf</code>/<code>isValidTag</code> の境界・<code>?tag=</code> 絞り込みと不正タグ 400・据え置きのテストが緑）。</li>
+  <li><code>npm run dev</code> → 端末の入力者を♂/♀で切替 → 登録した支出の明細行に対応色のドットが出る。全体カードの「♂/♀」で合計・ドーナツ・明細が絞られ、月送りでも維持される。</li>
+  <li>クレカ明細PDFを取込 → プレビューに「カード: 〇〇」 → 一括登録後、各行に <code>card:〇〇</code> タグ（ドット）が付く。<code>npx prisma studio</code> で <code>Expense.tags</code> を確認。編集・保存しても <code>tags</code> は据え置き。</li>
+</ul>
+
+</div>
+</body>
+</html>

@@ -70,4 +70,12 @@ describe("POST /api/expenses", () => {
       })
     );
   });
+
+  it("入力者 cookie 未設定なら tags は空配列で作成", async () => {
+    getEnteredBy.mockResolvedValue(null);
+    create.mockResolvedValue({ id: "e2", ...valid, category: { id: "cat-1", name: "食費" } });
+    const res = await POST(jsonReq(URL, valid));
+    expect(res.status).toBe(201);
+    expect(create.mock.calls[0][0].data.tags).toEqual([]);
+  });
 });
