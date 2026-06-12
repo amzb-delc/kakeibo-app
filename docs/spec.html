@@ -920,7 +920,7 @@ hr {
 <h2>改修履歴</h2>
 
 <h3>2026-06-12 — 全体カードに6ヶ月比較（積み上げ棒）スライドペイン</h3>
-<p><span class="badge badge-major">major</span> ホームの全体カードを<strong>横スライド式の2ペイン</strong>に拡張。単月内訳（ドーナツ＋レジェンド）⇔ 直近6ヶ月のカテゴリ別積み上げ棒グラフを切替えられるようにした。設計記録は <a href="six-month-chart-plan.html">6ヶ月比較プラン</a>。PR 番号未定（<code>feat/six-month-chart</code>）。</p>
+<p><span class="badge badge-major">major</span> ホームの全体カードを<strong>横スライド式の2ペイン</strong>に拡張。単月内訳（ドーナツ＋レジェンド）⇔ 直近6ヶ月のカテゴリ別積み上げ棒グラフを切替えられるようにした。設計記録は <a href="six-month-chart-plan.html">6ヶ月比較プラン</a>。PR #71。</p>
 <ul>
   <li><strong>UI</strong>: 全体カードが2ペインに。単月ペイン右辺の縦長シェブロン（<code>›</code>）で6ヶ月ペインへ、6ヶ月ペイン左辺（<code>‹</code>）で単月へスライド（約300ms）。月送りしても表示モードは維持。夫婦タグフィルタは両ペイン共通</li>
   <li><strong>グラフ</strong>: <code>src/components/stacked-bar-chart.tsx</code>（新規）。自前 SVG（recharts 不採用）。6本固定（古い月＝左→表示月＝右端）、<code>sortOrder</code> 昇順で下から積み上げ、色は <code>categoryColor()</code> でドーナツと共通。空月は <code>total=0</code> の空棒。6ヶ月最大月合計で正規化、先頭のみ年付き月ラベル（例 <code>'25 12月</code>）、表示月の棒のみ合計額ラベル</li>

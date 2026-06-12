@@ -131,7 +131,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 <h1>全体カードの6ヶ月比較（積み上げ棒）— 実装プラン</h1>
 
 <blockquote>
-作成: 2026-06-12。<strong>ステータス: ✅ 実装完了（2026-06-12・PR 番号未定 / <code>feat/six-month-chart</code>）</strong>。
+作成: 2026-06-12。<strong>ステータス: ✅ 実装完了（2026-06-12・PR #71）</strong>。
 ホームの全体カード（月次サマリーカード）を<strong>横スライド式の2ペイン</strong>に拡張し、従来の単月ペイン（ドーナツ＋レジェンド）に加えて<strong>直近6ヶ月のカテゴリ別積み上げ棒グラフ</strong>を見られるようにする。<br>
 グラフは<strong>自前 SVG</strong>（recharts 等は不採用）で、色は既存ドーナツと共通の <code>categoryColor()</code> パレットを使い、<strong>カテゴリ単独比較</strong>への切替も持つ。夫婦タグフィルタ（全体/♂/♀）は両ペイン共通で、サーバ側絞り込みのためグラフにも反映される。<br>
 API は <code>GET /api/monthly-summary</code> のレスポンスに <code>sixMonths</code> 配列を追加（古い月→表示月の6本固定・タグフィルタ適用後）。
