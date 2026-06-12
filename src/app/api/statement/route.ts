@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { extractStatement, StatementExtractionError } from "@/lib/statement";
+import { cardTagOf } from "@/lib/tags";
 import { findDuplicateFlags } from "@/lib/duplicate";
 import {
   requireHouseholdId,
@@ -80,7 +81,12 @@ export async function POST(req: NextRequest) {
     });
 
     const flagged = await findDuplicateFlags(householdId, rows);
-    return NextResponse.json({ rows: flagged } satisfies StatementExtractResult);
+    // カード名はタグ化できる形（trim 済み・上限内）に正規化して返す。タグ化不能なら null。
+    const cardName =
+      typeof extracted.cardName === "string" && cardTagOf(extracted.cardName)
+        ? extracted.cardName.trim()
+        : null;
+    return NextResponse.json({ cardName, rows: flagged } satisfies StatementExtractResult);
   } catch (e) {
     console.error("statement extraction failed", e);
     const status = (e as { status?: number })?.status;

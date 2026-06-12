@@ -16,6 +16,7 @@ export type StatementExtractionRow = {
 };
 
 export type StatementExtraction = {
+  cardName: string | null; // 明細のカード名/ブランド名（例: 楽天カード）。判別不能なら null
   rows: StatementExtractionRow[];
 };
 
@@ -36,6 +37,11 @@ const STATEMENT_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
+    cardName: {
+      type: ["string", "null"],
+      description:
+        "明細のカード名・ブランド名（例: 楽天カード、三井住友カード、JCBカードW）。ヘッダ・表紙・ロゴ周辺の記載から判断し、30文字以内で簡潔に。判別できなければ null",
+    },
     rows: {
       type: "array",
       items: {
@@ -66,7 +72,7 @@ const STATEMENT_SCHEMA = {
       },
     },
   },
-  required: ["rows"],
+  required: ["cardName", "rows"],
 };
 
 export async function extractStatement(opts: {
@@ -82,6 +88,7 @@ export async function extractStatement(opts: {
       : "  （カテゴリ未設定）";
 
   const instruction = `これは日本のクレジットカード利用明細のPDFです。家計簿に取り込むため、すべての利用明細行を漏れなく構造化抽出してください。
+cardName には明細のカード名・ブランド名（例: 楽天カード、三井住友カード）をヘッダや表紙の記載から30文字以内で。判別できなければ null。
 各行（rows[]）は次の項目を持ちます。
 - amount: 利用金額（円・整数）。返金・キャンセル・マイナス計上はマイナスの整数で
 - spentAt: ご利用日を YYYY-MM-DD で（年の記載が無ければ明細の対象期間から推定）
