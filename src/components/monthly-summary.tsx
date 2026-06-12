@@ -301,8 +301,10 @@ export function MonthlySummaryView({
             </div>
           </div>
           {/* 単月ペイン ⇔ 6ヶ月ペインを横スライドで切替。外枠で overflow を切り、
-              内側の 2 枚（各 w-full）を translateX で左右に動かす。 */}
-          <div className="overflow-hidden">
+              内側の 2 枚（各 w-full）を translateX で左右に動かす。
+              シェブロンはペインのレイアウト外に出し、カードに対する絶対配置の
+              フローティングボタンにする（inert なペインの外なので常に操作可能）。 */}
+          <div className="relative overflow-x-clip">
             <div
               className="flex w-[200%] transition-transform duration-300 ease-out"
               style={{
@@ -310,15 +312,15 @@ export function MonthlySummaryView({
                   cardMode === "sixMonths" ? "translateX(-50%)" : "translateX(0)",
               }}
             >
-              {/* === 単月ペイン（ドーナツ＋レジェンド）。右辺にスライドUI === */}
+              {/* === 単月ペイン（ドーナツ＋レジェンド） === */}
               {/* 非表示側ペインは inert で配下のボタン群ごとフォーカス不可にする（WCAG 4.1.2）。
                   aria-hidden は jsdom（テスト）の role 除外用に併記 */}
               <div
-                className="w-1/2 shrink-0 pr-1"
+                className="w-1/2 shrink-0"
                 inert={cardMode === "sixMonths" ? true : undefined}
                 aria-hidden={cardMode === "sixMonths"}
               >
-                <div className="flex items-stretch gap-2">
+                <div className="flex items-stretch">
                   <div className="flex flex-1 items-start gap-3 min-w-0">
                     <div className="shrink-0 w-[160px]">
                       <DonutChart
@@ -373,64 +375,28 @@ export function MonthlySummaryView({
                       </ul>
                     )}
                   </div>
-                  {/* 右辺の縦長スライドUI（6ヶ月比較へ） */}
-                  <button
-                    type="button"
-                    onClick={() => setCardMode("sixMonths")}
-                    aria-label="6ヶ月の比較を表示"
-                    tabIndex={cardMode === "sixMonths" ? -1 : 0}
-                    className="shrink-0 flex w-7 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
-                  >
-                    <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
-                      <path
-                        d="M4 4 L10 10 L4 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
                 </div>
               </div>
 
-              {/* === 6ヶ月ペイン（積み上げ棒）。左辺にスライドUI === */}
+              {/* === 6ヶ月ペイン（積み上げ棒） === */}
               <div
-                className="w-1/2 shrink-0 pl-1"
+                className="w-1/2 shrink-0"
                 inert={cardMode !== "sixMonths" ? true : undefined}
                 aria-hidden={cardMode !== "sixMonths"}
               >
-                <div className="flex items-stretch gap-2">
-                  {/* 左辺の縦長スライドUI（単月へ戻る） */}
-                  <button
-                    type="button"
-                    onClick={() => setCardMode("month")}
-                    aria-label="単月の内訳に戻る"
-                    tabIndex={cardMode === "sixMonths" ? 0 : -1}
-                    className="shrink-0 flex w-7 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
-                  >
-                    <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
-                      <path
-                        d="M10 4 L4 10 L10 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
+                <div className="flex items-stretch">
                   <div className="flex-1 min-w-0">
                     <StackedBarChart
                       data={summary.sixMonths}
                       selectedCategoryId={chartCategoryId}
                       selectedSortOrder={chartCategory?.sortOrder ?? null}
+                      selectedYm={`${summary.year}-${String(summary.month).padStart(2, "0")}`}
                     />
                     {/* グラフ用カテゴリ選択（単月の選択とは独立）。タップで単独カテゴリ比較、
                         再タップ／「全体」で積み上げに戻る。 */}
                     {summary.categories.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                      // ring-offset とスクロールバーが下端で見切れないよう pb で余白を確保
+                      <div className="mt-2 pb-1 flex flex-wrap gap-1.5">
                         <button
                           type="button"
                           onClick={() => setChartCategoryId(null)}
@@ -468,6 +434,47 @@ export function MonthlySummaryView({
                 </div>
               </div>
             </div>
+
+            {/* フローティングのシェブロン（カードに対する絶対配置・縦中央）。
+                inert なペインの外なので常に操作可能。表示モードに応じて出す向きを切替:
+                単月表示中は右の › （6ヶ月へ）、6ヶ月表示中は左の ‹ （単月へ戻る）。 */}
+            {cardMode === "month" ? (
+              <button
+                type="button"
+                onClick={() => setCardMode("sixMonths")}
+                aria-label="6ヶ月の比較を表示"
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-muted active:bg-muted"
+              >
+                <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
+                  <path
+                    d="M4 4 L10 10 L4 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCardMode("month")}
+                aria-label="単月の内訳に戻る"
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-muted active:bg-muted"
+              >
+                <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
+                  <path
+                    d="M10 4 L4 10 L10 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
