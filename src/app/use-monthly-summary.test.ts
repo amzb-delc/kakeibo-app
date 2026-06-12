@@ -11,6 +11,7 @@ const SUMMARY: MonthlySummary = {
   compareTotal: null,
   boxStats: null,
   categories: [],
+  sixMonths: [],
 };
 
 beforeEach(() => {

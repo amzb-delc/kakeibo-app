@@ -14,6 +14,7 @@ const SUMMARY: MonthlySummary = {
     { categoryId: "a", name: "食費", sortOrder: 0, total: 100, compareTotal: null, boxStats: null, expenses: [] },
     { categoryId: "b", name: "日用品", sortOrder: 1, total: 50, compareTotal: null, boxStats: null, expenses: [] },
   ],
+  sixMonths: [],
 };
 
 const baseOpts = (over: Partial<Parameters<typeof useCategorySelection>[0]> = {}) => ({
