@@ -109,7 +109,11 @@ a { color: var(--primary); }
   </a>
   <a class="card" href="entered-by-plan.html">
     <div class="t">入力者（夫/妻） <span class="badge b-done">✅ 実装完了</span></div>
-    <div class="d">支出に入力者（♂/♀）を記録。端末ごとの cookie 設定で新規登録時に付与、既定は妻、編集は据え置き（PR #58 → #63）。</div>
+    <div class="d">支出に入力者（♂/♀）を記録。端末ごとの cookie 設定で新規登録時に付与、既定は妻、編集は据え置き（PR #58 → #63）。<strong>後継: 支出タグへ移行</strong>。</div>
+  </a>
+  <a class="card" href="expense-tags-plan.html">
+    <div class="t">支出タグ（enteredBy → tags） <span class="badge b-done">✅ 実装完了</span></div>
+    <div class="d"><code>enteredBy</code> を内部タグ配列 <code>tags</code> へ一般化。夫婦タグ <code>spouse:N</code>／カードタグ <code>card:〇〇</code>、明細行の識別ドット・全体カードの夫婦フィルタ（feat/expense-tags）。</div>
   </a>
 </div>
 

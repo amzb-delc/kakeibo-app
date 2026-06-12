@@ -91,4 +91,33 @@ describe("POST /api/expenses/batch", () => {
     expect(data.tags).toEqual(["spouse:2"]);
     expect(data.categoryId).toBe("cat-1");
   });
+
+  it("cardName 指定で全行に夫婦タグ＋カードタグを付与する", async () => {
+    getEnteredBy.mockResolvedValue(2);
+    const rows = [validRow, { ...validRow, amount: 800 }];
+    const res = await POST(jsonReq(URL, { rows, cardName: "楽天カード" }));
+    expect(res.status).toBe(201);
+    expect(create).toHaveBeenCalledTimes(2);
+    for (const call of create.mock.calls) {
+      expect(call[0].data.tags).toEqual(["spouse:2", "card:楽天カード"]);
+    }
+  });
+
+  it("cardName が31文字超なら 400・何も作成しない", async () => {
+    const res = await POST(
+      jsonReq(URL, { rows: [validRow], cardName: "あ".repeat(31) })
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("カード名が不正です");
+    expect($transaction).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("cardName: null なら card タグは付かず夫婦タグのみ", async () => {
+    getEnteredBy.mockResolvedValue(2);
+    const res = await POST(jsonReq(URL, { rows: [validRow], cardName: null }));
+    expect(res.status).toBe(201);
+    expect(create.mock.calls[0][0].data.tags).toEqual(["spouse:2"]);
+  });
 });
