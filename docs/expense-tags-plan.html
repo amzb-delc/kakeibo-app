@@ -135,7 +135,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 <h1>支出タグ（enteredBy → tags）— 実装プラン</h1>
 
 <blockquote>
-作成: 2026-06-12。<strong>ステータス: ✅ 実装完了（2026-06-12・PR 番号未定 / <code>feat/expense-tags</code>）</strong>。
+作成: 2026-06-12。<strong>ステータス: ✅ 実装完了（2026-06-12・実装本体 PR #69／フォローアップ PR #70）</strong>。
 支出ごとの <code>Expense.enteredBy Int?</code>（入力者 1=♂/2=♀）を廃止し、<strong>汎用的な内部タグ配列 <code>Expense.tags String[]</code></strong> へ一般化する。<br>
 入力者は <strong>夫婦タグ <code>spouse:1</code>(♂)/<code>spouse:2</code>(♀)</strong> として、クレカ明細のカードは <strong>カードタグ <code>card:&lt;カード名&gt;</code></strong> として記録する。<strong>タグは内部仕様</strong>（画面に <code>#xxx</code> 形式は出さない）。<br>
 付与・据え置きの方針は <a href="entered-by-plan.html">入力者プラン</a>を踏襲（<strong>新規登録時にサーバが付与・編集 PATCH は据え置き</strong>）。設定の夫/妻選択・cookie・<code>/api/session</code> は従来どおり存続。新たに<strong>明細行の識別ドット</strong>と<strong>全体カードの夫婦タグフィルタ</strong>を追加。

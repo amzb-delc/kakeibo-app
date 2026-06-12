@@ -906,7 +906,7 @@ hr {
 <h2>改修履歴</h2>
 
 <h3>2026-06-12 — 支出タグ（<code>enteredBy</code> → <code>tags String[]</code>）＋ SEC-6 修正</h3>
-<p><span class="badge badge-major">major</span> 入力者専用列 <code>Expense.enteredBy Int?</code> を汎用の内部タグ配列 <code>Expense.tags String[]</code> へ一般化。設計記録は <a href="expense-tags-plan.html">支出タグプラン</a>。<code>feat/expense-tags</code>（PR 番号未定）。</p>
+<p><span class="badge badge-major">major</span> 入力者専用列 <code>Expense.enteredBy Int?</code> を汎用の内部タグ配列 <code>Expense.tags String[]</code> へ一般化。設計記録は <a href="expense-tags-plan.html">支出タグプラン</a>。PR #69（実装本体）・PR #70（テスト/SEC-6修正/docs/seed）。</p>
 <ul>
   <li><strong>タグ内部仕様</strong>: <code>src/lib/tags.ts</code> が単一ソース。夫婦タグ <code>spouse:1</code>(♂)/<code>spouse:2</code>(♀)、カードタグ <code>card:&lt;カード名&gt;</code>（trim 後1〜30文字・制御文字不可）。種別は名前空間プレフィックスで判定。画面に <code>#xxx</code> 形式は出さない</li>
   <li><strong>マイグレーション</strong> <code>20260612051542_replace_entered_by_with_tags</code>: <code>tags</code> 列追加 → 旧 <code>enteredBy</code> を <code>spouse:N</code> へバックフィル → <code>enteredBy</code> 列削除（ロスレス）</li>
