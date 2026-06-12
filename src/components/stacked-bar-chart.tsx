@@ -28,27 +28,10 @@ function monthLabel(ym: string, prevYm: string | null): { year: string | null; m
   return { year: showYear ? `'${y.slice(2)}` : null, month };
 }
 
-// 棒の上に載せるコンパクト金額表記。1万以上は「4.2万」、未満は「8,500」。0 は空。
-function formatCompactYen(amount: number): string {
+// 棒の上・目盛に載せる金額表記。省略しない（実質6桁まで・カンマ区切り）。0 は空。
+function formatAmountLabel(amount: number): string {
   if (amount <= 0) return "";
-  if (amount >= 10000) {
-    const man = amount / 10000;
-    // 10万以上は小数を出さず「12万」、未満は小数1桁「4.2万」（末尾 .0 は丸める）
-    const digits = man >= 10 ? 0 : 1;
-    const s = man.toFixed(digits).replace(/\.0$/, "");
-    return `${s}万`;
-  }
   return amount.toLocaleString("ja-JP");
-}
-
-// 目盛りに使う「キリの良い」上限値を求める。1/2/5 × 10^n の刻みに丸め上げる。
-function niceCeil(value: number): number {
-  if (value <= 0) return 0;
-  const exp = Math.floor(Math.log10(value));
-  const base = Math.pow(10, exp);
-  const frac = value / base;
-  const niceFrac = frac <= 1 ? 1 : frac <= 2 ? 2 : frac <= 5 ? 5 : 10;
-  return niceFrac * base;
 }
 
 type Props = {
@@ -85,11 +68,9 @@ export function StackedBarChart({
   const chartBottom = VIEW_H - LABEL_H;
   const chartH = chartBottom - chartTop;
 
-  // 金額の目盛線（薄いグレー水平線）。キリの良い上限値とその半分の2本を引く。
-  // バーの正規化基準は実 maxTotal のままにし、目盛は丸めた値で見やすくする。
-  const niceMax = niceCeil(Math.max(...barTotals, 0));
-  const gridValues =
-    niceMax > 0 ? [niceMax, niceMax / 2].filter((v) => v > 0) : [];
+  // 金額の目盛線はグラフ縦中央に1本（値は正規化基準 maxTotal の半分・省略なし表記）。
+  // 全月 0 のときは引かない。
+  const midValue = Math.max(...barTotals, 0) > 0 ? Math.round(maxTotal / 2) : 0;
 
   return (
     <div className="w-full">
@@ -99,32 +80,29 @@ export function StackedBarChart({
         role="img"
         aria-label="過去6ヶ月の支出比較グラフ"
       >
-        {/* 金額の目盛線（max とその半分）。線は薄いグレー、右端に小さく目盛値 */}
-        {gridValues.map((v) => {
-          const gy = chartBottom - (v / maxTotal) * chartH;
-          return (
-            <g key={v}>
-              <line
-                x1={PAD_X}
-                y1={gy}
-                x2={VIEW_W - PAD_X}
-                y2={gy}
-                stroke="#e5e7eb"
-                strokeWidth={1}
-                strokeDasharray="2 3"
-              />
-              <text
-                x={VIEW_W - PAD_X}
-                y={gy - 2}
-                textAnchor="end"
-                className="fill-muted-foreground"
-                style={{ fontSize: "8px" }}
-              >
-                {formatCompactYen(v)}
-              </text>
-            </g>
-          );
-        })}
+        {/* 金額の目盛線（グラフ縦中央に1本）。線は薄いグレー、右端に目盛値（省略なし） */}
+        {midValue > 0 && (
+          <g>
+            <line
+              x1={PAD_X}
+              y1={chartTop + chartH / 2}
+              x2={VIEW_W - PAD_X}
+              y2={chartTop + chartH / 2}
+              stroke="#e5e7eb"
+              strokeWidth={1}
+              strokeDasharray="2 3"
+            />
+            <text
+              x={VIEW_W - PAD_X}
+              y={chartTop + chartH / 2 - 2}
+              textAnchor="end"
+              className="fill-muted-foreground"
+              style={{ fontSize: "8px" }}
+            >
+              {formatAmountLabel(midValue)}
+            </text>
+          </g>
+        )}
         {/* ベースライン */}
         <line
           x1={PAD_X}
@@ -199,7 +177,7 @@ export function StackedBarChart({
                   />
                 );
               })}
-              {/* 合計額ラベル（全6本・コンパクト表記）。表示月は太字で強調 */}
+              {/* 合計額ラベル（全6本・省略なし）。表示月は太字で強調 */}
               {barTotal > 0 && (
                 <text
                   x={x + barW / 2}
@@ -208,7 +186,7 @@ export function StackedBarChart({
                   className={isCurrent ? "fill-foreground" : "fill-muted-foreground"}
                   style={{ fontSize: "9px", fontWeight: isCurrent ? 700 : 500 }}
                 >
-                  {formatCompactYen(barTotal)}
+                  {formatAmountLabel(barTotal)}
                 </text>
               )}
               {/* 月ラベル。表示中の月は太字＋下線で強調（右端とは限らないため） */}

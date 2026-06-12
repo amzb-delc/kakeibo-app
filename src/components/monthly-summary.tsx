@@ -272,7 +272,7 @@ export function MonthlySummaryView({
   return (
     <main className="px-4 py-6 space-y-6">
         {/* 合計カード: 左にドーナツ（中央に合計金額）、右に上位7カテゴリのレジェンド（＝カテゴリ選択UI） */}
-        <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50">
+        <div className="relative bg-card rounded-2xl p-4 shadow-sm border border-border/50">
           {/* 夫婦タグフィルタ（全体/♂/♀）。選択でドーナツ・合計・前月比・明細すべてが絞られる。 */}
           <div className="mb-3 flex justify-end">
             <div
@@ -435,47 +435,49 @@ export function MonthlySummaryView({
               </div>
             </div>
 
-            {/* フローティングのシェブロン（カードに対する絶対配置・縦中央）。
-                inert なペインの外なので常に操作可能。表示モードに応じて出す向きを切替:
-                単月表示中は右の › （6ヶ月へ）、6ヶ月表示中は左の ‹ （単月へ戻る）。 */}
-            {cardMode === "month" ? (
-              <button
-                type="button"
-                onClick={() => setCardMode("sixMonths")}
-                aria-label="6ヶ月の比較を表示"
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-muted active:bg-muted"
-              >
-                <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
-                  <path
-                    d="M4 4 L10 10 L4 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setCardMode("month")}
-                aria-label="単月の内訳に戻る"
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-muted active:bg-muted"
-              >
-                <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
-                  <path
-                    d="M10 4 L4 10 L10 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            )}
           </div>
+          {/* フローティングのシェブロン（カードの枠線上に乗せる絶対配置・縦中央）。
+              コンテンツと被らないよう枠ギリギリ＝ボーダーを跨ぐ位置（半分外側）に置く。
+              overflow-x-clip の内側だと外側半分が切れるため、クリップ枠の外（カード直下）に置く。
+              inert なペインの外なので常に操作可能。表示モードに応じて出す向きを切替:
+              単月表示中は右の › （6ヶ月へ）、6ヶ月表示中は左の ‹ （単月へ戻る）。 */}
+          {cardMode === "month" ? (
+            <button
+              type="button"
+              onClick={() => setCardMode("sixMonths")}
+              aria-label="6ヶ月の比較を表示"
+              className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted active:bg-muted"
+            >
+              <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
+                <path
+                  d="M4 4 L10 10 L4 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCardMode("month")}
+              aria-label="単月の内訳に戻る"
+              className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted active:bg-muted"
+            >
+              <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
+                <path
+                  d="M10 4 L4 10 L10 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* 明細（選択中カテゴリの支出明細）。見出しの右に選択カテゴリのラベルを表示 */}
