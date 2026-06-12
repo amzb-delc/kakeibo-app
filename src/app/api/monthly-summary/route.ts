@@ -45,15 +45,29 @@ export async function GET(req: NextRequest) {
 
   // 偏差値用に「表示月含む過去6ヶ月」の範囲を作る
   const sixMonthsAgo = shiftMonth(year, month, -5);
-  const sixMonthRange = {
-    gte: jstMonthRange(sixMonthsAgo.year, sixMonthsAgo.month).gte,
-    lt: range.lt,
-  };
   const sixMonthKeys: string[] = [];
   for (let i = 5; i >= 0; i--) {
     const { year: y, month: m } = shiftMonth(year, month, -i);
     sixMonthKeys.push(ymKey(y, m));
   }
+
+  // 6ヶ月比較グラフの窓: 表示月が過去月のときは窓を未来側へ最大3ヶ月ずらし、
+  // 表示月の棒が右から 2〜4 番目に来るようにする（前月=右から2番目・前々月=3番目・
+  // それ以前=4番目固定）。forward ≤ 当月との差なので窓が実在の当月を超えることはない。
+  const diffMonths = (currentYear - year) * 12 + (currentMonth - month);
+  const forwardMonths = Math.min(Math.max(diffMonths, 0), 3);
+  const chartKeys: string[] = [];
+  for (let i = 5 - forwardMonths; i >= -forwardMonths; i--) {
+    const { year: y, month: m } = shiftMonth(year, month, -i);
+    chartKeys.push(ymKey(y, m));
+  }
+  const chartEnd = shiftMonth(year, month, forwardMonths);
+
+  // 取得範囲は「偏差値用の過去6ヶ月」と「グラフ窓」の和集合
+  const sixMonthRange = {
+    gte: jstMonthRange(sixMonthsAgo.year, sixMonthsAgo.month).gte,
+    lt: jstMonthRange(chartEnd.year, chartEnd.month).lt,
+  };
 
   // 表示月の支出をカテゴリ別に集計（明細は日付降順で並べる）
   const expenses = await prisma.expense.findMany({
@@ -92,6 +106,13 @@ export async function GET(req: NextRequest) {
     select: { amount: true, spentAt: true, categoryId: true },
   });
 
+  // 6ヶ月比較グラフのカテゴリ名・色解決用に世帯の全カテゴリ（16枠固定）を渡す
+  const allCategories = await prisma.category.findMany({
+    where: { householdId },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, name: true, sortOrder: true },
+  });
+
   // 集計は純粋関数に委譲（テスト可能にするため）。
   const summary = buildMonthlySummary({
     year,
@@ -100,6 +121,8 @@ export async function GET(req: NextRequest) {
     compareExpenses,
     sixMonthExpenses,
     sixMonthKeys,
+    chartKeys,
+    allCategories,
     hasCompare: compareRange !== null,
   });
 

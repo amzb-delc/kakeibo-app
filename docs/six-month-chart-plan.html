@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿アプリ — 全体カードの6ヶ月比較（積み上げ棒）実装プラン</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+  --decide-bg: #fee2e2;
+  --decide-fg: #991b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+    --decide-bg: #450a0a;
+    --decide-fg: #fca5a5;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+.backlink {
+  display: inline-block; margin-bottom: 16px; color: var(--primary);
+  text-decoration: none; font-size: 13px;
+}
+.backlink:hover { text-decoration: underline; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 8px 0; }
+a { color: var(--primary); }
+code {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+pre {
+  background: var(--code-bg); padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 12px 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--primary);
+  background: var(--card); border-radius: 0 8px 8px 0; color: var(--muted);
+  font-size: 14px;
+}
+blockquote strong { color: var(--fg); }
+ul { margin: 8px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px;
+  background: var(--card); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); font-weight: 600; white-space: nowrap; }
+td.c { text-align: center; white-space: nowrap; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-todo { background: var(--todo-bg); color: var(--todo-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.b-decide { background: var(--decide-bg); color: var(--decide-fg); }
+.rec { color: var(--success); font-weight: 600; }
+.muted { color: var(--muted); }
+del { color: var(--muted); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+.decision {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--destructive); border-radius: 0 8px 8px 0;
+  padding: 12px 16px; margin: 14px 0;
+}
+.decision h3 { margin-top: 0; }
+.decision.decided { border-left-color: var(--success); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="backlink" href="index.html">← ドキュメント一覧へ</a>
+<h1>全体カードの6ヶ月比較（積み上げ棒）— 実装プラン</h1>
+
+<blockquote>
+作成: 2026-06-12。<strong>ステータス: ✅ 実装完了（2026-06-12・PR #71）</strong>。
+ホームの全体カード（月次サマリーカード）を<strong>横スライド式の2ペイン</strong>に拡張し、従来の単月ペイン（ドーナツ＋レジェンド）に加えて<strong>直近6ヶ月のカテゴリ別積み上げ棒グラフ</strong>を見られるようにする。<br>
+グラフは<strong>自前 SVG</strong>（recharts 等は不採用）で、色は既存ドーナツと共通の <code>categoryColor()</code> パレットを使い、<strong>カテゴリ単独比較</strong>への切替も持つ。夫婦タグフィルタ（全体/♂/♀）は両ペイン共通で、サーバ側絞り込みのためグラフにも反映される。<br>
+API は <code>GET /api/monthly-summary</code> のレスポンスに <code>sixMonths</code> 配列を追加（古い月→表示月の6本固定・タグフィルタ適用後）。
+</blockquote>
+
+<h2>Context（なぜ6ヶ月比較を足すか）</h2>
+<p>全体カードはこれまで<strong>表示月単月</strong>の内訳（ドーナツ＋レジェンド）と、過去月閲覧時の「今月との差額」しか持っていなかった。月ごとの<strong>支出の推移を一目で比べたい</strong>（増えているカテゴリ・季節変動・先月との山の違い）というニーズに対し、単月＋差額だけでは弱い。</p>
+<p>そこで全体カードを<strong>横スライドで切り替わる2ペイン</strong>にし、片方に従来の単月内訳、もう片方に<strong>直近6ヶ月のカテゴリ別積み上げ棒グラフ</strong>を置く。グラフは表示月や夫婦タグフィルタ・カテゴリの色付けを<strong>単月ペインと共通化</strong>し、別画面に飛ばさず同じカード内で完結させる。</p>
+
+<h2>UI 設計（スライド式2ペイン）</h2>
+<p>全体カードを横方向の2ペインに分け、<strong>横スライド（約300ms）</strong>で切替える。タグフィルタ（全体/♂/♀）はカード上部に置き、<strong>両ペイン共通</strong>。月送り（◀▶・スワイプ）をしても<strong>表示モード（単月／6ヶ月）は維持</strong>する。</p>
+<table>
+<thead><tr><th>ペイン</th><th>内容</th><th>切替トリガ</th></tr></thead>
+<tbody>
+<tr><td>単月ペイン（既定）</td><td>従来どおりドーナツチャート＋レジェンド（カテゴリ選択UI）。<strong>右辺</strong>に縦長のシェブロン（<code>›</code>）を置く</td><td>右辺シェブロンのタップで6ヶ月ペインへスライド</td></tr>
+<tr><td>6ヶ月比較ペイン</td><td>縦型のカテゴリ別積み上げ棒グラフ（6本固定）＋カテゴリ選択チップ。<strong>左辺</strong>に縦長のシェブロン（<code>‹</code>）を置く</td><td>左辺シェブロンのタップで単月ペインへ戻る</td></tr>
+</tbody>
+</table>
+<ul>
+  <li>シェブロンは<strong>各ペインの辺に縦長</strong>で配置し、めくり方向を視覚的に示す（単月→右へ、6ヶ月→左へ）。</li>
+  <li>切替は <strong>300ms の横スライド</strong>。表示モードの state はカード側が保持し、月送りやタグ変更では失わない。</li>
+</ul>
+
+<h2>グラフ設計（自前 SVG・積み上げ棒）</h2>
+<p>実装は新規コンポーネント <code>src/components/stacked-bar-chart.tsx</code>。<strong>recharts 等の外部ライブラリは使わず</strong>、既存の <code>donut-chart.tsx</code> と同じ「自前 SVG」パターンで描く。</p>
+<ul>
+  <li><strong>6本固定</strong>: 左＝最も古い月、右端＝表示月。月送りすると6本がスライドして窓が動く。データのない月は <code>total=0</code> の<strong>空棒</strong>として詰めて常に6本を保つ。</li>
+  <li><strong>積み上げ</strong>: 各棒はカテゴリ別に <strong><code>sortOrder</code> 昇順で下から積み上げ</strong>る。色は既存16色パレット <code>categoryColor()</code>（ドーナツと共通）で、レジェンド／ドーナツと同じ色がそのまま棒にも出る。</li>
+  <li><strong>正規化</strong>: 棒の高さは<strong>6ヶ月の最大月合計</strong>を 100% として相対化する（窓内で一番高い月がフルハイト）。</li>
+  <li><strong>月ラベル</strong>: 年またぎを考慮し<strong>先頭のみ年付き</strong>（例 <code>'25 12月</code>、以降は <code>1月</code>…）。</li>
+  <li><strong>合計額ラベル</strong>: <strong>表示月（右端）の棒のみ</strong>合計額を数値で出す（他月は出さず賑やかさを抑える）。</li>
+</ul>
+
+<h3>カテゴリ単独比較</h3>
+<p>6ヶ月ペイン内に<strong>カテゴリ選択チップ</strong>を置く。あるカテゴリを選ぶと、6本の棒を<strong>そのカテゴリのみの単色棒</strong>（積み上げ解除）に切替え、推移を単独で比較できる。</p>
+<ul>
+  <li>単独表示時の<strong>正規化はそのカテゴリの6ヶ月最大額</strong>（全体合計ではなく、選択カテゴリの山に合わせてスケール）。</li>
+  <li>「全体」チップ／同じカテゴリの再タップで<strong>積み上げに戻る</strong>。</li>
+  <li>この選択は<strong>単月ペインのカテゴリ開閉とは独立した state</strong>（6ヶ月ペイン専用。互いに干渉しない）。</li>
+</ul>
+
+<h3>夫婦タグフィルタの連動</h3>
+<p>カード上部のタグフィルタ（全体/♂/♀）は<strong>両ペイン共通</strong>。<code>spouse:N</code> はサーバ側絞り込み（<code>GET /api/monthly-summary?tag=spouse:N</code>）なので、<code>sixMonths</code> も絞り込み後の値で返り、<strong>グラフにも反映</strong>される（合計・ドーナツ・前月比・明細と一貫）。</p>
+
+<h2>API レスポンス拡張（<code>sixMonths</code>）</h2>
+<p><code>GET /api/monthly-summary</code> のレスポンスに <code>sixMonths</code> を追加する。<strong>古い月→表示月の6本固定</strong>で、<code>tag</code> 指定時はそのフィルタ適用後の値。route は世帯の全カテゴリを取得し、各月の <code>byCategory</code> の名前／色解決に使う。</p>
+<pre><code>// レスポンスに追加されるフィールド
+"sixMonths": [
+  {
+    "ym": "2025-12",
+    "total": 128400,
+    "byCategory": [
+      { "categoryId": "...", "name": "食費", "sortOrder": 0, "total": 48100 },
+      { "categoryId": "...", "name": "日用品", "sortOrder": 1, "total": 12000 }
+    ]
+  },
+  // ... 古い月 → 表示月 の順で 6 要素固定
+]</code></pre>
+<ul>
+  <li>各月オブジェクト: <code>ym: "YYYY-MM"</code> / <code>total: number</code>（その月の合計）/ <code>byCategory: Array&lt;{ categoryId, name, sortOrder, total }&gt;</code>。</li>
+  <li>並びは<strong>常に6要素</strong>（最古→表示月）。データのない月も <code>total=0</code>・<code>byCategory</code> 空で詰める。</li>
+  <li>集計は <code>src/lib/monthly-summary.ts</code>、route は <code>src/app/api/monthly-summary/route.ts</code>。型は <code>src/types/index.ts</code> に追加。</li>
+</ul>
+
+<h2>実装ファイル</h2>
+<table>
+<thead><tr><th>ファイル</th><th>役割</th></tr></thead>
+<tbody>
+<tr><td><code>src/components/stacked-bar-chart.tsx</code></td><td><strong>新規</strong>。自前 SVG の縦型積み上げ棒グラフ（6本固定・正規化・月ラベル・カテゴリ単独比較）</td></tr>
+<tr><td><code>src/components/monthly-summary.tsx</code></td><td>全体カードを2ペイン化（スライド切替・シェブロン・タグフィルタ共通化・6ヶ月ペインの state）</td></tr>
+<tr><td><code>src/lib/monthly-summary.ts</code></td><td><code>sixMonths</code> の集計（純関数）</td></tr>
+<tr><td><code>src/app/api/monthly-summary/route.ts</code></td><td>世帯全カテゴリ取得 → 名前/色解決 → <code>sixMonths</code> をレスポンスに同梱</td></tr>
+<tr><td><code>src/types/index.ts</code></td><td><code>sixMonths</code> の型追加</td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2 id="decisions">★ 決定事項</h2>
+
+<div class="decision decided">
+<h3>① グラフは自前 SVG（recharts 不採用） <span class="badge b-done">✅ 決定</span></h3>
+<p>既存の <code>donut-chart.tsx</code> がすでに「自前 SVG」で実装されており、色付け（<code>categoryColor()</code>）・装飾扱い（<code>aria-hidden</code>）・小幅端末対応のパターンが揃っている。積み上げ棒も同じパターンで描けるため、<strong>recharts 等の依存追加を回避</strong>し、ドーナツとグラフの<strong>色・トーンの一貫性</strong>を保つ。バンドルサイズと学習コストの観点でも自前が有利。</p>
+</div>
+
+<div class="decision decided">
+<h3>② 6本固定 ＋ 空月ゼロ詰め <span class="badge b-done">✅ 決定</span></h3>
+<p>窓を常に6本に保つことで、月送りしてもレイアウトが伸縮せず推移が読みやすい。データのない月は <code>total=0</code> の空棒として詰める（穴を空けない）。</p>
+</div>
+
+<div class="decision decided">
+<h3>③ 6ヶ月ペインのカテゴリ選択は単月ペインと独立 <span class="badge b-done">✅ 決定</span></h3>
+<p>単月ペインの「明細を出すカテゴリ選択」と、6ヶ月ペインの「単独比較するカテゴリ選択」は<strong>用途が違う</strong>ため state を分離。互いの選択が干渉しないようにする。</p>
+</div>
+
+<div class="decision decided">
+<h3>④ 表示モードは月送り・タグ変更をまたいで維持 <span class="badge b-done">✅ 決定</span></h3>
+<p>単月／6ヶ月の表示モードはカード側 state で保持し、月送りやタグフィルタ変更では失わない。「6ヶ月を見ている最中に月送りしたら単月に戻された」体験を避ける。</p>
+</div>
+
+<hr>
+
+<h2>実機フィードバックによる調整（2026-06-12）</h2>
+<p>初回実装（<code>f671411</code> 時点の設計）を実機で確認したところ、過去月閲覧時の窓位置やシェブロンの被り・ラベルの賑やかさに改善余地が見つかった。以下は<strong>実機フィードバックを受けて入れた調整</strong>（バックエンド <code>510a89e</code>、UI <code>9a9e05f</code> → <code>55473c9</code>）。当初設計の「6本固定・古い月→表示月＝右端」は<strong>当月閲覧時の挙動として残るが</strong>、過去月閲覧時はグラフ窓がずれるため上記④の「表示月＝右端」前提は崩れる（強調ロジックを右端固定から表示月一致判定へ変更）。</p>
+
+<h3>① グラフ窓のずれ（過去月閲覧時）</h3>
+<p>表示月が過去月のとき、6ヶ月窓を<strong>未来側へ最大3ヶ月ずらす</strong>。表示月の棒が右から 2〜4 番目に来ることで、表示月の「先」の月も見えて推移の文脈が掴みやすくなる。</p>
+<ul>
+  <li><strong>当月閲覧</strong>＝表示月が右端（従来どおり）。<strong>前月</strong>＝右から2番目／<strong>前々月</strong>＝3番目／<strong>3ヶ月以上前</strong>＝右から4番目で固定。</li>
+  <li>ずれ量 <code>forwardMonths = min(max(当月との差, 0), 3)</code>。<strong>窓が実在の当月を超えることはない</strong>（forward ≤ 当月との差のため）。</li>
+  <li><strong>偏差値（boxStats）用の「表示月含む過去6ヶ月」窓（<code>sixMonthKeys</code>）は据え置き</strong>。グラフ専用に <code>chartKeys</code> を新設し、両者を分離した。DB 取得範囲は両窓の<strong>和集合</strong>（<code>sixMonthKeys</code> の最古 〜 <code>chartKeys</code> の末尾）。</li>
+  <li>API の <code>sixMonths</code> は<strong>このグラフ窓（<code>chartKeys</code>）に基づく</strong>（偏差値窓ではない）。集計は <code>chartKeys.map(...)</code>、route で <code>chartKeys</code>／<code>chartEnd</code> を算出して <code>buildMonthlySummary</code> に渡す。</li>
+</ul>
+
+<h3>② シェブロンのフローティング化</h3>
+<p>シェブロン（<code>‹</code>/<code>›</code>）を<strong>ペイン内レイアウトから外し</strong>、全体カードに対する絶対配置のフローティング丸ボタンに変更。<strong>カードのボーダーを跨ぐ位置</strong>（左右端・縦中央・半分外側）に置き、コンテンツとの被りを解消した（overflow クリップ枠の外＝カード直下に配置）。</p>
+<ul>
+  <li><strong>単月表示中は右の <code>›</code> のみ</strong>、<strong>6ヶ月表示中は左の <code>‹</code> のみ</strong>を出すトグル切替。</li>
+  <li><code>inert</code> なペインの外なので常に操作可能。ペインから旧ボタン枠（<code>w-7</code>）を除去しコンテンツ幅を回復、横スライドのクリップを <code>overflow-x-clip</code> にして縦の見切れを解消。</li>
+</ul>
+
+<h3>③ 積み上げは薄い色・単独比較は濃い色</h3>
+<p>全体（積み上げ）表示時はセグメントを <strong><code>fillOpacity</code> 0.6</strong> で薄くし、密集した積み上げの可読性を上げる。<strong>カテゴリ単独比較時は濃い色（<code>fillOpacity=1</code>）</strong>のまま。</p>
+
+<h3>④ 全6本に合計額ラベル＋表示月の強調</h3>
+<p>当初は「表示月（右端）の棒のみ合計額」だったが、<strong>全6本の棒に合計額ラベル</strong>を出すよう変更。窓ずれで表示月が右端とは限らなくなったため、強調は<strong>表示月一致判定（<code>selectedYm</code>）</strong>に切替えた。</p>
+<ul>
+  <li>合計額は<strong>省略なしのカンマ区切り</strong>（実質6桁までのため崩れない）。<strong>0円の月は非表示</strong>。</li>
+  <li><strong>表示月の棒</strong>は月ラベルを<strong>太字＋下線</strong>、金額ラベルも<strong>太字</strong>で強調（右端とは限らない窓ずれに追従）。</li>
+</ul>
+
+<h3>⑤ 目盛線はグラフ縦中央に1本</h3>
+<p>金額の目盛線は<strong>グラフ縦中央に1本</strong>だけ引く（薄いグレー）。値は<strong>正規化基準＝6本中の最大合計の半分</strong>で、右端に省略なし表記の目盛値ラベルを添える（当初の上限＋半分の2本構成から簡素化）。</p>
+
+<hr>
+
+<h2>検証（実装後）</h2>
+<ul>
+  <li><code>npm run lint</code> → <code>npm test</code>（<code>sixMonths</code> の集計＝6本固定・空月ゼロ詰め・タグ絞り込み適用のテストが緑）。</li>
+  <li><code>npm run dev</code> → 全体カード右辺の <code>›</code> で6ヶ月ペインへスライド、左辺 <code>‹</code> で戻る。月送りしても表示モードが維持される。</li>
+  <li>棒の色がドーナツ／レジェンドと一致し、<code>sortOrder</code> 昇順で下から積み上がる。先頭月のみ年付きラベル、表示月の棒のみ合計額ラベル。</li>
+  <li>カテゴリチップで単独比較に切替 → そのカテゴリの単色棒6本（最大額で正規化）。「全体」／再タップで積み上げに戻る。</li>
+  <li>タグフィルタ「♂/♀」でグラフの値も絞られる（サーバ側適用）。</li>
+</ul>
+
+</div>
+</body>
+</html>

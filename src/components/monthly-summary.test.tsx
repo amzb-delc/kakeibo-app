@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { MonthlySummary } from "@/types";
 import { OTHERS_CATEGORY_ID } from "@/lib/category-constants";
@@ -36,6 +36,7 @@ const summary: MonthlySummary = {
       ],
     },
   ],
+  sixMonths: [],
 };
 
 afterEach(() => cleanup());
@@ -111,6 +112,7 @@ describe("MonthlySummaryView 「その他」表示", () => {
         { id: `k${i + 1}-e`, amount: (8 - i) * 100, spentAt: "2026-06-01T03:00:00.000Z", updatedAt: "2026-06-01T03:00:00.000Z", storeName: null, memo: null, tags: [] },
       ],
     })),
+    sixMonths: [],
   };
 
   it("その他選択でカードは複数でも、ソートヘッダは1つだけ", () => {
@@ -125,8 +127,88 @@ describe("MonthlySummaryView 「その他」表示", () => {
     );
     // ソートヘッダ（日付ボタン）は全カード共通で1つ
     expect(screen.getAllByRole("button", { name: "日付で並び替え" })).toHaveLength(1);
-    // その他バケツの2カテゴリがカードとして並ぶ
-    expect(screen.getByText("カテゴリ7")).toBeInTheDocument();
-    expect(screen.getByText("カテゴリ8")).toBeInTheDocument();
+    // その他バケツの2カテゴリがカードとして並ぶ。
+    // 6ヶ月ペインのカテゴリ選択ボタンにも同名が出るため、明細セクションに限定して確認する。
+    const detail = within(screen.getByRole("heading", { name: "明細" }).parentElement!.parentElement!);
+    expect(detail.getByText("カテゴリ7")).toBeInTheDocument();
+    expect(detail.getByText("カテゴリ8")).toBeInTheDocument();
+  });
+});
+
+describe("MonthlySummaryView 6ヶ月ペインの切替（スモーク）", () => {
+  // sixMonths を持つサマリー。チャート自体の描画検証はせず、切替UIの存在だけ確認する。
+  const withSix: MonthlySummary = {
+    year: 2026,
+    month: 6,
+    total: 300,
+    compareTotal: null,
+    boxStats: null,
+    categories: [
+      {
+        categoryId: "c1",
+        name: "食費",
+        sortOrder: 0,
+        total: 300,
+        compareTotal: null,
+        boxStats: null,
+        expenses: [],
+      },
+    ],
+    sixMonths: [
+      { ym: "2026-01", total: 0, byCategory: [] },
+      { ym: "2026-02", total: 0, byCategory: [] },
+      { ym: "2026-03", total: 0, byCategory: [] },
+      { ym: "2026-04", total: 0, byCategory: [] },
+      { ym: "2026-05", total: 0, byCategory: [] },
+      { ym: "2026-06", total: 300, byCategory: [{ categoryId: "c1", name: "食費", sortOrder: 0, total: 300 }] },
+    ],
+  };
+
+  function viewWithSix() {
+    return render(
+      <MonthlySummaryView
+        summary={withSix}
+        openCategoryId="c1"
+        onToggleCategory={vi.fn()}
+        tag={null}
+        onTagChange={vi.fn()}
+      />
+    );
+  }
+
+  it("既定（単月）では 6ヶ月比較へ切り替えるシェブロンが見える", () => {
+    viewWithSix();
+    expect(
+      screen.getByRole("button", { name: "6ヶ月の比較を表示" })
+    ).toBeInTheDocument();
+    // 既定では 6ヶ月ペインは aria-hidden のため、戻るボタンはアクセシビリティ木に出ない
+    expect(
+      screen.queryByRole("button", { name: "単月の内訳に戻る" })
+    ).toBeNull();
+  });
+
+  it("シェブロン押下で 6ヶ月ペインに切り替わり、棒グラフ（SVG）と戻るボタンが現れる", () => {
+    viewWithSix();
+    fireEvent.click(screen.getByRole("button", { name: "6ヶ月の比較を表示" }));
+    // 切替後は 6ヶ月ペインが可視になり、グラフ・戻るボタンがアクセシブルになる
+    expect(
+      screen.getByRole("img", { name: "過去6ヶ月の支出比較グラフ" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "単月の内訳に戻る" })
+    ).toBeInTheDocument();
+  });
+
+  it("戻るボタンで単月ペインへ戻れる（往復しても落ちない）", () => {
+    viewWithSix();
+    fireEvent.click(screen.getByRole("button", { name: "6ヶ月の比較を表示" }));
+    fireEvent.click(screen.getByRole("button", { name: "単月の内訳に戻る" }));
+    // 単月へ戻ると 6ヶ月ペインは再び aria-hidden になる
+    expect(
+      screen.getByRole("button", { name: "6ヶ月の比較を表示" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "単月の内訳に戻る" })
+    ).toBeNull();
   });
 });

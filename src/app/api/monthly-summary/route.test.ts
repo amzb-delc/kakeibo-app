@@ -5,8 +5,13 @@ import { getReq } from "@/test/route-helpers";
 const { getHouseholdId } = vi.hoisted(() => ({ getHouseholdId: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getHouseholdId }));
 
-const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
-vi.mock("@/lib/prisma", () => ({ prisma: { expense: { findMany } } }));
+const { findMany, categoryFindMany } = vi.hoisted(() => ({
+  findMany: vi.fn(),
+  categoryFindMany: vi.fn(),
+}));
+vi.mock("@/lib/prisma", () => ({
+  prisma: { expense: { findMany }, category: { findMany: categoryFindMany } },
+}));
 
 import { GET } from "./route";
 
@@ -14,6 +19,9 @@ beforeEach(() => {
   getHouseholdId.mockReset();
   findMany.mockReset();
   findMany.mockResolvedValue([]); // 支出は空（buildMonthlySummary は実関数）
+  categoryFindMany.mockReset();
+  // 世帯の全カテゴリ（6ヶ月グラフの名前/色解決用）。空でも純関数は動く。
+  categoryFindMany.mockResolvedValue([]);
 });
 
 describe("GET /api/monthly-summary", () => {
@@ -32,9 +40,17 @@ describe("GET /api/monthly-summary", () => {
     expect(body.year).toBe(2026);
     expect(body.month).toBe(6);
     expect(Array.isArray(body.categories)).toBe(true);
+    // 6ヶ月比較グラフ用の sixMonths を含む（6本固定）
+    expect(Array.isArray(body.sixMonths)).toBe(true);
+    expect(body.sixMonths).toHaveLength(6);
     // IDOR 防止: 取得は必ず自世帯スコープ
     expect(findMany).toHaveBeenCalled();
     for (const call of findMany.mock.calls) {
+      expect(call[0].where.householdId).toBe("hh-1");
+    }
+    // カテゴリ取得（6ヶ月グラフの名前/色解決用）も自世帯スコープ
+    expect(categoryFindMany).toHaveBeenCalled();
+    for (const call of categoryFindMany.mock.calls) {
       expect(call[0].where.householdId).toBe("hh-1");
     }
   });

@@ -55,6 +55,8 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: [],
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: [],
       hasCompare: false,
     });
     expect(r.total).toBe(3500);
@@ -79,6 +81,8 @@ describe("buildMonthlySummary", () => {
       compareExpenses,
       sixMonthExpenses: [],
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: [],
       hasCompare: true,
     });
     expect(r.compareTotal).toBe(2300);
@@ -94,6 +98,8 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: [],
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: [],
       hasCompare: true,
     });
     expect(r.categories[0].compareTotal).toBe(0);
@@ -110,6 +116,8 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: six,
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: [],
       hasCompare: false,
     });
     expect(r.boxStats).toBeNull();
@@ -125,6 +133,8 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: [],
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: [],
       hasCompare: false,
     });
     expect(r.categories[0].expenses[0].tags).toEqual(["spouse:2", "card:楽天カード"]);
@@ -144,9 +154,147 @@ describe("buildMonthlySummary", () => {
       compareExpenses: [],
       sixMonthExpenses: six,
       sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: [],
       hasCompare: false,
     });
     expect(r.boxStats).not.toBeNull();
     expect(r.boxStats?.median).toBe(25000);
+  });
+});
+
+// 6ヶ月比較グラフ用の sixMonths 集計
+const ALL_CATS = [
+  { id: "food", name: "食費", sortOrder: 0 },
+  { id: "daily", name: "日用品", sortOrder: 1 },
+  { id: "fun", name: "娯楽", sortOrder: 3 },
+];
+
+describe("buildMonthlySummary sixMonths（6ヶ月比較グラフ）", () => {
+  it("sixMonthKeys の順で 6 本固定。データのない月は total=0・byCategory=[]", () => {
+    // 2 つの月だけにデータを置く（残り 4 ヶ月は空棒になるはず）
+    const six: SixMonthExpense[] = [
+      { amount: 5000, categoryId: "food", spentAt: d("2026-01-10") },
+      { amount: 8000, categoryId: "food", spentAt: d("2026-04-10") },
+    ];
+    const r = buildMonthlySummary({
+      year: 2026,
+      month: 4,
+      expenses: [],
+      compareExpenses: [],
+      sixMonthExpenses: six,
+      sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: ALL_CATS,
+      hasCompare: false,
+    });
+    // 6 本固定・キー順（古い月→表示月）を保持
+    expect(r.sixMonths).toHaveLength(6);
+    expect(r.sixMonths.map((m) => m.ym)).toEqual(SIX_KEYS);
+    // データのない月は 0 / 空配列
+    const byYm = Object.fromEntries(r.sixMonths.map((m) => [m.ym, m]));
+    expect(byYm["2025-11"]).toEqual({ ym: "2025-11", total: 0, byCategory: [] });
+    expect(byYm["2025-12"]).toEqual({ ym: "2025-12", total: 0, byCategory: [] });
+    expect(byYm["2026-02"]).toEqual({ ym: "2026-02", total: 0, byCategory: [] });
+    expect(byYm["2026-03"]).toEqual({ ym: "2026-03", total: 0, byCategory: [] });
+    // データのある月は合計が入る
+    expect(byYm["2026-01"].total).toBe(5000);
+    expect(byYm["2026-04"].total).toBe(8000);
+  });
+
+  it("byCategory は sortOrder 昇順で、name/sortOrder は allCategories から解決される", () => {
+    // 1 月に sortOrder の異なる 3 カテゴリを混在させる（投入順は sortOrder と逆）
+    const six: SixMonthExpense[] = [
+      { amount: 300, categoryId: "fun", spentAt: d("2026-04-10") }, // sortOrder 3
+      { amount: 200, categoryId: "daily", spentAt: d("2026-04-11") }, // sortOrder 1
+      { amount: 100, categoryId: "food", spentAt: d("2026-04-12") }, // sortOrder 0
+    ];
+    const r = buildMonthlySummary({
+      year: 2026,
+      month: 4,
+      expenses: [],
+      compareExpenses: [],
+      sixMonthExpenses: six,
+      sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: ALL_CATS,
+      hasCompare: false,
+    });
+    const apr = r.sixMonths.find((m) => m.ym === "2026-04")!;
+    expect(apr.total).toBe(600);
+    // sortOrder 昇順に並ぶ（food=0, daily=1, fun=3）
+    expect(apr.byCategory.map((c) => c.categoryId)).toEqual(["food", "daily", "fun"]);
+    // name / sortOrder は allCategories から解決される
+    expect(apr.byCategory).toEqual([
+      { categoryId: "food", name: "食費", sortOrder: 0, total: 100 },
+      { categoryId: "daily", name: "日用品", sortOrder: 1, total: 200 },
+      { categoryId: "fun", name: "娯楽", sortOrder: 3, total: 300 },
+    ]);
+  });
+
+  it("同一カテゴリの複数支出は月内で合算される", () => {
+    const six: SixMonthExpense[] = [
+      { amount: 100, categoryId: "food", spentAt: d("2026-03-01") },
+      { amount: 250, categoryId: "food", spentAt: d("2026-03-20") },
+    ];
+    const r = buildMonthlySummary({
+      year: 2026,
+      month: 4,
+      expenses: [],
+      compareExpenses: [],
+      sixMonthExpenses: six,
+      sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: ALL_CATS,
+      hasCompare: false,
+    });
+    const mar = r.sixMonths.find((m) => m.ym === "2026-03")!;
+    expect(mar.total).toBe(350);
+    expect(mar.byCategory).toEqual([
+      { categoryId: "food", name: "食費", sortOrder: 0, total: 350 },
+    ]);
+  });
+
+  it("allCategories に無い categoryId は name='' / sortOrder=0 にフォールバックする", () => {
+    const six: SixMonthExpense[] = [
+      { amount: 500, categoryId: "ghost", spentAt: d("2026-02-10") },
+    ];
+    const r = buildMonthlySummary({
+      year: 2026,
+      month: 4,
+      expenses: [],
+      compareExpenses: [],
+      sixMonthExpenses: six,
+      sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: ALL_CATS,
+      hasCompare: false,
+    });
+    const feb = r.sixMonths.find((m) => m.ym === "2026-02")!;
+    expect(feb.byCategory).toEqual([
+      { categoryId: "ghost", name: "", sortOrder: 0, total: 500 },
+    ]);
+  });
+
+  it("月跨ぎの支出が JST 月キーで正しく振り分けられる（月境界）", () => {
+    // JST 2026-02-01 00:00 は UTC 2026-01-31 15:00。spentAt は parseJstDate（JST解釈）。
+    const six: SixMonthExpense[] = [
+      { amount: 111, categoryId: "food", spentAt: d("2026-01-31") }, // 1月末
+      { amount: 222, categoryId: "food", spentAt: d("2026-02-01") }, // 2月頭
+    ];
+    const r = buildMonthlySummary({
+      year: 2026,
+      month: 4,
+      expenses: [],
+      compareExpenses: [],
+      sixMonthExpenses: six,
+      sixMonthKeys: SIX_KEYS,
+      chartKeys: SIX_KEYS,
+      allCategories: ALL_CATS,
+      hasCompare: false,
+    });
+    const byYm = Object.fromEntries(r.sixMonths.map((m) => [m.ym, m.total]));
+    expect(byYm["2026-01"]).toBe(111);
+    expect(byYm["2026-02"]).toBe(222);
   });
 });

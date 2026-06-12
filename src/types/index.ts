@@ -43,6 +43,18 @@ export type CategorySummary = {
   expenses: CategoryExpense[];
 };
 
+// 6ヶ月比較グラフ用の月別集計（古い月 → 表示月の順・6本固定。データのない月は total=0）
+export type SixMonthSummary = {
+  ym: string; // "YYYY-MM"
+  total: number;
+  byCategory: Array<{
+    categoryId: string;
+    name: string;
+    sortOrder: number; // categoryColor() の色解決に使う
+    total: number;
+  }>;
+};
+
 export type MonthlySummary = {
   year: number;
   month: number;
@@ -50,4 +62,5 @@ export type MonthlySummary = {
   compareTotal: number | null;
   boxStats: BoxStats | null;
   categories: CategorySummary[];
+  sixMonths: SixMonthSummary[];
 };

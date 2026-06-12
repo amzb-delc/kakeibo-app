@@ -12,6 +12,7 @@ import { resolveSummaryView } from "@/lib/summary-view";
 import { sortExpenses, type SortField, type SortDir } from "@/lib/expense-sort";
 import { useExpenseModal } from "@/components/expense-modal";
 import { DonutChart } from "@/components/donut-chart";
+import { StackedBarChart } from "@/components/stacked-bar-chart";
 import { tagColor, SPOUSE_TAGS } from "@/lib/tags";
 import type { MonthlySummary, CategorySummary, BoxStats } from "@/types";
 
@@ -241,6 +242,16 @@ export function MonthlySummaryView({
   const [amountDir, setAmountDir] = useState<SortDir>("desc");
   const [sortKey, setSortKey] = useState<"date" | "amount">("date");
 
+  // 全体カードの表示モード（単月ドーナツ ⇔ 6ヶ月積み上げ棒）。横スライドで切替。
+  // 月送り時はモードを維持する（6ヶ月比較を見ている最中に勝手に単月へ戻ると不便なため）。
+  const [cardMode, setCardMode] = useState<"month" | "sixMonths">("month");
+  // 6ヶ月グラフの単独カテゴリ比較。null=積み上げ。単月の openCategoryId とは独立に持つ。
+  const [chartCategoryId, setChartCategoryId] = useState<string | null>(null);
+  const chartCategory =
+    chartCategoryId !== null
+      ? summary.categories.find((c) => c.categoryId === chartCategoryId) ?? null
+      : null;
+
   const dateFieldFromStep: "spentAt" | "updatedAt" =
     dateStep < 2 ? "spentAt" : "updatedAt";
   const dateDirFromStep: SortDir = dateStep % 2 === 0 ? "desc" : "asc";
@@ -261,7 +272,7 @@ export function MonthlySummaryView({
   return (
     <main className="px-4 py-6 space-y-6">
         {/* 合計カード: 左にドーナツ（中央に合計金額）、右に上位7カテゴリのレジェンド（＝カテゴリ選択UI） */}
-        <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50">
+        <div className="relative bg-card rounded-2xl p-4 shadow-sm border border-border/50">
           {/* 夫婦タグフィルタ（全体/♂/♀）。選択でドーナツ・合計・前月比・明細すべてが絞られる。 */}
           <div className="mb-3 flex justify-end">
             <div
@@ -289,60 +300,184 @@ export function MonthlySummaryView({
               })}
             </div>
           </div>
-          <div className="flex items-start gap-3">
-            <div className="shrink-0 w-[160px]">
-              <DonutChart
-                segments={legendItems.map((it) => ({
-                  id: it.id,
-                  value: it.total,
-                  color: it.color.hex,
-                }))}
-                selectedId={highlightId}
-                dimAll={highlightId === null}
+          {/* 単月ペイン ⇔ 6ヶ月ペインを横スライドで切替。外枠で overflow を切り、
+              内側の 2 枚（各 w-full）を translateX で左右に動かす。
+              シェブロンはペインのレイアウト外に出し、カードに対する絶対配置の
+              フローティングボタンにする（inert なペインの外なので常に操作可能）。 */}
+          <div className="relative overflow-x-clip">
+            <div
+              className="flex w-[200%] transition-transform duration-300 ease-out"
+              style={{
+                transform:
+                  cardMode === "sixMonths" ? "translateX(-50%)" : "translateX(0)",
+              }}
+            >
+              {/* === 単月ペイン（ドーナツ＋レジェンド） === */}
+              {/* 非表示側ペインは inert で配下のボタン群ごとフォーカス不可にする（WCAG 4.1.2）。
+                  aria-hidden は jsdom（テスト）の role 除外用に併記 */}
+              <div
+                className="w-1/2 shrink-0"
+                inert={cardMode === "sixMonths" ? true : undefined}
+                aria-hidden={cardMode === "sixMonths"}
               >
-                <span className="text-xs text-muted-foreground">合計</span>
-                <p className="text-xl font-bold tabular-nums whitespace-nowrap">
-                  {formatYen(summary.total)}
-                </p>
-                {totalLevel && (
-                  <p className={`text-[11px] font-medium mt-0.5 ${TREND_TEXT_COLOR[totalLevel]}`}>
-                    {totalDiff}
-                  </p>
-                )}
-              </DonutChart>
-            </div>
-            {legendItems.length > 0 && (
-              <ul className="flex-1 min-w-0 space-y-1 pt-1">
-                {legendItems.map((it) => {
-                  const isSelected = selectedId === it.id;
-                  return (
-                    <li key={it.id} className="min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => onToggleCategory(it.id)}
-                        aria-pressed={isSelected}
-                        className="flex w-full items-center justify-between gap-2 text-left"
+                <div className="flex items-stretch">
+                  <div className="flex flex-1 items-start gap-3 min-w-0">
+                    <div className="shrink-0 w-[160px]">
+                      <DonutChart
+                        segments={legendItems.map((it) => ({
+                          id: it.id,
+                          value: it.total,
+                          color: it.color.hex,
+                        }))}
+                        selectedId={highlightId}
+                        dimAll={highlightId === null}
                       >
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <span
-                            className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-1 text-sm font-medium ${it.color.tag} ${isSelected ? "ring-2 ring-current ring-offset-1" : ""}`}
-                          >
-                            <span className="truncate">{it.name}</span>
-                          </span>
-                          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
-                            {it.count}件
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                          {formatYen(it.total)}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                        <span className="text-xs text-muted-foreground">合計</span>
+                        <p className="text-xl font-bold tabular-nums whitespace-nowrap">
+                          {formatYen(summary.total)}
+                        </p>
+                        {totalLevel && (
+                          <p className={`text-[11px] font-medium mt-0.5 ${TREND_TEXT_COLOR[totalLevel]}`}>
+                            {totalDiff}
+                          </p>
+                        )}
+                      </DonutChart>
+                    </div>
+                    {legendItems.length > 0 && (
+                      <ul className="flex-1 min-w-0 space-y-1 pt-1">
+                        {legendItems.map((it) => {
+                          const isSelected = selectedId === it.id;
+                          return (
+                            <li key={it.id} className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => onToggleCategory(it.id)}
+                                aria-pressed={isSelected}
+                                className="flex w-full items-center justify-between gap-2 text-left"
+                              >
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                  <span
+                                    className={`inline-flex min-w-0 items-center rounded-lg px-2.5 py-1 text-sm font-medium ${it.color.tag} ${isSelected ? "ring-2 ring-current ring-offset-1" : ""}`}
+                                  >
+                                    <span className="truncate">{it.name}</span>
+                                  </span>
+                                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
+                                    {it.count}件
+                                  </span>
+                                </span>
+                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                  {formatYen(it.total)}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* === 6ヶ月ペイン（積み上げ棒） === */}
+              <div
+                className="w-1/2 shrink-0"
+                inert={cardMode !== "sixMonths" ? true : undefined}
+                aria-hidden={cardMode !== "sixMonths"}
+              >
+                <div className="flex items-stretch">
+                  <div className="flex-1 min-w-0">
+                    <StackedBarChart
+                      data={summary.sixMonths}
+                      selectedCategoryId={chartCategoryId}
+                      selectedSortOrder={chartCategory?.sortOrder ?? null}
+                      selectedYm={`${summary.year}-${String(summary.month).padStart(2, "0")}`}
+                    />
+                    {/* グラフ用カテゴリ選択（単月の選択とは独立）。タップで単独カテゴリ比較、
+                        再タップ／「全体」で積み上げに戻る。 */}
+                    {summary.categories.length > 0 && (
+                      // ring-offset とスクロールバーが下端で見切れないよう pb で余白を確保
+                      <div className="mt-2 pb-1 flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setChartCategoryId(null)}
+                          aria-pressed={chartCategoryId === null}
+                          className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                            chartCategoryId === null
+                              ? "bg-foreground text-background"
+                              : "bg-muted text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          全体
+                        </button>
+                        {summary.categories.map((cat) => {
+                          const active = chartCategoryId === cat.categoryId;
+                          const color = categoryColor(cat.sortOrder);
+                          return (
+                            <button
+                              key={cat.categoryId}
+                              type="button"
+                              onClick={() =>
+                                setChartCategoryId(active ? null : cat.categoryId)
+                              }
+                              aria-pressed={active}
+                              className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${color.tag} ${
+                                active ? "ring-2 ring-current ring-offset-1" : "opacity-70 hover:opacity-100"
+                              }`}
+                            >
+                              {cat.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
+          {/* フローティングのシェブロン（カードの枠線上に乗せる絶対配置・縦中央）。
+              コンテンツと被らないよう枠ギリギリ＝ボーダーを跨ぐ位置（半分外側）に置く。
+              overflow-x-clip の内側だと外側半分が切れるため、クリップ枠の外（カード直下）に置く。
+              inert なペインの外なので常に操作可能。表示モードに応じて出す向きを切替:
+              単月表示中は右の › （6ヶ月へ）、6ヶ月表示中は左の ‹ （単月へ戻る）。 */}
+          {cardMode === "month" ? (
+            <button
+              type="button"
+              onClick={() => setCardMode("sixMonths")}
+              aria-label="6ヶ月の比較を表示"
+              className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted active:bg-muted"
+            >
+              <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
+                <path
+                  d="M4 4 L10 10 L4 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCardMode("month")}
+              aria-label="単月の内訳に戻る"
+              className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted active:bg-muted"
+            >
+              <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
+                <path
+                  d="M10 4 L4 10 L10 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* 明細（選択中カテゴリの支出明細）。見出しの右に選択カテゴリのラベルを表示 */}
