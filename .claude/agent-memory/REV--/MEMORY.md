@@ -1,0 +1,2 @@
+- [タグ機能のレビュー観点](review_tags_feature.md) — enteredBy→tags(String[])移行の検証ポイント（cardName二重検証・spouseタグ付与経路・tagフィルタ一貫適用）
+- [requireSameOrigin の判定ロジック](review_same_origin_csrf.md) — SEC-6の Origin vs Host/x-forwarded-host 比較。偽装耐性の判断基準と本番Vercelでの注意点

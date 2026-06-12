@@ -92,6 +92,13 @@ export async function GET(req: NextRequest) {
     select: { amount: true, spentAt: true, categoryId: true },
   });
 
+  // 6ヶ月比較グラフのカテゴリ名・色解決用に世帯の全カテゴリ（16枠固定）を渡す
+  const allCategories = await prisma.category.findMany({
+    where: { householdId },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, name: true, sortOrder: true },
+  });
+
   // 集計は純粋関数に委譲（テスト可能にするため）。
   const summary = buildMonthlySummary({
     year,
@@ -100,6 +107,7 @@ export async function GET(req: NextRequest) {
     compareExpenses,
     sixMonthExpenses,
     sixMonthKeys,
+    allCategories,
     hasCompare: compareRange !== null,
   });
 

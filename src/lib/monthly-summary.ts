@@ -32,6 +32,18 @@ export type SummaryCategoryExpense = {
   tags: string[]; // 内部タグ（src/lib/tags.ts）。識別ドット表示に使う
 };
 
+// 6ヶ月比較グラフ用の月別集計（古い月 → 表示月の順・6本固定）
+export type SixMonthSummary = {
+  ym: string; // "YYYY-MM"
+  total: number; // データのない月は 0（空棒として描画する）
+  byCategory: Array<{
+    categoryId: string;
+    name: string;
+    sortOrder: number; // categoryColor() の色解決に使う
+    total: number;
+  }>;
+};
+
 export type MonthlySummaryResult = {
   year: number;
   month: number;
@@ -47,6 +59,7 @@ export type MonthlySummaryResult = {
     boxStats: BoxStats | null;
     expenses: SummaryCategoryExpense[];
   }>;
+  sixMonths: SixMonthSummary[];
 };
 
 export function buildMonthlySummary(params: {
@@ -56,10 +69,19 @@ export function buildMonthlySummary(params: {
   compareExpenses: CompareExpense[];
   sixMonthExpenses: SixMonthExpense[];
   sixMonthKeys: string[]; // 表示月含む過去6ヶ月の "YYYY-MM"
+  allCategories: Array<{ id: string; name: string; sortOrder: number }>; // 世帯の全カテゴリ（16枠）
   hasCompare: boolean; // 過去月閲覧時のみ true（当月は比較しない）
 }): MonthlySummaryResult {
-  const { year, month, expenses, compareExpenses, sixMonthExpenses, sixMonthKeys, hasCompare } =
-    params;
+  const {
+    year,
+    month,
+    expenses,
+    compareExpenses,
+    sixMonthExpenses,
+    sixMonthKeys,
+    allCategories,
+    hasCompare,
+  } = params;
 
   // 表示月をカテゴリ別に集計（明細の並びは渡された順を保持）
   const categoryMap = new Map<
@@ -141,5 +163,26 @@ export function buildMonthlySummary(params: {
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  return { year, month, total, compareTotal, boxStats, categories };
+  // 6ヶ月比較グラフ用に月別の積み上げデータを整形（sixMonthKeys は古い月→表示月の順）。
+  // データのない月も total=0 で 6 本固定にする（棒の本数・位置を安定させる）。
+  const categoryMeta = new Map(allCategories.map((c) => [c.id, c]));
+  const sixMonths: SixMonthSummary[] = sixMonthKeys.map((ym) => {
+    const inner = monthlyCategoryTotals.get(ym);
+    const byCategory = inner
+      ? Array.from(inner.entries())
+          .map(([categoryId, categoryTotal]) => {
+            const meta = categoryMeta.get(categoryId);
+            return {
+              categoryId,
+              name: meta?.name ?? "",
+              sortOrder: meta?.sortOrder ?? 0,
+              total: categoryTotal,
+            };
+          })
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+      : [];
+    return { ym, total: monthlyTotals.get(ym) ?? 0, byCategory };
+  });
+
+  return { year, month, total, compareTotal, boxStats, categories, sixMonths };
 }
