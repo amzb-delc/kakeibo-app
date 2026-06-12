@@ -49,3 +49,4 @@ next-env.d.ts
 # Claude Code: 使い捨てワークツリーとローカル個人設定はコミットしない
 .claude/worktrees/
 .claude/settings.local.json
+.claude/agent-memory/
