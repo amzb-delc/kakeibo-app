@@ -1,0 +1,19 @@
+{
+  "worktree": {
+    "bgIsolation": "none"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -c '([\"Explore\",\"Plan\",\"claude-code-guide\",\"REV一郎\"]) as $ro | (.tool_input.subagent_type // \"\") as $t | if ($ro | index($t)) then {} elif (.tool_input.isolation // \"\") == \"worktree\" then {} else {hookSpecificOutput:{hookEventName:\"PreToolUse\",permissionDecision:\"deny\",permissionDecisionReason:\"このリポジトリでは、ファイルを書き換える(コミットを伴う)サブエージェントは isolation:\\\"worktree\\\" で起動する規約です。isolation を worktree にして再実行してください。Explore/Plan 等の読み取り専用調査エージェント、および read-only レビュアー REV一郎 は隔離不要です。\"}} end'",
+            "statusMessage": "サブエージェントの worktree 隔離を確認中（書き込み系のみ）"
+          }
+        ]
+      }
+    ]
+  }
+}

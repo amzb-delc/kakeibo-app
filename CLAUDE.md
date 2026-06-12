@@ -2,12 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **一次情報は `docs/spec.html`（living spec）。** 画面・API・機能の挙動はそちらを参照。本ファイルは spec に書きづらい「非自明なアーキテクチャ・運用上の落とし穴・ワークフロー規約」だけを残す。
+
 ## 開発コマンド
 
 ```bash
 npm run dev       # 開発サーバー起動 (localhost:3000)
 npm run build     # プロダクションビルド
 npm run lint      # ESLint
+npm test          # Vitest 一括実行（watch は npm run test:watch）
 npx prisma generate          # Prismaクライアント生成
 npx prisma migrate dev       # マイグレーション実行
 npx prisma db seed           # シードデータ投入
@@ -17,76 +20,62 @@ npm run db:set-passphrase -- "世帯コード"   # 世帯id(=世帯コード)を
 
 ## アーキテクチャ
 
-**技術スタック:** Next.js 16 (App Router) + Prisma 5 + PostgreSQL + shadcn-ui + TypeScript
+**スタック:** Next.js 16 (App Router) + Prisma 5 + PostgreSQL + shadcn-ui + TypeScript。`DATABASE_URL`（env）に接続文字列。Prismaクライアントは `src/lib/prisma.ts` にシングルトン。
 
-**データベース:** `.env` の `DATABASE_URL` に PostgreSQL の接続文字列を設定する。
+ページ遷移は持たず `/`（月次サマリー＝ホーム）のみ。登録/編集・設定はボトムシートのモーダル（`ExpenseModalProvider` / `SettingsModalProvider`）。
 
-**Prismaクライアント:** `src/lib/prisma.ts` にシングルトンで定義。dev環境ではホットリロード対応。
+### 認証（世帯コード）— 最重要の非自明点
 
-**認証（世帯コード）:** ユーザー管理は持たず、**夫婦で共有する「世帯コード」= `household.id`** を入力・保存した端末だけが家計データを見られる方式。
-- 保存: `/api/session` に世帯コードを POST → 一致する世帯があれば `household` cookie（httpOnly・長期・**HMAC 署名付き**）を発行（＝端末に「保存」）。DELETE で「クリア」。レート制限あり（同一 IP 60 秒 10 回）。
-- スコープ: 各データ API は `getHouseholdId()`（`src/lib/auth.ts`、cookie から取得）で世帯を特定。`getHouseholdId` は cookie の **HMAC 署名を検証**（`src/lib/cookie-sign.ts`）し、未署名・改竄は未保存扱い（401）。`middleware` は使わず API 側でガード。
-- **`SESSION_SECRET`（env）**: cookie 署名鍵。**本番は必須**（未設定だと署名検証で 500）。dev/test は固定フォールバックで動作。**署名鍵を変える／導入すると既存 cookie は無効化され、全端末で世帯コードの再保存が必要**。
-- 世帯コードはアプリから変更しない（仕様）。変更は `npm run db:set-passphrase -- "世帯コード"`（既存世帯の id を付け替え）。
-- 保存UIは設定モーダル（`SettingsModalProvider` / フッタ「設定」）、未保存のときは `/` が未保存画面。`SessionProvider` がクライアントの保存状態を保持。
-- cookie は端末（ブラウザ／PWA）ごとに別物。**iOSでは Safari とホーム画面PWAでストレージが分離**されるため、保存状態は両者で共有されない（片方でクリアしてももう片方には残る）。MVPの軽量な保護として許容する仕様。
-- seed / 上記スクリプトの既定世帯IDは `"demo-household"`（seed・`set-passphrase.ts` 内のリテラル）。
+ユーザー管理は持たず、**夫婦で共有する「世帯コード」= `household.id`** を保存した端末だけがデータを見られる。
 
-## ドキュメント
+- `/api/session` に世帯コードを POST → 一致世帯なら `household` cookie（httpOnly・長期・HMAC署名付き）を発行、DELETE でクリア。レート制限あり（同一IP 60秒10回）。
+- 各データAPIは `getHouseholdId()`（`src/lib/auth.ts`）で世帯特定。cookie の HMAC署名を検証（`src/lib/cookie-sign.ts`）し、未署名・改竄は未保存扱い。**`/api/session` 以外のデータAPIは未保存だと 401。**
+- **`SESSION_SECRET`（env）は本番必須**（未設定だと署名検証で500）。dev/test は固定フォールバック。**鍵を変える/導入すると既存cookieは全て無効化され、全端末で再保存が必要。**
+- 世帯コードはアプリから変更しない。変更は `npm run db:set-passphrase`。seed/同スクリプトの既定IDは `"demo-household"`。
+- **iOSは Safari とホーム画面PWAでストレージが分離**され保存状態を共有しない（MVPの軽量保護として許容）。
 
-`docs/` に**自己完結 HTML** で読み物を置く規約（人間がブラウザで読めて見やすい・git 追跡で共有可能）。**起点は `docs/index.html`**（全ドキュメントへのリンク集）。各ページ上部の `← ドキュメント一覧へ` で index に戻れる。`spec.html`（MVP仕様書＝living spec）、`refactor-backlog.html`、各機能の実装プラン（`*-plan.html`）。**docs を増やしたら `index.html` にカード/リンクを追加する。**
+## ドキュメント規約
 
-- **実装を伴う改修のプランは `docs/<feature>-plan.html` に残す**（plan mode の `~/.claude/plans/*.md` はリポ外・ランダム名で共有/発見しづらいため）。スタイルは既存の `docs/statement-import-plan.html` / `docs/entered-by-plan.html` に倣う（light/dark 対応・`.wrap`・`h1/h2/h3`・`.badge`・`.decision` 等）。冒頭に `← MVP仕様書へ戻る` の backlink と、作成日＋ステータス（✅実装完了・PR番号）の blockquote を置く。
-- 仕様の変更は `spec.html`（living spec）に反映する。プラン HTML は「設計時の記録」として残す。
+`docs/` に**自己完結HTML**で置く（ブラウザで読めて git 共有可能）。**起点は `docs/index.html`**、各ページ上部に index へ戻る backlink。docs を増やしたら `index.html` にリンク追加。
 
-## 画面構成
+- **実装を伴う改修のプランは `docs/<feature>-plan.html` に残す**（plan mode の `~/.claude/plans/*.md` はリポ外で共有しづらいため）。スタイルは `docs/statement-import-plan.html` / `entered-by-plan.html` に倣い、冒頭に backlink ＋「作成日・ステータス(PR番号)」の blockquote。
+- 仕様変更は `spec.html` に反映。プランHTMLは「設計時の記録」として残す。
+- **リファクタ／セキュリティのバックログは `docs/refactor-backlog.html` がマスター**（Tier 採番・残タスク・SEC 項目の現況を集約）。進捗の更新はこの HTML を直接編集する（採番リストをコード/メモリに散らさない）。
 
-| パス | 概要 |
-|------|------|
-| `/` | 月次サマリー（ホーム・アプリの起点）。月切り替え・カテゴリ選択・明細表示。登録/編集は FAB のモーダルで行う |
+## ワークフロー規約
 
-※ ページ遷移は持たず、支出の登録/編集（`ExpenseModalProvider`）と設定（世帯コード保存・カテゴリ管理、`SettingsModalProvider`）は**ボトムシートのモーダル**で開く。
+- **非自明な改修（UI/仕様変更・機能追加など）は feat ブランチを切り、GitHub PR で main にマージ**する。`main` 直コミットは避ける（typo・小修正のような明らかに軽微な変更のみ直でも可）。着手前に `git checkout -b feat/xxx`。
+- コミットは **feat + docs に分割**するスタイル。
+- push 後は `gh pr create`（または GitHub MCP `create_pull_request`）で PR を立てる。
+- **ファイルを書き換える（＝コミットを伴い得る）サブエージェント（Agent ツール）は、必ず `isolation: "worktree"`（隔離ワークツリー）で起動する**。複数の並行ジョブが同じ作業ディレクトリでブランチを切り替え、未コミット変更を失う/stash 退避される競合を避けるため。**`Explore`/`Plan`/`claude-code-guide` などの読み取り専用調査エージェント、および read-only レビュアー `REV一郎`（Write/Edit を持たず、`git diff` で作業ツリーの直近差分を見る必要があるため）は隔離不要**（`.claude/settings.json` の PreToolUse フックが種別で判定し、書き込み系のみ worktree を必須化＝**このリポジトリ限定**・他プロジェクトには適用しない）。共有ハブ＝`expense-modal.tsx`/`page.tsx`/`*-provider.tsx`/`schema.prisma`/`package-lock.json` は特に並行で衝突しやすい。
 
-## APIルート
+### サブエージェント分業（所有境界とブランチ運用）
 
-| エンドポイント | 概要 |
-|------|------|
-| `GET/POST/PATCH/DELETE /api/session` | 保存状態の取得（世帯＋入力者。**入力者cookie が無ければ既定2=♀を発行**） / 世帯コードを保存（cookie発行） / **入力者(1=♂/2=♀)を端末に保存（PATCH）** / クリア（両cookie破棄） |
-| `GET /api/categories` | カテゴリ一覧（sortOrder順）。`?scope=all` で無効含む全16スロット（管理画面用） |
-| `PATCH /api/categories/[id]` | カテゴリの名前変更・有効/無効トグル（`Category.enabled`） |
-| `POST /api/expenses` | 支出登録（amount, spentAt, categoryId 必須） |
-| `POST /api/expenses/batch` | 支出の一括登録（明細取り込み用）。全行バリデーション→1件でも失敗なら何も作らず errors を返す（全成功か全失敗）。上限500件 |
-| `GET/PATCH/DELETE /api/expenses/[id]` | 支出の取得 / 編集 / 削除 |
-| `GET /api/monthly-summary?year=&month=` | 月次集計（当月・前月合計、カテゴリ別） |
-| `POST /api/ocr` | レシート画像（base64）から金額・店名・日付・カテゴリ候補を抽出（Claude ビジョン） |
-| `POST /api/statement` | クレカ明細PDF（base64）から利用明細行を一括抽出（Claude document）。自世帯カテゴリに解決し、重複候補に `duplicateLikely` を付与 |
+メイン（司令塔兼実装）が逐次起動し、**コミット/PRは直列**。worktree は使い捨て（成果の永続性はブランチが持つ。書き込み系は push まで完了して終了）。
 
-`/api/session` 以外のデータ API は**未保存（cookie 無し）だと 401**。
+| 領域 | 担当 | worktree | ブランチ |
+|---|---|---|---|
+| PRレビュー（read-only） | `REV一郎` | 不要 | なし（`gh pr diff`/MCPで読み、`gh pr review` でコメント） |
+| `*.test.ts` の追加・更新 | `TEST二郎` | 使い捨て（frontmatter で既定） | feature 相乗り／単独タスクは `agent/test-jiro` |
+| `docs/` の更新（spec/plan/backlog/index） | `DOC三郎` | 使い捨て（同上） | feature 相乗り／単独タスクは `agent/doc-saburo` |
+| フロントエンド実装（スポット起動） | `FRONT四郎` | 使い捨て（同上） | `feat/xxx`（1機能=1PR） |
+| バックエンド実装・root・`CLAUDE.md`・メモリ | メイン | — | `feat/xxx` |
 
-## データモデルの補足
+専用ブランチ（`agent/*`）はマージまで積み増し、マージ後は main に追従させてから次を積む。
 
-- `Expense.amount` は円単位の整数
-- `Expense.enteredBy` は**入力者**（`1=♂(夫) / 2=♀(妻)`）。**端末ごとの設定**（設定モーダルで選択 → `ENTERED_BY_COOKIE`）で、**新規登録（POST `/api/expenses`・batch）時にサーバが cookie から付与**する。**編集 PATCH は触らない（据え置き）**ため、`expense-form` / `validateExpenseInput` には乗せない。**未設定の端末は起動時の GET `/api/session` で既定値 2=♀ を発行**（妻がメイン利用の想定。夫は設定で 1=♂ に切替）するので、登録の必須ゲートは設けない。`getEnteredBy()`（`src/lib/auth.ts`）で取得。**一覧での入力者表示は未実装**（別途）
-- `Category` は `householdId` ごとにユニーク。**16スロット固定**（seedで生成）。追加・削除・並び替えは不可だが、**名前変更・有効/無効トグルは実装済み**（設定モーダル内 `category-manager.tsx` ＋ `PATCH /api/categories/[id]`、`Category.enabled` 列）
-- トレンド判定ロジックは `src/lib/trend.ts` に集約
+## データモデルの非自明点
 
-## 実装上の制約（MVPスコープ）
+spec の「データモデル」に加え、コードを触る前に知っておくべき点:
 
-- ユーザー管理（個人アカウント）は持たない。保護は世帯共有の世帯コードのみ（上記「認証」参照）
-- レシートOCRは実装済み（`POST /api/ocr` + `src/lib/ocr.ts`、Claude ビジョン）。撮影・縮小・読み取りは再利用可能な `ReceiptCaptureButton`（隠し input + `useReceiptOcr`）が担い、抽出結果（金額・店名・日付・カテゴリ）だけを `onResult` で返す。**2つの動線**:
-  - **支出モーダル新規時のヘッダーのカメラ**: 開いているフォームに `ocrResult`（`expense-modal` 経由で `ExpenseForm` に渡る）として反映。
-  - **フッター右のカメラ（ホーム）**: 撮影 → `openCreate({ ocr, keepOpen: true })` で**連続入力ON・レシートの月**で登録モーダルを開く（まとめ入力動線）。アイコンは“重ねカメラ”で連続入力モードを表す。
-  - **日付の扱い**: OCR の日付が妥当なら（`parseReceiptDate`、`src/lib/date.ts`）**年月日を丸ごと**フォームに反映する。レシートの月でフォームが開くとき、ホームの表示月も `createMonth` 経由で同期する（`useMonthlySummary.goToMonth`）。
-  - **画像は保存しない**（抽出のみ、`receiptImageUrl`/`ocrRawText` は未使用のまま）。`ANTHROPIC_API_KEY` 必須（未設定なら 503）。モデルは `OCR_MODEL`（既定 `claude-haiku-4-5`）
-- 日付入力: `ExpenseForm` の年月日は**縦ホイール**（`src/components/wheel.tsx`、汎用ドラム）で選ぶ。**月・日は端で巡回**（`loop`）、年は範囲（今年〜5年前＋OCR等で外れた年も内包）。年月変更時は日を月末でクランプ（`clampDay`）。無効日付は保存をブロック（クライアント）＋サーバも弾く（`parseJstDate` は 2/30・4/31 等をロールオーバーせず null）。登録/編集の保存時も `onSuccess` の年月でホーム表示月を同期する。
-- 連続入力（ロック）トグル: 支出モーダル**新規時のヘッダー**にスイッチ（`src/components/ui/switch.tsx`、base-ui）を置き、ON のとき保存後もシートを閉じず年月＋日＋カテゴリを残して続けて入力する。状態は `expense-modal` が保持し `ExpenseForm` に渡す。錠アイコンはスイッチのトラック内（ON=閉錠・OFF=開錠）。
-- フッター（`footer-nav.tsx`）: ホームは唯一のページなのでサマリータブは廃止。**左=設定／中央=登録FAB（手入力）／右=レシートOCRカメラ**。FAB とカメラは未保存（`unlocked` でない）のときは出さない（OCR API も 401）。
-- クレカ明細の一括取り込みは実装済み（`POST /api/statement` + `src/lib/statement.ts`、Claude の document(PDF) 抽出。既定モデルは `STATEMENT_MODEL`＝`claude-sonnet-4-6`、env で切替可）。動線は**ホームのヘッダ左「フォルダ」アイコン**（`StatementImportButton`）→ PDF ピッカー → 抽出 → **プレビューシート**（`statement-preview-sheet.tsx`）→ `POST /api/expenses/batch` で一括登録。
-  - **プレビューUI**: 各明細は**1行**（行頭ドット・日付 `M/D`・金額・カテゴリ・店名・チェック）。**金額・日付・カテゴリ・登録ON/OFFは編集可、店名は表示のみ**（`title` にフル表示）。金額は**6桁上限**（最大 ¥999,999）。行頭ドットの色で状態を示す（未入力=赤 / 重複=amber / 返金=gray）。ヘッダに**読み取り期間**、上部に「**選択行のみ**」フィルタ・**カテゴリ一括選択**メニュー・「**別のPDFを選び直す**」リンク。
-  - **memo に PDF ファイル名を自動入力**: 取り込んだ各支出の `memo` に元 PDF のファイル名を入れる（`fileName`）。
-  - **重複候補**: 抽出行を対象期間の既存支出と突合し（`src/lib/duplicate.ts`、同日×同額×店名近似。店名は **NFKC 正規化**で全角/半角ゆれを吸収）`duplicateLikely` を立てる。**重複候補・返金（負）・金額なしは既定 OFF**で取り込むが、**除外はせずユーザー判断**（行頭ドット＋凡例で明示・手動 ON 可）。
-  - **取り込みデータの保持**: ×（キャンセル）後も `StatementImportProvider` が rows を**15分メモリ保持**し、フォルダアイコンに**件数バッジ**を出す。再タップで**再抽出なしで開き直す**（`reopen`）。登録成功で破棄。
-  - **抽出中の表示**: 抽出中（`importing`）はホーム右ヘッダのキャラに「**考え中…**」吹き出し（`ThinkingBubble` / `HeaderCharacter` の `thinking` prop）。
-  - **PDFは保存しない**（抽出のみ、base64 は送信後破棄）。`ANTHROPIC_API_KEY` 必須（未設定なら 503）。状態は `StatementImportProvider`（`ExpenseModalProvider` の内側でカテゴリ先読み・登録後の一覧再取得 `notifyBatch` を借りる）。
-- 通知機能は未実装（`notificationDay`, `notificationTime` フィールドのみ存在）
-- カテゴリの**追加・削除・並び替えは未対応**（16スロット固定）。名前変更・有効/無効の管理UIは実装済み（`category-manager.tsx`、設定モーダル内）
+- `Expense.amount` は円単位の整数。
+- `Expense.enteredBy`（入力者 `1=♂/2=♀`）は**端末cookie設定（`ENTERED_BY_COOKIE`）を元に新規登録(POST/batch)時にサーバが付与**。**編集 PATCH は据え置き**で、`expense-form`/`validateExpenseInput` には乗せない。未設定端末は GET `/api/session` が既定2=♀を発行するため登録の必須ゲートは無い。`getEnteredBy()`（`src/lib/auth.ts`）。
+- `Category` は **16スロット固定**（seed生成・`householdId` ごとにユニーク）。追加・削除・並び替えは不可、名前変更・有効/無効トグルのみ（`Category.enabled`）。
+- `POST /api/expenses/batch` は**全成功か全失敗**（1件でも失敗なら何も作らず errors を返す・上限500件）。
+- 日付は `src/lib/date.ts`。`parseJstDate` は 2/30・4/31 等をロールオーバーせず null（無効日付はサーバが弾く）。トレンド判定は `src/lib/trend.ts`。
+
+## 実装状況（MVPスコープ）
+
+機能の動線・UI詳細は `docs/spec.html`、設計記録は各 `*-plan.html` 参照。要点のみ:
+
+- **レシートOCR**（`src/lib/ocr.ts`）・**クレカ明細PDF取込**（`src/lib/statement.ts` → プレビュー → `/api/expenses/batch`）は実装済。いずれも **`ANTHROPIC_API_KEY` 必須**（未設定なら503）、画像/PDFは保存しない。モデルは env `OCR_MODEL`（既定 haiku）/ `STATEMENT_MODEL`（既定 sonnet）。
+- **未実装:** 通知（`notificationDay`/`notificationTime` フィールドのみ）。カテゴリの追加・削除・並び替え。一覧での入力者表示。

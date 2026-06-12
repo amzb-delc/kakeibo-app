@@ -45,3 +45,7 @@ next-env.d.ts
 
 # クレカ明細など個人の取り込み元PDF（OCR検証用にローカルに置くが、コミットしない）
 /statement_*.pdf
+
+# Claude Code: 使い捨てワークツリーとローカル個人設定はコミットしない
+.claude/worktrees/
+.claude/settings.local.json
