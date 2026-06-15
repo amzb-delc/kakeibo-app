@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getDemoUserId, getEnteredBy } from "@/lib/auth";
+import { getEnteredBy } from "@/lib/auth";
 import { cardTagOf, spouseTagOf } from "@/lib/tags";
 import { validateExpenseInput } from "@/lib/expenses";
 import {
@@ -52,8 +52,6 @@ export async function POST(req: NextRequest) {
     ...(cardTag ? [cardTag] : []),
   ];
 
-  const createdByUserId = await getDemoUserId();
-
   // 全行をバリデーション。1行でも失敗したら何も作らず errors を返す（＝全行ロールバック）。
   // プレビューで確認済みの前提なので、部分コミットより「全成功か全失敗」が明快。
   const validated: {
@@ -100,7 +98,6 @@ export async function POST(req: NextRequest) {
           storeName: v.storeName,
           memo: v.memo,
           tags,
-          createdByUserId,
         },
       })
     )

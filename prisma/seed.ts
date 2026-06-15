@@ -44,16 +44,6 @@ const categorySlotData = (householdId: string) =>
   }));
 
 async function main() {
-  // デモ用ユーザー
-  const user = await prisma.user.upsert({
-    where: { email: "demo@example.com" },
-    update: {},
-    create: {
-      name: "デモユーザー",
-      email: "demo@example.com",
-    },
-  });
-
   // デモ用世帯
   const household = await prisma.household.upsert({
     where: { id: DEFAULT_HOUSEHOLD_ID },
@@ -61,24 +51,6 @@ async function main() {
     create: {
       id: DEFAULT_HOUSEHOLD_ID,
       name: "ワレワレ",
-      notificationDay: 25,
-      notificationTime: "09:00",
-    },
-  });
-
-  // 世帯メンバー登録
-  await prisma.householdMember.upsert({
-    where: {
-      householdId_userId: {
-        householdId: household.id,
-        userId: user.id,
-      },
-    },
-    update: {},
-    create: {
-      householdId: household.id,
-      userId: user.id,
-      role: "owner",
     },
   });
 
@@ -144,7 +116,6 @@ async function main() {
     storeName: string | null;
     memo: string | null;
     tags: string[];
-    createdByUserId: string;
   };
 
   // デモ用の内部タグ（src/lib/tags.ts の仕様）。識別ドット・夫婦フィルタの実機確認が
@@ -174,7 +145,6 @@ async function main() {
       storeName,
       memo,
       tags: demoTags(),
-      createdByUserId: user.id,
     });
   };
 
@@ -250,7 +220,6 @@ async function main() {
   await prisma.expense.createMany({ data });
 
   console.log("Seed completed.");
-  console.log(`  User: ${user.email}`);
   console.log(`  Household: ${household.name}`);
   console.log(
     `  Categories: ${CATEGORY_SLOTS} slots (${slotName(0)}..${slotName(CATEGORY_SLOTS - 1)}, ${ENABLED_SLOTS} enabled)`

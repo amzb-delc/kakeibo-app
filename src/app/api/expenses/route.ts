@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getDemoUserId, getEnteredBy } from "@/lib/auth";
+import { getEnteredBy } from "@/lib/auth";
 import { spouseTagOf } from "@/lib/tags";
 import { validateExpenseInput } from "@/lib/expenses";
 import {
@@ -30,8 +30,6 @@ export async function POST(req: NextRequest) {
   const enteredBy = await getEnteredBy();
   const tags = enteredBy ? [spouseTagOf(enteredBy)] : [];
 
-  const createdByUserId = await getDemoUserId();
-
   const expense = await prisma.expense.create({
     data: {
       householdId,
@@ -41,7 +39,6 @@ export async function POST(req: NextRequest) {
       storeName: data.storeName ?? null,
       memo: data.memo ?? null,
       tags,
-      createdByUserId,
     },
     include: { category: { select: { id: true, name: true } } },
   });

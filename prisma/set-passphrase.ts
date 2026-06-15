@@ -2,7 +2,7 @@
  * 世帯コードのセットアップ用スクリプト（一度きり）。
  *
  * 「世帯コード = household.id」方式のため、既存世帯の id を選んだ世帯コードへ付け替える。
- * id は各テーブルの FK なので、子レコード（Category / Expense / HouseholdMember）も
+ * id は各テーブルの FK なので、子レコード（Category / Expense）も
  * トランザクションで新 id に移行する。
  *
  * 使い方:
@@ -22,7 +22,7 @@ async function main() {
   }
 
   const households = await prisma.household.findMany({
-    select: { id: true, name: true, notificationDay: true, notificationTime: true },
+    select: { id: true, name: true },
   });
   if (households.length === 0) {
     console.error("世帯が見つかりません。先に `npm run db:seed` を実行してください。");
@@ -55,8 +55,6 @@ async function main() {
       data: {
         id: newId,
         name: current.name,
-        notificationDay: current.notificationDay,
-        notificationTime: current.notificationTime,
       },
     });
     await tx.category.updateMany({
@@ -64,10 +62,6 @@ async function main() {
       data: { householdId: newId },
     });
     await tx.expense.updateMany({
-      where: { householdId: current.id },
-      data: { householdId: newId },
-    });
-    await tx.householdMember.updateMany({
       where: { householdId: current.id },
       data: { householdId: newId },
     });
