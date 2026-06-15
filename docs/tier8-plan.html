@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿アプリ — Tier 8 スキーマ撤去 実装プラン</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+  --decide-bg: #fee2e2;
+  --decide-fg: #991b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+    --decide-bg: #450a0a;
+    --decide-fg: #fca5a5;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+.backlink {
+  display: inline-block; margin-bottom: 16px; color: var(--primary);
+  text-decoration: none; font-size: 13px;
+}
+.backlink:hover { text-decoration: underline; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 8px 0; }
+a { color: var(--primary); }
+code {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+pre {
+  background: var(--code-bg); padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 12px 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--primary);
+  background: var(--card); border-radius: 0 8px 8px 0; color: var(--muted);
+  font-size: 14px;
+}
+blockquote strong { color: var(--fg); }
+ul { margin: 8px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px;
+  background: var(--card); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); font-weight: 600; white-space: nowrap; }
+td.c { text-align: center; white-space: nowrap; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-todo { background: var(--todo-bg); color: var(--todo-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.b-decide { background: var(--decide-bg); color: var(--decide-fg); }
+.rec { color: var(--success); font-weight: 600; }
+.muted { color: var(--muted); }
+del { color: var(--muted); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+.decision {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--destructive); border-radius: 0 8px 8px 0;
+  padding: 12px 16px; margin: 14px 0;
+}
+.decision h3 { margin-top: 0; }
+.decision.decided { border-left-color: var(--success); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="backlink" href="index.html">← ドキュメント一覧へ</a>
+<h1>Tier 8 — スキーマ撤去 実装プラン</h1>
+
+<blockquote>
+作成: 2026-06-15。<strong>ステータス: ✅ 実装完了（2026-06-15・コミット <code>d50eb10</code>・<code>feat/tier8-schema-cleanup</code>・PR 番号未定）</strong>。
+<a href="refactor-backlog.html">リファクタ・バックログ</a>の <strong>Tier 8（旧 #12 本体）</strong>＝本番化前に残していた「未使用のマルチユーザー/通知の足場と画像予約列」を一括撤去する。<br>
+DBマイグレを伴い、かつ「完成させる or 撤去する」の設計判断が必要だったため、本番化の直前に別途実施する方針だった項目。<strong>決定は全撤去</strong>。支出データ（<code>householdId</code> / <code>categoryId</code> / <code>tags</code> 等）は保持する。
+</blockquote>
+
+<h2>Context（なぜ撤去するか）</h2>
+<p>初期スキーマには「将来のマルチユーザー／通知／レシート画像保存」を見越した足場が入っていたが、MVP ではいずれも採用しないまま運用が固まった。本アプリの認可は<strong>世帯コード（<code>household.id</code>）の保有のみ</strong>で、個人アカウントの概念は無い（<a href="spec.html">spec</a>「MVPスコープ外 / 認証・複数ユーザー」）。本番化の直前に、未使用の足場を残すか消すかを決める必要があった。</p>
+
+<div class="decision decided">
+<h3>設計判断: 完成させる or 撤去する → <strong>全撤去</strong> <span class="badge b-done">✅ 決定</span></h3>
+<ul>
+  <li><strong>マルチユーザー（<code>User</code> / <code>HouseholdMember</code>）は元々未使用</strong>。認可は世帯コード方式に確定しており、ユーザー単位の概念を完成させる予定がない。</li>
+  <li><strong><code>Expense.createdByUserId</code> は情報量ゼロ＋フットガン</strong>。常に demo ユーザー固定で入っていて分析価値が無いうえ、<code>getDemoUserId()</code> がデプロイ時に demo ユーザー未作成だと「demo user not found」で 500 になる地雷だった。入力者の区別は既に <strong>夫婦タグ <code>spouse:N</code></strong>（<a href="expense-tags-plan.html">支出タグプラン</a>）が担っている。</li>
+  <li><strong>通知（<code>notificationDay</code> / <code>notificationTime</code>）は送信ロジックが無く列だけ</strong>の未実装方針。</li>
+  <li><strong>画像予約列（<code>receiptImageUrl</code> / <code>ocrRawText</code>）は「画像は保存しない」方針</strong>で書き込み経路が無い（死んだバリデーションは T5-2 で既に撤去済み）。</li>
+</ul>
+<p>いずれも「いつか使うかも」の予約に過ぎず、本番化前に消す方が seed・デプロイ手順・型がシンプルになり安全。よって完成ではなく<strong>全撤去</strong>を選択。</p>
+</div>
+
+<h2>撤去対象</h2>
+<table>
+<thead><tr><th>対象</th><th>場所</th><th>理由</th></tr></thead>
+<tbody>
+<tr><td><code>User</code> モデル</td><td><code>prisma/schema.prisma</code></td><td>マルチユーザー未採用</td></tr>
+<tr><td><code>HouseholdMember</code> モデル（+ <code>role</code>）</td><td><code>prisma/schema.prisma</code></td><td>同上</td></tr>
+<tr><td><code>Expense.createdByUserId</code>（+ FK / relation）</td><td><code>schema.prisma</code> / <code>api/expenses/route.ts</code> / <code>api/expenses/batch/route.ts</code></td><td>常に demo 固定で情報量ゼロ・500 フットガン</td></tr>
+<tr><td><code>getDemoUserId()</code> / <code>DEMO_USER_EMAIL</code></td><td><code>src/lib/auth.ts</code></td><td><code>createdByUserId</code> 付与専用だった</td></tr>
+<tr><td><code>Household.notificationDay</code> / <code>notificationTime</code></td><td><code>schema.prisma</code></td><td>通知未実装（列だけ）</td></tr>
+<tr><td><code>Expense.receiptImageUrl</code> / <code>ocrRawText</code></td><td><code>schema.prisma</code></td><td>画像非保存方針の予約列</td></tr>
+</tbody>
+</table>
+<p><strong>保持するもの:</strong> <code>Household</code>（<code>id</code>=世帯コード / <code>name</code> / タイムスタンプ）、<code>Category</code>（16スロット）、<code>Expense</code> の支出データ本体（<code>householdId</code> / <code>categoryId</code> / <code>amount</code> / <code>spentAt</code> / <code>storeName</code> / <code>memo</code> / <code>tags</code>）。</p>
+
+<h2>マイグレーション</h2>
+<p><code>prisma/migrations/20260615000000_tier8_drop_user_scaffolding/migration.sql</code>。</p>
+<pre><code>-- FK 解除
+ALTER TABLE "Expense" DROP CONSTRAINT IF EXISTS "Expense_createdByUserId_fkey";
+ALTER TABLE "HouseholdMember" DROP CONSTRAINT IF EXISTS "HouseholdMember_householdId_fkey";
+ALTER TABLE "HouseholdMember" DROP CONSTRAINT IF EXISTS "HouseholdMember_userId_fkey";
+-- テーブル削除
+DROP TABLE "HouseholdMember";
+DROP TABLE "User";
+-- 通知フィールド撤去
+ALTER TABLE "Household" DROP COLUMN "notificationDay", DROP COLUMN "notificationTime";
+-- createdByUserId（情報量ゼロ）と予約列（画像非保存）を撤去
+ALTER TABLE "Expense" DROP COLUMN "createdByUserId",
+DROP COLUMN "receiptImageUrl", DROP COLUMN "ocrRawText";</code></pre>
+<p>支出行そのものは消えない（DROP するのは <code>User</code>/<code>HouseholdMember</code> テーブルと <code>Expense</code>/<code>Household</code> の一部列のみ）。</p>
+
+<h2>デプロイへの影響</h2>
+<ul>
+  <li><strong>本番 seed が簡素化</strong>: demo ユーザーの作成が不要になり、<code>seed</code> から user 関連の生成を削除。<code>set-passphrase</code> も新スキーマに追従。</li>
+  <li><strong>「demo user not found」500 フットガンが消滅</strong>: <code>getDemoUserId()</code> が無くなったため、デプロイ時に demo ユーザーが無くても支出登録（<code>POST /api/expenses</code> / <code>batch</code>）が 500 にならない。bootstrap 手順から「user を作る」ステップが不要に。</li>
+  <li>支出登録は <code>createdByUserId</code> の付与をやめた（入力者は引き続き <code>tags</code> の <code>spouse:N</code> でサーバが新規登録時のみ付与）。</li>
+</ul>
+
+<h2>検証（実装後）</h2>
+<ul>
+  <li><code>npx prisma migrate dev</code> → <code>npm run lint</code> → <code>npm test</code>（既存の支出登録・タグ付与テストが緑）。</li>
+  <li><code>npx prisma db seed</code> で demo ユーザー不要のまま seed が通り、支出が再生成される（撤去前の支出データは保持される）。</li>
+  <li><code>npm run dev</code> → 支出の新規登録・編集・明細一括取込が <code>createdByUserId</code> 無しで通る。<code>npx prisma studio</code> で <code>User</code>/<code>HouseholdMember</code> テーブルと撤去列が消えていることを確認。</li>
+</ul>
+
+</div>
+</body>
+</html>
