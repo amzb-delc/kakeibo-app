@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { jsonReq } from "@/test/route-helpers";
 
-const { getHouseholdId, getDemoUserId, getEnteredBy } = vi.hoisted(() => ({
+const { getHouseholdId, getEnteredBy } = vi.hoisted(() => ({
   getHouseholdId: vi.fn(),
-  getDemoUserId: vi.fn(),
   getEnteredBy: vi.fn(),
 }));
-vi.mock("@/lib/auth", () => ({ getHouseholdId, getDemoUserId, getEnteredBy }));
+vi.mock("@/lib/auth", () => ({ getHouseholdId, getEnteredBy }));
 
 // validateExpenseInput は実関数のまま使い、その中の category 照合だけ prisma をモック。
 const { findFirst, create, $transaction } = vi.hoisted(() => ({
@@ -25,7 +24,6 @@ const validRow = { amount: 1280, spentAt: "2026-05-03", categoryId: "cat-1" };
 
 beforeEach(() => {
   getHouseholdId.mockReset().mockResolvedValue("hh-1");
-  getDemoUserId.mockReset().mockResolvedValue("u-1");
   getEnteredBy.mockReset().mockResolvedValue(1); // 入力者は設定済みが既定
   findFirst.mockReset().mockResolvedValue({ id: "cat-1" }); // 自世帯にカテゴリ存在
   create.mockReset().mockImplementation((args) => args); // $transaction に渡る配列要素
@@ -75,7 +73,7 @@ describe("POST /api/expenses/batch", () => {
     expect($transaction).not.toHaveBeenCalled();
   });
 
-  it("全行有効なら 201・1トランザクションで自世帯/デモユーザー/入力者作成", async () => {
+  it("全行有効なら 201・1トランザクションで自世帯/入力者タグ作成（createdByUserId は付与しない）", async () => {
     getEnteredBy.mockResolvedValue(2);
     const rows = [validRow, { ...validRow, amount: 800, storeName: "コンビニ" }];
     const res = await POST(jsonReq(URL, { rows }));
@@ -87,7 +85,7 @@ describe("POST /api/expenses/batch", () => {
     expect(create).toHaveBeenCalledTimes(2);
     const data = create.mock.calls[0][0].data;
     expect(data.householdId).toBe("hh-1");
-    expect(data.createdByUserId).toBe("u-1");
+    expect(data).not.toHaveProperty("createdByUserId");
     expect(data.tags).toEqual(["spouse:2"]);
     expect(data.categoryId).toBe("cat-1");
   });
