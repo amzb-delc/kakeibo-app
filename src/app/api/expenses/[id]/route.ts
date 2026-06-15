@@ -49,10 +49,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   });
   if (result.count === 0) return jsonError("not found", 404);
 
-  const expense = await prisma.expense.findUnique({
-    where: { id },
+  // updateMany 直後の取得だが、並行削除で null になり得るため防御
+  const expense = await prisma.expense.findFirst({
+    where: { id, householdId },
     include: { category: { select: { id: true, name: true } } },
   });
+  if (!expense) return jsonError("not found", 404);
+
   return NextResponse.json(expense);
 }
 
