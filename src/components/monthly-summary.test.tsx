@@ -176,39 +176,50 @@ describe("MonthlySummaryView 6ヶ月ペインの切替（スモーク）", () =>
     );
   }
 
-  it("既定（単月）では 6ヶ月比較へ切り替えるシェブロンが見える", () => {
+  it("既定（単月）では単月トグルがアクティブで、6ヶ月グラフは非表示", () => {
     viewWithSix();
+    // トグルは常時両方DOMにあり、アクティブ側が aria-pressed=true
+    expect(screen.getByRole("button", { name: "単月の内訳" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "6ヶ月の比較" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+    // 6ヶ月ペインは aria-hidden のためグラフは a11y 木に出ない
     expect(
-      screen.getByRole("button", { name: "6ヶ月の比較を表示" })
-    ).toBeInTheDocument();
-    // 既定では 6ヶ月ペインは aria-hidden のため、戻るボタンはアクセシビリティ木に出ない
-    expect(
-      screen.queryByRole("button", { name: "単月の内訳に戻る" })
+      screen.queryByRole("img", { name: "過去6ヶ月の支出比較グラフ" })
     ).toBeNull();
   });
 
-  it("シェブロン押下で 6ヶ月ペインに切り替わり、棒グラフ（SVG）と戻るボタンが現れる", () => {
+  it("6ヶ月トグル押下で 6ヶ月ペインに切り替わり、棒グラフ（SVG）が現れる", () => {
     viewWithSix();
-    fireEvent.click(screen.getByRole("button", { name: "6ヶ月の比較を表示" }));
-    // 切替後は 6ヶ月ペインが可視になり、グラフ・戻るボタンがアクセシブルになる
+    fireEvent.click(screen.getByRole("button", { name: "6ヶ月の比較" }));
     expect(
       screen.getByRole("img", { name: "過去6ヶ月の支出比較グラフ" })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "単月の内訳に戻る" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "6ヶ月の比較" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "単月の内訳" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
   });
 
-  it("戻るボタンで単月ペインへ戻れる（往復しても落ちない）", () => {
+  it("単月トグルで単月ペインへ戻れる（往復しても落ちない）", () => {
     viewWithSix();
-    fireEvent.click(screen.getByRole("button", { name: "6ヶ月の比較を表示" }));
-    fireEvent.click(screen.getByRole("button", { name: "単月の内訳に戻る" }));
-    // 単月へ戻ると 6ヶ月ペインは再び aria-hidden になる
+    fireEvent.click(screen.getByRole("button", { name: "6ヶ月の比較" }));
+    fireEvent.click(screen.getByRole("button", { name: "単月の内訳" }));
+    expect(screen.getByRole("button", { name: "単月の内訳" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    // 単月へ戻ると 6ヶ月ペインは再び aria-hidden になりグラフは a11y 木から消える
     expect(
-      screen.getByRole("button", { name: "6ヶ月の比較を表示" })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "単月の内訳に戻る" })
+      screen.queryByRole("img", { name: "過去6ヶ月の支出比較グラフ" })
     ).toBeNull();
   });
 });

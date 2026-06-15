@@ -146,8 +146,8 @@ API は <code>GET /api/monthly-summary</code> のレスポンスに <code>sixMon
 <table>
 <thead><tr><th>ペイン</th><th>内容</th><th>切替トリガ</th></tr></thead>
 <tbody>
-<tr><td>単月ペイン（既定）</td><td>従来どおりドーナツチャート＋レジェンド（カテゴリ選択UI）。<strong>右辺</strong>に縦長のシェブロン（<code>›</code>）を置く</td><td>右辺シェブロンのタップで6ヶ月ペインへスライド</td></tr>
-<tr><td>6ヶ月比較ペイン</td><td>縦型のカテゴリ別積み上げ棒グラフ（6本固定）＋カテゴリ選択チップ。<strong>左辺</strong>に縦長のシェブロン（<code>‹</code>）を置く</td><td>左辺シェブロンのタップで単月ペインへ戻る</td></tr>
+<tr><td>単月ペイン（既定）</td><td>従来どおりドーナツチャート＋レジェンド（カテゴリ選択UI）。<strong>右辺</strong>に縦長のシェブロン（<code>›</code>）を置く<br><span class="muted">※当初設計。現行は<strong>カード左上のトグルスイッチ</strong>で切替（後述「UIブラッシュアップ 2026-06-15」）</span></td><td>右辺シェブロンのタップで6ヶ月ペインへスライド</td></tr>
+<tr><td>6ヶ月比較ペイン</td><td>縦型のカテゴリ別積み上げ棒グラフ（6本固定）＋カテゴリ選択チップ。<strong>左辺</strong>に縦長のシェブロン（<code>‹</code>）を置く<br><span class="muted">※当初設計。現行は<strong>カード左上のトグルスイッチ</strong>で切替（後述「UIブラッシュアップ 2026-06-15」）</span></td><td>左辺シェブロンのタップで単月ペインへ戻る</td></tr>
 </tbody>
 </table>
 <ul>
@@ -265,6 +265,27 @@ API は <code>GET /api/monthly-summary</code> のレスポンスに <code>sixMon
 
 <h3>⑤ 目盛線はグラフ縦中央に1本</h3>
 <p>金額の目盛線は<strong>グラフ縦中央に1本</strong>だけ引く（薄いグレー）。値は<strong>正規化基準＝6本中の最大合計の半分</strong>で、右端に省略なし表記の目盛値ラベルを添える（当初の上限＋半分の2本構成から簡素化）。</p>
+
+<hr>
+
+<h2>UIブラッシュアップ（2026-06-15）</h2>
+<p>6ヶ月グラフ（PR #71 でマージ済み）の表示まわりを、操作系と目盛ラベルの2点でさらに磨いた。<strong>ステータス: ✅ 実装完了（2026-06-15・コミット <code>d144665</code>・PR 番号未定／<code>feat/chart-toggle-control</code>）</strong>。対象は <code>src/components/monthly-summary.tsx</code> と <code>src/components/stacked-bar-chart.tsx</code>（テストは <code>monthly-summary.test.tsx</code> をトグル仕様へ追従）。</p>
+
+<h3>① 表示切替: フローティングシェブロン → 左上トグルスイッチ</h3>
+<p>これまでカード左右端のボーダーを跨ぐ<strong>フローティングのシェブロン（<code>›</code>/<code>‹</code>）を廃止</strong>し、全体カード<strong>左上にアイコントグルスイッチ</strong>を設置した。タグフィルタと同じ<strong>セグメント様式</strong>（アクティブ側を <code>bg-card</code> ＋ <code>shadow-sm</code> でハイライト）で、右上の夫婦タグフィルタと<strong>左右に並ぶ</strong>。</p>
+<ul>
+  <li><strong>アイコン</strong>: 単月＝ドーナツ（lucide <code>ChartPie</code>）／6ヶ月＝棒グラフ（lucide <code>ChartColumnBig</code>）。<code>aria-hidden</code> のアイコンに対し、各ボタンへ <code>aria-label</code>（「単月の内訳」「6ヶ月の比較」）と <code>aria-pressed</code>（<code>cardMode</code> 一致で <code>true</code>）を付与。外枠は <code>role="group"</code> ＋ <code>aria-label="表示の切り替え"</code>。</li>
+  <li>切替操作は上段左のトグル（<code>cardMode</code>）が一手に担い、横スライド演出（300ms・2ペインの translateX）自体は据え置き。ペイン内のシェブロン枠は除去した。</li>
+  <li><strong>経緯</strong>: 当初＝ペイン辺の縦長シェブロン（2026-06-12 設計）→ 実機調整でフローティング丸ボタン化（2026-06-12）→ 本改修で<strong>左上トグルスイッチに集約</strong>。フローティングはカード端でのタップ位置が掴みづらく、タグフィルタと操作面が分かれていたため、両者を上段に並べて操作系を1ヶ所にまとめた。</li>
+</ul>
+
+<h3>② 目盛線の金額ラベル: 左ガターへ分離＋短縮表記＋niceRound</h3>
+<p>グラフ縦中央の目盛線（前回調整で1本に簡素化）に添える金額ラベルを、<strong>位置・値・表記の3点</strong>で作り直した。</p>
+<ul>
+  <li><strong>値（niceRound）</strong>: 従来は「正規化基準＝6本中最大合計の半分」をそのまま表示していたが、<strong>中央付近のキリの良い金額</strong>に丸めて表示する。<code>niceRound()</code> は与えた値を <strong>1 / 2 / 5 × 10ⁿ</strong> のいずれかへ丸める（例: 47,000 → 50,000）。目盛線の y 位置はこの niceRound 値に対応させる。</li>
+  <li><strong>位置（左ガター分離）</strong>: グラフ左に<strong>専用ガター（余白帯 <code>AXIS_W=24</code>）</strong>を確保し、棒の描画域（<code>plotLeft = PAD_X + AXIS_W</code> / <code>innerW</code>）をその分だけ右に寄せた。ラベルはこのガター内に右寄せで置くため、<strong>棒・合計額ラベルと一切重ならない</strong>。</li>
+  <li><strong>表記（短縮）</strong>: <code>formatAxisLabel()</code> で、1万以上は「5万」「100万」（万単位は基本整数・小数が出たら1桁）、<strong>1万未満はカンマ区切り</strong>。狭いガターに収めるための短縮で、棒の上に出す<strong>合計額ラベル（省略なしカンマ区切り）とは別系統</strong>（合計額は据え置き）。</li>
+</ul>
 
 <hr>
 

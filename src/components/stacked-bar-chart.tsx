@@ -12,6 +12,7 @@ import type { SixMonthSummary } from "@/types";
 const VIEW_W = 360;
 const VIEW_H = 220;
 const PAD_X = 12; // 左右の余白
+const AXIS_W = 24; // 左の目盛ラベル用ガター（棒の描画域はこの分だけ右に寄せる）
 const LABEL_H = 22; // 月ラベル帯の高さ
 const TOTAL_H = 18; // 合計額ラベル帯の高さ（棒の上）
 const GAP_RATIO = 0.34; // 棒間の隙間（バー幅に対する比率）
@@ -28,10 +29,34 @@ function monthLabel(ym: string, prevYm: string | null): { year: string | null; m
   return { year: showYear ? `'${y.slice(2)}` : null, month };
 }
 
-// 棒の上・目盛に載せる金額表記。省略しない（実質6桁まで・カンマ区切り）。0 は空。
+// 棒の上に載せる合計額表記。省略しない（実質6桁まで・カンマ区切り）。0 は空。
 function formatAmountLabel(amount: number): string {
   if (amount <= 0) return "";
   return amount.toLocaleString("ja-JP");
+}
+
+// 左の目盛ラベル用の短縮表記（ガターに収める）。1万以上は「5万」「100万」、未満はカンマ区切り。
+// niceRound 由来の値は基本キリが良く、万単位は整数になる（小数が出たら1桁）。
+function formatAxisLabel(amount: number): string {
+  if (amount <= 0) return "";
+  if (amount >= 10000) {
+    const man = amount / 10000;
+    const s = Number.isInteger(man) ? String(man) : man.toFixed(1);
+    return `${s}万`;
+  }
+  return amount.toLocaleString("ja-JP");
+}
+
+// 目盛線に使う「キリの良い」金額を、与えた値の近傍から選ぶ（1/2/5 × 10^n に丸める）。
+// frac 7.0〜9.99 は 10 に切り上がるため最大 1.43 倍まで上振れするが、2 倍未満なので
+// gridValue が maxTotal を超えず目盛線が描画域上端を飛び出すことはない（近傍切り上げ寄り）。
+function niceRound(value: number): number {
+  if (value <= 0) return 0;
+  const exp = Math.floor(Math.log10(value));
+  const base = Math.pow(10, exp);
+  const frac = value / base;
+  const niceFrac = frac < 1.5 ? 1 : frac < 3 ? 2 : frac < 7 ? 5 : 10;
+  return niceFrac * base;
 }
 
 type Props = {
@@ -58,7 +83,9 @@ export function StackedBarChart({
   const maxTotal = Math.max(...barTotals, 1); // 0除算回避
 
   const n = data.length || 1;
-  const innerW = VIEW_W - PAD_X * 2;
+  // 左に目盛ラベル用ガター（AXIS_W）を確保し、棒の描画域はその分だけ右に寄せる。
+  const plotLeft = PAD_X + AXIS_W;
+  const innerW = VIEW_W - plotLeft - PAD_X;
   const slot = innerW / n;
   const barW = slot / (1 + GAP_RATIO);
   const gap = slot - barW;
@@ -68,9 +95,9 @@ export function StackedBarChart({
   const chartBottom = VIEW_H - LABEL_H;
   const chartH = chartBottom - chartTop;
 
-  // 金額の目盛線はグラフ縦中央に1本（値は正規化基準 maxTotal の半分・省略なし表記）。
-  // 全月 0 のときは引かない。
-  const midValue = Math.max(...barTotals, 0) > 0 ? Math.round(maxTotal / 2) : 0;
+  // 金額の目盛線は1本。中央付近（maxTotal の半分）のキリの良い金額を選び、その値に
+  // 対応する高さに引く（ラベルとの整合のため位置は中央固定にしない）。全月 0 のときは引かない。
+  const gridValue = Math.max(...barTotals, 0) > 0 ? niceRound(maxTotal / 2) : 0;
 
   return (
     <div className="w-full">
@@ -80,32 +107,38 @@ export function StackedBarChart({
         role="img"
         aria-label="過去6ヶ月の支出比較グラフ"
       >
-        {/* 金額の目盛線（グラフ縦中央に1本）。線は薄いグレー、右端に目盛値（省略なし） */}
-        {midValue > 0 && (
-          <g>
-            <line
-              x1={PAD_X}
-              y1={chartTop + chartH / 2}
-              x2={VIEW_W - PAD_X}
-              y2={chartTop + chartH / 2}
-              stroke="#e5e7eb"
-              strokeWidth={1}
-              strokeDasharray="2 3"
-            />
-            <text
-              x={VIEW_W - PAD_X}
-              y={chartTop + chartH / 2 - 2}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: "8px" }}
-            >
-              {formatAmountLabel(midValue)}
-            </text>
-          </g>
-        )}
+        {/* 金額の目盛線（キリの良い金額1本）。線は薄いグレー。目盛値は左ガター内に
+            短縮表記（「5万」等）で右寄せ配置し、棒・合計額と一切重ならないようにする。 */}
+        {gridValue > 0 &&
+          (() => {
+            const gy = chartBottom - (gridValue / maxTotal) * chartH;
+            return (
+              <g>
+                <line
+                  x1={plotLeft}
+                  y1={gy}
+                  x2={VIEW_W - PAD_X}
+                  y2={gy}
+                  stroke="#e5e7eb"
+                  strokeWidth={1}
+                  strokeDasharray="2 3"
+                />
+                <text
+                  x={plotLeft - 4}
+                  y={gy}
+                  dominantBaseline="central"
+                  textAnchor="end"
+                  className="fill-muted-foreground"
+                  style={{ fontSize: "8px" }}
+                >
+                  {formatAxisLabel(gridValue)}
+                </text>
+              </g>
+            );
+          })()}
         {/* ベースライン */}
         <line
-          x1={PAD_X}
+          x1={plotLeft}
           y1={chartBottom}
           x2={VIEW_W - PAD_X}
           y2={chartBottom}
@@ -113,7 +146,7 @@ export function StackedBarChart({
           strokeWidth={1}
         />
         {data.map((month, i) => {
-          const x = PAD_X + slot * i + gap / 2;
+          const x = plotLeft + slot * i + gap / 2;
           const barTotal = barTotals[i];
           const barH = (barTotal / maxTotal) * chartH;
           // 表示中の月（窓内のどこにあるか不定）の棒を強調する
