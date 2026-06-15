@@ -48,6 +48,8 @@ function formatAxisLabel(amount: number): string {
 }
 
 // 目盛線に使う「キリの良い」金額を、与えた値の近傍から選ぶ（1/2/5 × 10^n に丸める）。
+// frac 7.0〜9.99 は 10 に切り上がるため最大 1.43 倍まで上振れするが、2 倍未満なので
+// gridValue が maxTotal を超えず目盛線が描画域上端を飛び出すことはない（近傍切り上げ寄り）。
 function niceRound(value: number): number {
   if (value <= 0) return 0;
   const exp = Math.floor(Math.log10(value));
