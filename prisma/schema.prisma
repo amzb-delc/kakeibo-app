@@ -7,41 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+model Household {
   id        String   @id @default(cuid())
   name      String
-  email     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  householdMembers HouseholdMember[]
-  expenses         Expense[]
-}
-
-model Household {
-  id               String   @id @default(cuid())
-  name             String
-  notificationDay  Int?
-  notificationTime String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  members    HouseholdMember[]
   categories Category[]
   expenses   Expense[]
-}
-
-model HouseholdMember {
-  id          String   @id @default(cuid())
-  householdId String
-  userId      String
-  role        String   @default("member")
-  createdAt   DateTime @default(now())
-
-  household Household @relation(fields: [householdId], references: [id])
-  user      User      @relation(fields: [userId], references: [id])
-
-  @@unique([householdId, userId])
 }
 
 model Category {
@@ -69,17 +42,12 @@ model Expense {
   memo            String?
   // 内部タグ（複数属性）。"spouse:1"/"spouse:2"=入力者（端末cookie由来・新規登録時のみ付与）、
   // "card:<カード名>"=クレカ明細取込時のカード種別。編集では据え置く。仕様は src/lib/tags.ts。
-  tags            String[] @default([])
-  // OCR は POST /api/ocr で実装済みだが「画像は保存しない」方針のため以下2列は現在未使用。
-  receiptImageUrl String? // 予約: 将来レシート画像を保存する場合に使う
-  ocrRawText      String? // 予約: 抽出元の生テキストを残す案（現状は書き込まない）
-  createdByUserId String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
   category  Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  createdBy User      @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
 
   @@index([householdId, spentAt])
   @@index([categoryId, spentAt])

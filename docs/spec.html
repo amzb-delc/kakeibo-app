@@ -397,7 +397,7 @@ hr {
 │   ├── monthly-summary.tsx   # 月次サマリー表示（ドーナツ/レジェンド/明細/並び替え）
 │   └── ui/                   # shadcn / Base UI コンポーネント
 ├── lib/
-│   ├── auth.ts               # getHouseholdId(cookie) / HOUSEHOLD_COOKIE / getDemoUserId
+│   ├── auth.ts               # getHouseholdId(cookie) / HOUSEHOLD_COOKIE / getEnteredBy
 │   ├── api.ts                # requireHouseholdId(401) / parseJsonBody / jsonError（ルート共通）
 │   ├── validation.ts         # ValidationError 型（expenses/categories 共通）
 │   ├── app-meta.ts           # HOUSEHOLD_NAME / APP_VERSION / APP_LABEL
@@ -440,12 +440,12 @@ hr {
 <p>すべてのテーブルは世帯（<code>Household</code>）にスコープされる。MVP では <code>demo-household</code> 1件のみが seed で投入される。</p>
 
 <h3>ER概要</h3>
-<pre><code>User ──┐
-       ├── HouseholdMember ── Household ──┬── Category ──┐
-       │                                  │              │
-       └────────────── Expense ───────────┴──────────────┘
-                       (createdByUserId, householdId, categoryId)
+<pre><code>Household ──┬── Category ──┐
+            │              │
+            └── Expense ───┘
+               (householdId, categoryId)
 </code></pre>
+<p class="muted">※ <code>User</code> / <code>HouseholdMember</code>（マルチユーザー足場）と <code>Expense.createdByUserId</code> は <strong>Tier 8 で撤去済み</strong>（2026-06-15）。ユーザー管理は持たず、認可は世帯コード（<code>household.id</code>）の保有のみ。</p>
 
 <h3>Expense（支出）</h3>
 <table>
@@ -458,11 +458,9 @@ hr {
 <tr><td>storeName</td><td>String?</td><td>任意。最大100文字</td></tr>
 <tr><td>memo</td><td>String?</td><td>任意。最大500文字。明細取り込みでは取り込み元 PDF のファイル名を自動入力</td></tr>
 <tr><td>tags</td><td>String[]</td><td>内部タグ（<code>@default([])</code>）。<strong>夫婦タグ <code>spouse:1</code>(♂)/<code>spouse:2</code>(♀)</strong>＝端末の入力者 cookie 由来、<strong>カードタグ <code>card:&lt;カード名&gt;</code></strong>＝クレカ明細取込由来。<strong>新規登録時のみサーバが付与</strong>（編集は据え置き）。種別は名前空間プレフィックスで判定（<code>src/lib/tags.ts</code>）。画面に <code>#xxx</code> 形式は出さない内部仕様。旧 <code>enteredBy Int?</code> を <code>spouse:N</code> へバックフィルして置換（<a href="expense-tags-plan.html">支出タグプラン</a>）</td></tr>
-<tr><td>receiptImageUrl</td><td>String?</td><td>将来のレシート画像URL</td></tr>
-<tr><td>ocrRawText</td><td>String?</td><td>将来のOCR生テキスト</td></tr>
-<tr><td>createdByUserId</td><td>String</td><td>FK → User（onDelete: Restrict）</td></tr>
 <tr><td>createdAt / updatedAt</td><td>DateTime</td><td>Prisma 標準</td></tr>
 </table>
+<p class="muted">※ <code>receiptImageUrl</code> / <code>ocrRawText</code>（画像非保存方針の予約列）と <code>createdByUserId</code>（常に demo ユーザー固定で情報量ゼロ）は <strong>Tier 8 で撤去済み</strong>（2026-06-15）。</p>
 <p><strong>インデックス:</strong> <code>(householdId, spentAt)</code>, <code>(categoryId, spentAt)</code></p>
 
 <h3>Category（カテゴリ）</h3>
@@ -478,8 +476,9 @@ hr {
 <p><strong>必須スロット:</strong> 先頭4個（<code>sortOrder 0..3</code>、<code>isRequiredSlot</code>）は<strong>無効化できない</strong>（常に ON）。スロット定数は <code>src/lib/category-constants.ts</code>（prisma 非依存・副作用なしで両側から import 可）に集約。</p>
 <p><strong>遅延生成:</strong> 不足スロットは管理画面を開いた時（<code>GET /api/categories?scope=all</code>）に <code>ensureCategorySlots()</code> が <code>sortOrder 0..15</code> の欠番を無効スロットで埋めて16枠へ収束（並行リクエストは <code>@@unique</code> + <code>skipDuplicates</code> で握り潰し）。世帯コード変更で id を付け替えた世帯でも seed を待たず揃う。</p>
 
-<h3>Household / User / HouseholdMember</h3>
-<p>Householdは <code>notificationDay</code> / <code>notificationTime</code> を持つが、通知機能は未実装。HouseholdMember の <code>role</code> は <code>"owner"</code> | <code>"member"</code> を想定。ユーザー管理は持たず、世帯共有の<strong>世帯コード</strong>（<code>household.id</code>）を保存した端末のみ保護対象にする。</p>
+<h3>Household</h3>
+<p>世帯。<code>id</code>（cuid）＝<strong>世帯コード</strong>、<code>name</code>、<code>createdAt</code> / <code>updatedAt</code> のみを持つ。ユーザー管理は持たず、世帯共有の世帯コード（<code>household.id</code>）を保存した端末のみ保護対象にする。</p>
+<p class="muted">※ <code>User</code> / <code>HouseholdMember</code> モデルと <code>Household.notificationDay</code> / <code>notificationTime</code>（通知未実装の予約フィールド）は <strong>Tier 8 で撤去済み</strong>（2026-06-15・<a href="tier8-plan.html">Tier 8 スキーマ撤去プラン</a>）。マルチユーザー方式は元々未使用、通知は送信ロジックが無く列だけの状態だった。</p>
 </section>
 
 <section id="layout">
@@ -666,7 +665,7 @@ hr {
 <h4><span class="method method-post">POST</span> /api/expenses</h4>
 <p>支出を新規作成。</p>
 <p><strong>必須:</strong> <code>amount</code>（0〜100,000,000の整数。0円可）、<code>spentAt</code>（<code>YYYY-MM-DD</code>）、<code>categoryId</code>（世帯のカテゴリ）</p>
-<p><strong>任意:</strong> <code>storeName</code>（≤100）、<code>memo</code>（≤500）、<code>receiptImageUrl</code></p>
+<p><strong>任意:</strong> <code>storeName</code>（≤100）、<code>memo</code>（≤500）</p>
 <p><strong>タグ（入力者）:</strong> ボディでは受け取らず、<strong>サーバが端末の入力者 cookie（<code>getEnteredBy()</code>）から夫婦タグ <code>spouse:1</code>(♂)/<code>spouse:2</code>(♀) を <code>tags</code> に付与</strong>する（編集 PATCH は据え置き）。<code>batch</code> も同様（＋下記の <code>card:</code> タグ）。タグ仕様は <a href="expense-tags-plan.html">支出タグプラン</a>参照。</p>
 <p><strong>レスポンス:</strong> <code>201</code> + 作成された <code>Expense</code> / <code>400</code> + <code>{ error }</code></p>
 <pre><code>{
@@ -703,7 +702,7 @@ hr {
 <tr><td>amount</td><td>スキップ</td><td>400</td></tr>
 <tr><td>spentAt</td><td>スキップ</td><td>400</td></tr>
 <tr><td>categoryId</td><td>スキップ</td><td>400</td></tr>
-<tr><td>storeName / memo / receiptImageUrl</td><td>スキップ</td><td>null にクリア</td></tr>
+<tr><td>storeName / memo</td><td>スキップ</td><td>null にクリア</td></tr>
 </table>
 </div>
 
@@ -811,7 +810,6 @@ hr {
 <tr><td>categoryId</td><td>非空文字列、かつ DB で当該世帯（cookie の <code>householdId</code>）の Category に存在</td></tr>
 <tr><td>storeName</td><td>≤100文字、空文字は null</td></tr>
 <tr><td>memo</td><td>≤500文字、空文字は null</td></tr>
-<tr><td>receiptImageUrl</td><td>文字列、空文字は null</td></tr>
 </table>
 
 <h3>世帯スコープ（権限）</h3>
@@ -906,9 +904,9 @@ hr {
 <ul>
   <li><strong>認証・複数ユーザー</strong>:
     個人アカウントは持たず、保護は<strong>世帯共有の世帯コード</strong>のみ（<code>src/lib/auth.ts</code> の <code>getHouseholdId()</code> に集約）。</li>
-  <li><strong>OCR レシート読み取り</strong>: <strong>実装済み</strong>（<code>POST /api/ocr</code> + <code>src/lib/ocr.ts</code>、Claude ビジョン）。<strong>画像は保存しない</strong>方針のため <code>Expense.receiptImageUrl</code> / <code>ocrRawText</code> は引き続き未使用。</li>
+  <li><strong>OCR レシート読み取り</strong>: <strong>実装済み</strong>（<code>POST /api/ocr</code> + <code>src/lib/ocr.ts</code>、Claude ビジョン）。<strong>画像は保存しない</strong>方針（予約列 <code>receiptImageUrl</code> / <code>ocrRawText</code> は Tier 8 で撤去済み）。</li>
   <li><strong>クレカ明細の一括取り込み</strong>: <strong>実装済み</strong>（<code>POST /api/statement</code> + <code>src/lib/statement.ts</code>、Claude の document(PDF) 抽出。既定モデル <code>STATEMENT_MODEL</code>＝<code>claude-sonnet-4-6</code>）。ホームのヘッダ左「フォルダ」アイコン → PDF ピッカー → 抽出 → プレビューシート（行ごとに編集／除外、重複候補は <code>duplicateLikely</code> で警告）→ <code>POST /api/expenses/batch</code> で一括登録。<strong>PDFは保存しない</strong>。重複判定は <code>src/lib/duplicate.ts</code>（同日×同額×店名近似、除外せずユーザー判断）。</li>
-  <li><strong>通知</strong>: <code>Household.notificationDay</code> / <code>notificationTime</code> はフィールドのみ。送信ロジックなし。</li>
+  <li><strong>通知</strong>: 未実装。予約フィールド <code>Household.notificationDay</code> / <code>notificationTime</code> は Tier 8 で撤去済み（送信ロジックも列も無い）。</li>
   <li><strong>カテゴリの追加・削除・並び替え</strong>: <strong>16スロット固定</strong>のため不可。名前変更・有効/無効の切替は実装済み（設定モーダル）。</li>
   <li><strong>予算機能</strong>: 未実装。</li>
   <li><strong>ダークモード</strong>: 常にライト固定。</li>
@@ -918,6 +916,18 @@ hr {
 
 <section id="changelog">
 <h2>改修履歴</h2>
+
+<h3>2026-06-15 — Tier 8 未使用スキーマ撤去（User/HouseholdMember/通知/予約列/createdByUserId）</h3>
+<p><span class="badge badge-major">major</span> 本番化前に未使用のマルチユーザー・通知の足場と画像予約列を一括撤去。設計記録は <a href="tier8-plan.html">Tier 8 スキーマ撤去プラン</a>。PR 番号未定（<code>feat/tier8-schema-cleanup</code>・コミット <code>d50eb10</code>）。</p>
+<ul>
+  <li><strong>モデル削除</strong>: <code>User</code> / <code>HouseholdMember</code>（マルチユーザー方式は元々未使用）。認可は世帯コードの保有のみで変わらず。</li>
+  <li><strong>Expense.createdByUserId 削除</strong>＋ <code>getDemoUserId()</code> / <code>DEMO_USER_EMAIL</code>（<code>src/lib/auth.ts</code>）削除。常に demo ユーザー固定で情報量ゼロだった列を撤去 → デプロイ時の「demo user not found」500 フットガンが消滅し、本番 seed が簡素化（user 作成が不要に）。支出登録（<code>POST /api/expenses</code> / <code>batch</code>）は <code>createdByUserId</code> の付与をやめた。</li>
+  <li><strong>通知フィールド削除</strong>: <code>Household.notificationDay</code> / <code>notificationTime</code>（通知未実装の予約列）。</li>
+  <li><strong>予約列削除</strong>: <code>Expense.receiptImageUrl</code> / <code>ocrRawText</code>（画像非保存方針で未使用）。</li>
+  <li><strong>マイグレーション</strong> <code>20260615000000_tier8_drop_user_scaffolding</code>: 上記テーブル/列を DROP。支出データ（<code>householdId</code> / <code>categoryId</code> / <code>tags</code> 等）は保持。<code>seed</code> / <code>set-passphrase</code> を新スキーマに追従。</li>
+</ul>
+
+<hr>
 
 <h3>2026-06-15 — 6ヶ月グラフのUIブラッシュアップ（表示切替トグル化＋目盛ラベル左ガター分離）</h3>
 <p><span class="badge badge-minor">minor</span> 6ヶ月グラフ（PR #71）の表示まわりを2点改修。設計記録は <a href="six-month-chart-plan.html">6ヶ月比較プラン</a>（「UIブラッシュアップ（2026-06-15）」）。PR 番号未定（<code>feat/chart-toggle-control</code>・コミット <code>d144665</code>）。</p>

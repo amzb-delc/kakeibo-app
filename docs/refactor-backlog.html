@@ -120,6 +120,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 <strong>追記(2026-06-10): 追加バックログを全消化。</strong> ホーム無関係7件（DV-1/SP-1=#41・WT-1=#42・IME-1=#43・SW-1=#45・SL-1=#46・EM-1=#47）→ NM-1/TO-1=#55 → 明細取り込みテスト TC-2=#52・TC-1③=#53。<strong>実コードのバックログ項目はすべて完了。残るは Tier 8（スキーマ撤去・マイグレ要・本番直前）と、任意の UI テスト <code>statement-preview-sheet.tsx</code> のみ。</strong>（#47×#41 のマージ衝突で <code>splitYmd</code> import 漏れ→ fix PR #50。TC 行は #44 追加分が doc マージで欠落していたため本更新で復元）
 <strong>追記(2026-06-10): 追加バックログの「ホーム無関係」7件を消化（PR #41〜#47）。</strong> DV-1/SP-1（PR #41）・WT-1（#42）・IME-1（#43）・SW-1（#45）・SL-1（#46）・EM-1（#47）。<strong>残りは NM-1・TO-1（ホーム関連・低）＋ TC-1・TC-2（明細取り込みのテスト）＋ Tier 8。</strong>（#47×#41 のマージ衝突で <code>splitYmd</code> import 漏れ→ fix PR #50 で修正）<br>
 <strong>追記(2026-06-10): セキュリティ監査の結果を「セキュリティ・バックログ」セクションに追加（SEC-1〜SEC-9）。</strong> 公開デプロイ前必須の High 2件（SEC-1 ブルートフォース無制限・SEC-2 既定コード <code>demo-household</code>）＋ Medium 3・Low 4。IDOR/SQLi/XSS は健全と確認済み。<strong>SEC-1〜9 すべて対応完了</strong>（High=#57／Medium SEC-3=#59・SEC-4=#60・SEC-5=#61／Low SEC-6〜9=#66）。<strong>本番デプロイ前に <code>SESSION_SECRET</code> 必須＋署名導入で全端末の世帯コード再保存が必要（SEC-3）。SEC-5 の残2件（Next.js 同梱依存）は別スコープ。</strong>
+<strong>追記(2026-06-15): Tier 8（スキーマ撤去）完了。</strong> 決定は<strong>全撤去</strong>（<code>User</code>/<code>HouseholdMember</code>/<code>createdByUserId</code>/通知フィールド/画像予約列）。コミット <code>d50eb10</code>（<code>feat/tier8-schema-cleanup</code>・PR 番号未定）。<strong>これでリファクタ Tier 1〜8 はすべて完了。</strong>本番 seed から user 作成が不要になり「demo user not found」500 フットガンも消滅。詳細は <a href="tier8-plan.html">Tier 8 プラン</a>。
 </blockquote>
 
 <h2>完了済み（Tier 1〜4 / PR #18〜#24）</h2>
@@ -172,15 +173,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 </tbody>
 </table>
 
-<h2>Tier 8 — スキーマ撤去（旧 #12 本体・<span class="muted">DBマイグレ要・先に設計判断</span>）</h2>
-<p>未使用の「マルチユーザー/通知」足場をどうするか。<strong>完成させる or 撤去する</strong>を先に決める（コード前に意思決定）。撤去なら以下を一括:</p>
+<h2>Tier 8 — スキーマ撤去（旧 #12 本体・<span class="muted">DBマイグレ要・先に設計判断</span>） <span class="badge b-done">✅ 完了</span></h2>
+<p><strong>決定（2026-06-15）: 「完成させる or 撤去する」→ 全撤去。</strong> マルチユーザー方式は元々未使用、<code>createdByUserId</code> は常に demo ユーザー固定で情報量ゼロかつデプロイ時の「demo user not found」500 フットガン、通知・画像予約列は未実装方針のため。設計記録は <a href="tier8-plan.html">Tier 8 スキーマ撤去プラン</a>。</p>
+<p><strong>撤去内容（PR 番号未定・<code>feat/tier8-schema-cleanup</code>／コミット <code>d50eb10</code>）:</strong></p>
 <ul>
-  <li><code>HouseholdMember</code> モデル + <code>role</code>、（監査用途で残すか要確認の）<code>User</code></li>
-  <li><code>Household.notificationDay</code> / <code>notificationTime</code>（通知未実装）</li>
-  <li><code>Expense.receiptImageUrl</code> / <code>ocrRawText</code>（画像非保存方針）</li>
-  <li>工数 M / 価値 中 / <strong>マイグレ YES</strong></li>
+  <li><code>User</code> / <code>HouseholdMember</code> モデルを削除</li>
+  <li><code>Expense.createdByUserId</code> ＋ <code>getDemoUserId()</code> / <code>DEMO_USER_EMAIL</code>（<code>auth.ts</code>）を削除 → 500 フットガン消滅・本番 seed 簡素化（user 作成不要に）</li>
+  <li><code>Household.notificationDay</code> / <code>notificationTime</code>（通知未実装）を削除</li>
+  <li><code>Expense.receiptImageUrl</code> / <code>ocrRawText</code>（画像非保存方針の予約列）を削除</li>
 </ul>
-<p><span class="badge b-todo">⬜ 未着手</span> 本番化の直前に実施する方針。</p>
+<p>マイグレーション <code>20260615000000_tier8_drop_user_scaffolding</code>。支出データ（<code>householdId</code> / <code>categoryId</code> / <code>tags</code> 等）は保持。<code>seed</code> / <code>set-passphrase</code> を新スキーマに追従。<strong>これでリファクタ Tier はすべて完了。</strong></p>
 
 <h2>追加バックログ（2026-06-08〜）</h2>
 <table>
