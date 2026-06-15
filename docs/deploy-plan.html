@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿アプリ — 本番デプロイ手順</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+  --decide-bg: #fee2e2;
+  --decide-fg: #991b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+    --decide-bg: #450a0a;
+    --decide-fg: #fca5a5;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+.backlink {
+  display: inline-block; margin-bottom: 16px; color: var(--primary);
+  text-decoration: none; font-size: 13px;
+}
+.backlink:hover { text-decoration: underline; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 8px 0; }
+a { color: var(--primary); }
+code {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+pre {
+  background: var(--code-bg); padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 12px 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--primary);
+  background: var(--card); border-radius: 0 8px 8px 0; color: var(--muted);
+  font-size: 14px;
+}
+blockquote strong { color: var(--fg); }
+ul { margin: 8px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+ol { margin: 8px 0; padding-left: 22px; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px;
+  background: var(--card); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); font-weight: 600; white-space: nowrap; }
+td.c { text-align: center; white-space: nowrap; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-todo { background: var(--todo-bg); color: var(--todo-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.b-decide { background: var(--decide-bg); color: var(--decide-fg); }
+.rec { color: var(--success); font-weight: 600; }
+.muted { color: var(--muted); }
+del { color: var(--muted); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+.decision {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--destructive); border-radius: 0 8px 8px 0;
+  padding: 12px 16px; margin: 14px 0;
+}
+.decision h3 { margin-top: 0; }
+.decision.decided { border-left-color: var(--success); }
+.warn {
+  background: var(--hold-bg); color: var(--hold-fg);
+  border-radius: 0 8px 8px 0; border-left: 4px solid var(--warning);
+  padding: 12px 16px; margin: 14px 0;
+}
+.warn strong { color: var(--hold-fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="backlink" href="index.html">← ドキュメント一覧へ</a>
+<h1>本番デプロイ手順</h1>
+
+<blockquote>
+作成: 2026-06-15。<strong>ステータス: 未デプロイ（手順のみ）</strong>。<br>
+本番デプロイはまだ未実施。これから初回デプロイを行うための手順を自己完結でまとめる。
+特に「<strong>世帯コードを本番でどう設定するか</strong>」を §4 にはっきり残す。
+進行順は「仕様変更（タグ・6ヶ月グラフ・UI調整）→ <a href="tier8-plan.html">Tier 8（完了）</a> → 本デプロイ」。
+本ページは <a href="spec.html">spec</a> の挙動には影響しない運用ドキュメント。
+</blockquote>
+
+<h2>1. 構成（決定済み）</h2>
+<div class="decision decided">
+<h3>ホスティング構成 <span class="badge b-done">✅ 決定</span></h3>
+<ul>
+  <li><strong>アプリ = Vercel</strong>（Hobby / 無料枠）。関数リージョンは東京 <code>hnd1</code>。</li>
+  <li><strong>DB = Neon</strong>（無料枠・serverless Postgres）。</li>
+  <li><strong>無料枠のみで運用</strong>。Neon のアイドル時サスペンドは許容（§5 参照）。</li>
+</ul>
+</div>
+
+<h2>2. 環境変数（Vercel に設定）</h2>
+<p>Vercel のプロジェクト設定 → Environment Variables に登録する。</p>
+<table>
+<thead><tr><th>変数</th><th>必須</th><th>内容</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>DATABASE_URL</code></td>
+  <td class="c">必須</td>
+  <td>Neon の <strong>pooled 接続文字列</strong>（pgbouncer 経由）。アプリ実行時（サーバーレス関数）が使う。</td>
+</tr>
+<tr>
+  <td><code>DIRECT_URL</code></td>
+  <td class="c">必須</td>
+  <td>Neon の <strong>direct 接続文字列</strong>（pooler を経由しない方）。マイグレーション / DDL 用。
+  <div class="warn"><strong>作業が必要:</strong> <code>prisma/schema.prisma</code> の <code>datasource</code> に <code>directUrl = env("DIRECT_URL")</code> を追加する（<strong>現状未追加</strong>）。pooler 経由の接続では DDL/マイグレーションが安定しないため、Prisma の direct 接続を分離する。</div></td>
+</tr>
+<tr>
+  <td><code>SESSION_SECRET</code></td>
+  <td class="c">本番必須</td>
+  <td>cookie の HMAC 署名鍵。<strong>未設定だと cookie 署名検証で 500</strong>。導入/変更すると既存 cookie が全無効化され全端末で世帯コード再保存が必要だが、<strong>本番初回なので影響なし</strong>。</td>
+</tr>
+<tr>
+  <td><code>ANTHROPIC_API_KEY</code></td>
+  <td class="c">機能必須</td>
+  <td>レシート OCR・クレカ明細取込で必要。<strong>未設定だと該当 API が 503</strong>（家計簿の手入力自体は動く）。</td>
+</tr>
+<tr>
+  <td><code>OCR_MODEL</code> / <code>STATEMENT_MODEL</code></td>
+  <td class="c">任意</td>
+  <td>OCR / 明細抽出に使うモデルの上書き。既定は OCR=haiku / 明細=sonnet。</td>
+</tr>
+</tbody>
+</table>
+<div class="warn"><strong>作業が必要:</strong> OCR・明細取込の route に <code>export const maxDuration = 60</code>（以上）を設定する（<strong>現状未設定</strong>）。Claude への問い合わせで処理が数十秒かかり得るため、Vercel 関数の既定タイムアウトでは打ち切られる恐れがある。</div>
+
+<h2>3. ブートストラップ手順（ローカル or CI から Neon に向けて実行）</h2>
+<div class="warn"><strong>重要:</strong> Vercel はサーバーレスで常駐シェルが無いため、以下は「Vercel 上」ではなく <strong>手元の PC（または CI）から本番 Neon の接続文字列を一時的に指定して</strong>実行する。本番 DSN は<strong>コミット済み <code>.env</code> に入れない</strong>——一時 <code>export</code> するか、gitignore された <code>.env.production</code> で扱う。</div>
+<ol>
+  <li>Neon でプロジェクト / DB を作成 → 接続文字列を取得（<strong>pooled</strong> / <strong>direct</strong> の両方）。</li>
+  <li>本番に向けて <code>npx prisma migrate deploy</code> を実行（<code>DATABASE_URL</code> は <strong>direct 推奨</strong>）。
+    <div class="warn"><strong>本番では <code>migrate dev</code> 厳禁。</strong>必ず <code>migrate deploy</code>（既存マイグレーションを適用するだけ・schema からの差分生成やリセットをしない）。</div>
+  </li>
+  <li><code>NODE_ENV=production npx prisma db seed</code> を実行 → <strong>Tier 8 後は世帯（<code>demo-household</code>）＋カテゴリ 16 枠のみ作成</strong>。user 作成は廃止済み（<a href="tier8-plan.html">Tier 8</a>）。デモ支出は本番ガードでスキップされる。</li>
+  <li><code>npm run db:set-passphrase -- "本番の世帯コード"</code> で <code>household.id</code> を実コードへ付け替える（§4 ① と同一）。</li>
+  <li>（任意）<code>household.name</code>・カテゴリ名を実名へ変更。</li>
+</ol>
+
+<h2>4. 世帯コードの設定・入力フロー</h2>
+<p>本アプリの認可は<strong>「世帯コード = <code>household.id</code>」</strong>方式。ユーザー管理は無く、コードを保存した端末だけがデータを見られる（<a href="spec.html">spec</a>「認証 / 世帯コード」）。本番での扱いを 2 段階に分けて明記する。</p>
+
+<div class="decision decided">
+<h3>① 一度きりの設定（管理者 = あなたがローカルから実行） <span class="badge b-done">設定</span></h3>
+<p>§3 step 4 の <code>npm run db:set-passphrase -- "本番の世帯コード"</code> で <code>household.id</code> を実コードにする。</p>
+<ul>
+  <li><code>db:set-passphrase</code> は<strong>「dev 限定」ではなく <code>DATABASE_URL</code> 任せの DB 接続スクリプト</strong>。本番 Neon の接続文字列を指定して<strong>手元から 1 回叩く</strong>運用にする。</li>
+  <li>世帯コードはアプリの UI からは変更できない（変更 UI が無い＝仕様）。変更したいときは再度このスクリプトを本番に向けて実行する。</li>
+</ul>
+</div>
+
+<div class="decision decided">
+<h3>② 各端末での入力（夫婦それぞれ・日常） <span class="badge b-done">入力</span></h3>
+<ul>
+  <li>夫婦それぞれが端末でアプリを開き、ロック / 設定画面で ① のコードを入力する。</li>
+  <li><code>POST /api/session</code> がコードを照合 → 一致すれば <strong>HMAC 署名付き <code>household</code> cookie</strong> を保存する。</li>
+  <li><code>/api/session</code> は<strong>照合専用</strong>。コードの作成・変更はしない（アプリにコード変更 UI は無い＝仕様）。</li>
+</ul>
+</div>
+
+<div class="warn"><strong>注意（安全側の挙動）:</strong> seed 既定の <code>demo-household</code> は <a href="refactor-backlog.html">SEC-2</a> により本番では <code>/api/session</code> の保存を拒否する。つまり <strong>set-passphrase を踏まないと誰もログインできない</strong>——「設定忘れのまま誰でも入れてしまう」事故が起きない安全側の設計になっている。</div>
+
+<h2>5. その他の注意</h2>
+<ul>
+  <li><strong>iOS のストレージ分離:</strong> Safari とホーム画面 PWA でストレージが分離され、保存状態（世帯コードの cookie）を共有しない（MVP 許容）。Vercel が HTTPS を自動付与するため PWA の要件自体は満たす。</li>
+  <li><strong>Neon の自動サスペンド:</strong> 無料枠はアイドルで自動サスペンドするため、初回アクセスが 1〜2 秒遅いことがある（許容）。</li>
+  <li><strong>DDL / マイグレーションは direct 接続を使う</strong>（pooler 経由でない方）。pgbouncer 経由ではプリペアドステートメント等で問題が出やすい。</li>
+</ul>
+
+</div>
+</body>
+</html>

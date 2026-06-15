@@ -123,6 +123,10 @@ a { color: var(--primary); }
     <div class="t">Tier 8 スキーマ撤去 <span class="badge b-done">✅ 実装完了</span></div>
     <div class="d">本番化前に未使用の足場を全撤去。<code>User</code>/<code>HouseholdMember</code>・<code>Expense.createdByUserId</code>・通知フィールド・画像予約列を削除し seed/デプロイ手順を簡素化（feat/tier8-schema-cleanup）。</div>
   </a>
+  <a class="card" href="deploy-plan.html">
+    <div class="t">本番デプロイ手順 <span class="badge b-hold">未デプロイ（手順のみ）</span></div>
+    <div class="d">Vercel（東京 hnd1）＋ Neon（無料枠）への初回デプロイ手順。環境変数・ブートストラップ（migrate deploy → seed → set-passphrase）・<strong>世帯コードの本番設定/入力フロー</strong>を明記。</div>
+  </a>
 </div>
 
 <h2>バックログ</h2>
