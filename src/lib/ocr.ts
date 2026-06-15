@@ -4,8 +4,8 @@ import Anthropic from "@anthropic-ai/sdk";
 // 画像保存はしない方針なので、抽出に使った画像は呼び出し側で破棄する。
 
 // コスト優先で Haiku を既定にする（レシート抽出は短く単純なタスクなので十分実用的）。
-// 日本語レシートの精度をさらに上げたい場合は "claude-opus-4-8" に上げられる。
-const OCR_MODEL = "claude-haiku-4-5";
+// env で切替可（日本語レシートの精度をさらに上げたい場合は "claude-opus-4-8" など）。
+const OCR_MODEL = process.env.OCR_MODEL ?? "claude-haiku-4-5";
 
 export const OCR_ALLOWED_MEDIA_TYPES = [
   "image/jpeg",

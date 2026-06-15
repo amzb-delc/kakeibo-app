@@ -78,4 +78,4 @@ spec の「データモデル」に加え、コードを触る前に知ってお
 機能の動線・UI詳細は `docs/spec.html`、設計記録は各 `*-plan.html` 参照。要点のみ:
 
 - **レシートOCR**（`src/lib/ocr.ts`）・**クレカ明細PDF取込**（`src/lib/statement.ts` → プレビュー → `/api/expenses/batch`）は実装済。いずれも **`ANTHROPIC_API_KEY` 必須**（未設定なら503）、画像/PDFは保存しない。モデルは env `OCR_MODEL`（既定 haiku）/ `STATEMENT_MODEL`（既定 sonnet）。
-- **未実装:** 通知（`notificationDay`/`notificationTime` フィールドのみ）。カテゴリの追加・削除・並び替え。一覧での入力者表示。
+- **未実装:** 通知（`notificationDay`/`notificationTime` フィールドのみ）。カテゴリの追加・削除・並び替え。
