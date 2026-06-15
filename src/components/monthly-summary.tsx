@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { ChartPie, ChartColumnBig } from "lucide-react";
 import { getTrendLevel, TREND_TEXT_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
 import { formatYen, formatDiff } from "@/lib/format";
@@ -272,9 +273,43 @@ export function MonthlySummaryView({
   return (
     <main className="px-4 py-6 space-y-6">
         {/* 合計カード: 左にドーナツ（中央に合計金額）、右に上位7カテゴリのレジェンド（＝カテゴリ選択UI） */}
-        <div className="relative bg-card rounded-2xl p-4 shadow-sm border border-border/50">
-          {/* 夫婦タグフィルタ（全体/♂/♀）。選択でドーナツ・合計・前月比・明細すべてが絞られる。 */}
-          <div className="mb-3 flex justify-end">
+        <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50">
+          {/* 上段: 左に表示切替トグル（単月⇔6ヶ月）、右に夫婦タグフィルタ（全体/♂/♀）。 */}
+          <div className="mb-3 flex items-center justify-between">
+            {/* 表示切替: 単月（ドーナツ）⇔ 6ヶ月（積み上げ棒）。アクティブ側をハイライト。 */}
+            <div
+              role="group"
+              aria-label="表示の切り替え"
+              className="inline-flex rounded-lg bg-muted p-0.5"
+            >
+              <button
+                type="button"
+                onClick={() => setCardMode("month")}
+                aria-pressed={cardMode === "month"}
+                aria-label="単月の内訳"
+                className={`flex items-center justify-center rounded-md px-2.5 py-1.5 transition-colors ${
+                  cardMode === "month"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <ChartPie className="size-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCardMode("sixMonths")}
+                aria-pressed={cardMode === "sixMonths"}
+                aria-label="6ヶ月の比較"
+                className={`flex items-center justify-center rounded-md px-2.5 py-1.5 transition-colors ${
+                  cardMode === "sixMonths"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <ChartColumnBig className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            {/* 夫婦タグフィルタ（全体/♂/♀）。選択でドーナツ・合計・前月比・明細すべてが絞られる。 */}
             <div
               role="group"
               aria-label="入力者で絞り込み"
@@ -302,8 +337,7 @@ export function MonthlySummaryView({
           </div>
           {/* 単月ペイン ⇔ 6ヶ月ペインを横スライドで切替。外枠で overflow を切り、
               内側の 2 枚（各 w-full）を translateX で左右に動かす。
-              シェブロンはペインのレイアウト外に出し、カードに対する絶対配置の
-              フローティングボタンにする（inert なペインの外なので常に操作可能）。 */}
+              切替操作は上段左のトグルスイッチ（cardMode）が担う。 */}
           <div className="relative overflow-x-clip">
             <div
               className="flex w-[200%] transition-transform duration-300 ease-out"
@@ -436,48 +470,6 @@ export function MonthlySummaryView({
             </div>
 
           </div>
-          {/* フローティングのシェブロン（カードの枠線上に乗せる絶対配置・縦中央）。
-              コンテンツと被らないよう枠ギリギリ＝ボーダーを跨ぐ位置（半分外側）に置く。
-              overflow-x-clip の内側だと外側半分が切れるため、クリップ枠の外（カード直下）に置く。
-              inert なペインの外なので常に操作可能。表示モードに応じて出す向きを切替:
-              単月表示中は右の › （6ヶ月へ）、6ヶ月表示中は左の ‹ （単月へ戻る）。 */}
-          {cardMode === "month" ? (
-            <button
-              type="button"
-              onClick={() => setCardMode("sixMonths")}
-              aria-label="6ヶ月の比較を表示"
-              className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted active:bg-muted"
-            >
-              <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
-                <path
-                  d="M4 4 L10 10 L4 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setCardMode("month")}
-              aria-label="単月の内訳に戻る"
-              className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex size-8 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted active:bg-muted"
-            >
-              <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true">
-                <path
-                  d="M10 4 L4 10 L10 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          )}
         </div>
 
         {/* 明細（選択中カテゴリの支出明細）。見出しの右に選択カテゴリのラベルを表示 */}
