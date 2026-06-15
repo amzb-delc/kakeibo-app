@@ -920,7 +920,7 @@ hr {
 <h2>改修履歴</h2>
 
 <h3>2026-06-15 — 6ヶ月グラフのUIブラッシュアップ（表示切替トグル化＋目盛ラベル左ガター分離）</h3>
-<p><span class="badge badge-minor">minor</span> 6ヶ月グラフ（PR #71）の表示まわりを2点改修。設計記録は <a href="six-month-chart-plan.html">6ヶ月比較プラン</a>（「UIブラッシュアップ（2026-06-15）」）。PR 番号未定（<code>feat/chart-toggle-control</code>・コミット <code>d144665</code>）。</p>
+<p><span class="badge badge-minor">minor</span> 6ヶ月グラフ（PR #71）の表示まわりを2点改修。設計記録は <a href="six-month-chart-plan.html">6ヶ月比較プラン</a>（「UIブラッシュアップ（2026-06-15）」）。PR #72。</p>
 <ul>
   <li><strong>表示切替コントロール</strong>: 従来のカード左右端の<strong>フローティングシェブロン（<code>›</code>/<code>‹</code>）を廃止</strong>し、全体カード<strong>左上にアイコントグルスイッチ</strong>を設置（単月＝ドーナツ <code>ChartPie</code>／6ヶ月＝棒グラフ <code>ChartColumnBig</code>・lucide。アクティブ側ハイライトのセグメント様式・<code>aria-pressed</code>）。右上の夫婦タグフィルタと左右に並ぶ。横スライド演出は据え置き（<code>src/components/monthly-summary.tsx</code>）</li>
   <li><strong>目盛線の金額ラベル</strong>: 値を<strong>中央付近のキリの良い金額</strong>（<code>niceRound</code>＝1/2/5×10ⁿ に丸め）に変更。表示位置を<strong>グラフ左の専用ガター（<code>AXIS_W</code>）に分離</strong>し（棒の描画域を右に寄せ、棒・合計額と一切重ならない）、<strong>短縮表記</strong>（「5万」「100万」等・1万未満はカンマ区切り）で右寄せ配置（<code>src/components/stacked-bar-chart.tsx</code>）</li>

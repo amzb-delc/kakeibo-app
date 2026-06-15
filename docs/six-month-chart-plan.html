@@ -269,7 +269,7 @@ API は <code>GET /api/monthly-summary</code> のレスポンスに <code>sixMon
 <hr>
 
 <h2>UIブラッシュアップ（2026-06-15）</h2>
-<p>6ヶ月グラフ（PR #71 でマージ済み）の表示まわりを、操作系と目盛ラベルの2点でさらに磨いた。<strong>ステータス: ✅ 実装完了（2026-06-15・コミット <code>d144665</code>・PR 番号未定／<code>feat/chart-toggle-control</code>）</strong>。対象は <code>src/components/monthly-summary.tsx</code> と <code>src/components/stacked-bar-chart.tsx</code>（テストは <code>monthly-summary.test.tsx</code> をトグル仕様へ追従）。</p>
+<p>6ヶ月グラフ（PR #71 でマージ済み）の表示まわりを、操作系と目盛ラベルの2点でさらに磨いた。<strong>ステータス: ✅ 実装完了（2026-06-15・コミット <code>d144665</code>・PR #72）</strong>。対象は <code>src/components/monthly-summary.tsx</code> と <code>src/components/stacked-bar-chart.tsx</code>（テストは <code>monthly-summary.test.tsx</code> をトグル仕様へ追従）。</p>
 
 <h3>① 表示切替: フローティングシェブロン → 左上トグルスイッチ</h3>
 <p>これまでカード左右端のボーダーを跨ぐ<strong>フローティングのシェブロン（<code>›</code>/<code>‹</code>）を廃止</strong>し、全体カード<strong>左上にアイコントグルスイッチ</strong>を設置した。タグフィルタと同じ<strong>セグメント様式</strong>（アクティブ側を <code>bg-card</code> ＋ <code>shadow-sm</code> でハイライト）で、右上の夫婦タグフィルタと<strong>左右に並ぶ</strong>。</p>
