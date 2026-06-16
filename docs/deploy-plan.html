@@ -169,7 +169,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
   <td><code>DIRECT_URL</code></td>
   <td class="c">必須</td>
   <td>Neon の <strong>direct 接続文字列</strong>（pooler を経由しない方）。マイグレーション / DDL 用。
-  <div class="warn"><strong>作業が必要:</strong> <code>prisma/schema.prisma</code> の <code>datasource</code> に <code>directUrl = env("DIRECT_URL")</code> を追加する（<strong>現状未追加</strong>）。pooler 経由の接続では DDL/マイグレーションが安定しないため、Prisma の direct 接続を分離する。</div></td>
+  <p class="muted"><span class="badge b-done">✅ 対応済み</span> <code>prisma/schema.prisma</code> の <code>datasource</code> に <code>directUrl = env("DIRECT_URL")</code> を追加済み（コミット <code>c463a9d</code>）。pooler 経由の接続では DDL/マイグレーションが安定しないため、Prisma の direct 接続を分離した。</p></td>
 </tr>
 <tr>
   <td><code>SESSION_SECRET</code></td>
@@ -188,7 +188,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 </tr>
 </tbody>
 </table>
-<div class="warn"><strong>作業が必要:</strong> OCR・明細取込の route に <code>export const maxDuration = 60</code>（以上）を設定する（<strong>現状未設定</strong>）。Claude への問い合わせで処理が数十秒かかり得るため、Vercel 関数の既定タイムアウトでは打ち切られる恐れがある。</div>
+<p class="muted"><span class="badge b-done">✅ 対応済み</span> OCR・明細取込の route に <code>export const maxDuration = 60</code> を設定済み（<code>/api/ocr</code>・<code>/api/statement</code> の両 route・コミット <code>c463a9d</code>）。Claude への問い合わせで処理が数十秒かかり得るため、Vercel 関数の既定タイムアウトで打ち切られないようにした。</p>
+<p class="muted"><span class="badge b-done">✅ 対応済み</span> <code>package.json</code> の <code>dependencies</code> に紛れていた <code>vercel</code> CLI を完全除去済み（コミット <code>c463a9d</code>）。<code>-g</code> なしでインストールした名残のため。Vercel CLI はアプリの実行依存ではないので、必要時に <code>npm i -g vercel</code> でグローバル導入する方針。</p>
 
 <h2>3. ブートストラップ手順（ローカル or CI から Neon に向けて実行）</h2>
 <div class="warn"><strong>重要:</strong> Vercel はサーバーレスで常駐シェルが無いため、以下は「Vercel 上」ではなく <strong>手元の PC（または CI）から本番 Neon の接続文字列を一時的に指定して</strong>実行する。本番 DSN は<strong>コミット済み <code>.env</code> に入れない</strong>——一時 <code>export</code> するか、gitignore された <code>.env.production</code> で扱う。</div>
