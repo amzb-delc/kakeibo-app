@@ -20,6 +20,9 @@ const MAX_BODY_BYTES = 7 * 1024 * 1024;
 // 世帯単位のコスト/DoS 上限。明細(Sonnet)は重いので 60 秒 10 回まで（SEC-4）。
 const STATEMENT_RATE_LIMIT = { limit: 10, windowMs: 60 * 1000 };
 
+// Claude への明細抽出問い合わせで処理が数十秒かかり得るため、Vercel 関数の既定タイムアウトを延長
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   const csrf = requireSameOrigin(req); // SEC-6
   if (csrf) return csrf;

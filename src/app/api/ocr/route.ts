@@ -22,6 +22,9 @@ const MAX_BODY_BYTES = 8 * 1024 * 1024;
 // 世帯単位のコスト/DoS 上限。連写しても 60 秒 30 回まで（SEC-4）。
 const OCR_RATE_LIMIT = { limit: 30, windowMs: 60 * 1000 };
 
+// Claude への OCR 問い合わせで処理が数十秒かかり得るため、Vercel 関数の既定タイムアウトを延長
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   const csrf = requireSameOrigin(req); // SEC-6
   if (csrf) return csrf;
