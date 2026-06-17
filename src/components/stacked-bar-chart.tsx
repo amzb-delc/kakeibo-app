@@ -2,8 +2,9 @@
 // 6本固定の縦棒（古い月が左・表示月が右端）を、各月の byCategory を sortOrder 昇順で
 // 下から積み上げて描画する。色は category-color.ts の categoryColor(sortOrder).hex。
 //
-// selectedCategoryId を渡すと「そのカテゴリのみの単色棒」に切り替わる（解除で積み上げに戻る）。
-// 高さは 6ヶ月の最大合計（単独カテゴリ選択時はそのカテゴリの最大額）で正規化する。
+// selectedCategoryIds（複数選択）を渡すと「選択カテゴリのみの積み上げ棒」に切り替わる
+// （空集合で全カテゴリ積み上げに戻る）。各セグメント色は categoryColor(sortOrder) のまま。
+// 高さは 6ヶ月の最大合計（選択ありのときは選択カテゴリ合計の最大額）で正規化する。
 
 import { categoryColor } from "@/lib/category-color";
 import type { SixMonthSummary } from "@/types";
@@ -17,7 +18,7 @@ const LABEL_H = 22; // 月ラベル帯の高さ
 const TOTAL_H = 18; // 合計額ラベル帯の高さ（棒の上）
 const GAP_RATIO = 0.34; // 棒間の隙間（バー幅に対する比率）
 
-// 全体（積み上げ）表示時のセグメント不透明度。単独カテゴリ比較時は濃いまま（=1）。
+// 積み上げ表示時のセグメント不透明度（全体・選択時とも積み上げなので共通）。
 const STACK_FILL_OPACITY = 0.6;
 
 // "YYYY-MM" → 月ラベル。年が変わる棒（または先頭）だけ "'25 12月" のように年付きにする。
@@ -61,24 +62,24 @@ function niceRound(value: number): number {
 
 type Props = {
   data: SixMonthSummary[];
-  // 単独カテゴリ比較モード（その categoryId のみの単色棒）。null=積み上げ。
-  selectedCategoryId: string | null;
-  selectedSortOrder: number | null;
+  // 表示対象カテゴリの集合。空集合=全カテゴリ積み上げ。選択あり=選択カテゴリのみ積み上げ。
+  selectedCategoryIds: Set<string>;
   // 表示中の月 "YYYY-MM"。一致する棒の月ラベルを強調（太字＋下線）する。null=強調なし。
   selectedYm: string | null;
 };
 
 export function StackedBarChart({
   data,
-  selectedCategoryId,
-  selectedSortOrder,
+  selectedCategoryIds,
   selectedYm,
 }: Props) {
-  // 各棒の「描画に使う合計」: 通常は month.total、単独選択時はそのカテゴリの total。
+  const hasSelection = selectedCategoryIds.size > 0;
+  // 各棒の「描画に使う合計」: 通常は month.total、選択ありは選択カテゴリ合計。
   const barTotals = data.map((m) => {
-    if (selectedCategoryId === null) return m.total;
-    const hit = m.byCategory.find((c) => c.categoryId === selectedCategoryId);
-    return hit ? hit.total : 0;
+    if (!hasSelection) return m.total;
+    return m.byCategory
+      .filter((c) => selectedCategoryIds.has(c.categoryId))
+      .reduce((sum, c) => sum + c.total, 0);
   });
   const maxTotal = Math.max(...barTotals, 1); // 0除算回避
 
@@ -151,14 +152,15 @@ export function StackedBarChart({
           const barH = (barTotal / maxTotal) * chartH;
           // 表示中の月（窓内のどこにあるか不定）の棒を強調する
           const isCurrent = selectedYm !== null && month.ym === selectedYm;
-          // 全体（積み上げ）表示はセグメントを薄く、単独カテゴリ比較は濃いまま
-          const fillOpacity = selectedCategoryId === null ? STACK_FILL_OPACITY : 1;
+          // 全体・選択時とも積み上げなのでセグメントは一律に薄くする
+          const fillOpacity = STACK_FILL_OPACITY;
 
-          // 積み上げる対象セグメント（単独選択時はそのカテゴリだけ）
-          const segments =
-            selectedCategoryId === null
-              ? [...month.byCategory].sort((a, b) => a.sortOrder - b.sortOrder)
-              : month.byCategory.filter((c) => c.categoryId === selectedCategoryId);
+          // 積み上げる対象セグメント（選択ありは選択カテゴリだけ）。常に sortOrder 昇順で下から積む。
+          const segments = (
+            hasSelection
+              ? month.byCategory.filter((c) => selectedCategoryIds.has(c.categoryId))
+              : [...month.byCategory]
+          ).sort((a, b) => a.sortOrder - b.sortOrder);
 
           // 下から積む（y は上端基準なので chartBottom から差し引いていく）
           let stackBottom = chartBottom;
@@ -168,11 +170,12 @@ export function StackedBarChart({
               const h = (s.total / maxTotal) * chartH;
               const y = stackBottom - h;
               stackBottom = y;
-              const color =
-                selectedSortOrder !== null
-                  ? categoryColor(selectedSortOrder).hex
-                  : categoryColor(s.sortOrder).hex;
-              return { categoryId: s.categoryId, y, h, color };
+              return {
+                categoryId: s.categoryId,
+                y,
+                h,
+                color: categoryColor(s.sortOrder).hex,
+              };
             });
 
           const { year, month: mLabel } = monthLabel(

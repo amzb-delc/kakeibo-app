@@ -252,12 +252,20 @@ export function MonthlySummaryView({
   // 全体カードの表示モード（単月ドーナツ ⇔ 6ヶ月積み上げ棒）。横スライドで切替。
   // 月送り時はモードを維持する（6ヶ月比較を見ている最中に勝手に単月へ戻ると不便なため）。
   const [cardMode, setCardMode] = useState<"month" | "sixMonths">("month");
-  // 6ヶ月グラフの単独カテゴリ比較。null=積み上げ。単月の openCategoryId とは独立に持つ。
-  const [chartCategoryId, setChartCategoryId] = useState<string | null>(null);
-  const chartCategory =
-    chartCategoryId !== null
-      ? summary.categories.find((c) => c.categoryId === chartCategoryId) ?? null
-      : null;
+  // 6ヶ月グラフのカテゴリ複数選択。空=全カテゴリ積み上げ。単月の openCategoryId とは独立に持つ。
+  // 選択ありのときは選択カテゴリのみを各月で積み上げる。
+  const [chartCategoryIds, setChartCategoryIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  // ボタンのトグル: 選択中なら解除、未選択なら追加。
+  const toggleChartCategory = (categoryId: string) => {
+    setChartCategoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      return next;
+    });
+  };
 
   const dateFieldFromStep: "spentAt" | "updatedAt" =
     dateStep < 2 ? "spentAt" : "updatedAt";
@@ -433,21 +441,20 @@ export function MonthlySummaryView({
                   <div className="flex-1 min-w-0">
                     <StackedBarChart
                       data={summary.sixMonths}
-                      selectedCategoryId={chartCategoryId}
-                      selectedSortOrder={chartCategory?.sortOrder ?? null}
+                      selectedCategoryIds={chartCategoryIds}
                       selectedYm={`${summary.year}-${String(summary.month).padStart(2, "0")}`}
                     />
-                    {/* グラフ用カテゴリ選択（単月の選択とは独立）。タップで単独カテゴリ比較、
-                        再タップ／「全体」で積み上げに戻る。 */}
+                    {/* グラフ用カテゴリ選択（単月の選択とは独立）。複数選択可。
+                        タップでトグル、選択カテゴリのみ積み上げ。0件選択＝全体（「全体」で空にする）。 */}
                     {summary.categories.length > 0 && (
                       // ring-offset とスクロールバーが下端で見切れないよう pb で余白を確保
                       <div className="mt-2 pb-1 flex flex-wrap gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setChartCategoryId(null)}
-                          aria-pressed={chartCategoryId === null}
+                          onClick={() => setChartCategoryIds(new Set())}
+                          aria-pressed={chartCategoryIds.size === 0}
                           className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                            chartCategoryId === null
+                            chartCategoryIds.size === 0
                               ? "bg-foreground text-background"
                               : "bg-muted text-muted-foreground hover:text-foreground"
                           }`}
@@ -455,15 +462,13 @@ export function MonthlySummaryView({
                           全体
                         </button>
                         {summary.categories.map((cat) => {
-                          const active = chartCategoryId === cat.categoryId;
+                          const active = chartCategoryIds.has(cat.categoryId);
                           const color = categoryColor(cat.sortOrder);
                           return (
                             <button
                               key={cat.categoryId}
                               type="button"
-                              onClick={() =>
-                                setChartCategoryId(active ? null : cat.categoryId)
-                              }
+                              onClick={() => toggleChartCategory(cat.categoryId)}
                               aria-pressed={active}
                               className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${color.tag} ${
                                 active ? "ring-2 ring-current ring-offset-1" : "opacity-70 hover:opacity-100"
