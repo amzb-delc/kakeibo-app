@@ -4,5 +4,5 @@
 
 // TODO: 世帯名は DB から取得すべき。MVP は seed と揃えた固定値。
 export const HOUSEHOLD_NAME = "ワレワレ";
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "1.0.0";
 export const APP_LABEL = `${HOUSEHOLD_NAME}の家計簿 v${APP_VERSION}`;
