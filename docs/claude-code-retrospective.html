@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code 開発ワークフロー 振り返り（別PJに持ち越せる知見）</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+  --decide-bg: #fee2e2;
+  --decide-fg: #991b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+    --decide-bg: #450a0a;
+    --decide-fg: #fca5a5;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+.backlink {
+  display: inline-block; margin-bottom: 16px; color: var(--primary);
+  text-decoration: none; font-size: 13px;
+}
+.backlink:hover { text-decoration: underline; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 8px 0; }
+a { color: var(--primary); }
+code {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+pre {
+  background: var(--code-bg); padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 12px 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--primary);
+  background: var(--card); border-radius: 0 8px 8px 0; color: var(--muted);
+  font-size: 14px;
+}
+blockquote strong { color: var(--fg); }
+ul { margin: 8px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px;
+  background: var(--card); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); font-weight: 600; white-space: nowrap; }
+td.c { text-align: center; white-space: nowrap; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-todo { background: var(--todo-bg); color: var(--todo-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.b-decide { background: var(--decide-bg); color: var(--decide-fg); }
+.rec { color: var(--success); font-weight: 600; }
+.muted { color: var(--muted); }
+del { color: var(--muted); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+.takeaway {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--success); border-radius: 0 8px 8px 0;
+  padding: 10px 16px; margin: 14px 0; font-size: 14px;
+}
+.takeaway strong { color: var(--fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="backlink" href="index.html">← ドキュメント一覧へ</a>
+<h1>Claude Code 開発ワークフロー 振り返り（別PJに持ち越せる知見）</h1>
+
+<blockquote>
+作成: 2026-06-17。<strong>ステータス: 振り返り</strong>（特定機能の設計プランではなく、横断的な読み物）。<br>
+本プロジェクト（家計簿アプリ／オーナーは開発用途で Claude Code を初めて使った）の開発を通じて得た、<strong>プロジェクトを跨いで再利用できる Claude Code 開発ワークフローの知見</strong>を抽出したもの。kakeibo 固有の仕様（画面・API・データモデル）は対象外で、それらは <a href="spec.html">MVP仕様書</a> を参照。ここに書くのは「次のプロジェクトでも最初から効かせたい、進め方そのものの学び」。
+</blockquote>
+
+<h2>要旨（TL;DR）</h2>
+<ul>
+  <li><strong>足場を先に作る。</strong>役割分担サブエージェント＋worktree強制フック＋CLAUDE.md 規約は、1回テンプレ化すれば別PJにそのまま持ち込めて初速が出る。</li>
+  <li><strong>触る前に調べる。</strong>read-only の並行 Explore は安いので毎回やる。</li>
+  <li><strong>Git戦略はデプロイの現実に合わせる。</strong>main マージ＝本番デプロイなら、関連PRは stack して最後に1回マージでデプロイを集約。</li>
+  <li><strong>「ハーネスで強制」か「指示で運用」かを常に意識する。</strong>保証が欲しい挙動は記憶や善意でなく仕組み（フック / CI / ブランチ保護）に落とす。これが最重要の気づき。</li>
+  <li><strong>メモリ運用はスキル。</strong>repo/git から読めることは書かない。残すのは運用の罠・決定理由・外部ポインタ。</li>
+</ul>
+
+<h2>1. 並行作業の足場を最初に作ると後が速い</h2>
+<p>複数のサブエージェントに役割を持たせ、<strong>所有境界（＝誰がどのファイルを触るか）で分業を切る</strong>と、PR が小さく綺麗になり衝突が激減した。本PJでの切り方は次の通り。</p>
+<table>
+<thead><tr><th>領域</th><th>担当（例）</th><th>狙い</th></tr></thead>
+<tbody>
+<tr><td>テスト（<code>*.test.ts</code>）</td><td>テスト担当</td><td>実装とテストの責務を分け、テスト追加でのハブ衝突を避ける</td></tr>
+<tr><td>ドキュメント（<code>docs/</code>）</td><td>docs担当</td><td>spec/plan/backlog/index の更新を一手に集約</td></tr>
+<tr><td>フロント実装</td><td>フロント担当</td><td>UI 一式（コンポーネント・state・配線）を所有</td></tr>
+<tr><td>レビュー（read-only）</td><td>レビュー担当</td><td>コミット/PR 前の差分レビューだけを担う（書き込みなし）</td></tr>
+<tr><td>司令塔・バックエンド・root・規約</td><td>メイン</td><td>逐次起動と統合、PR は直列</td></tr>
+</tbody>
+</table>
+
+<h3>肝は「書き込み系サブエージェントの worktree 隔離を強制する PreToolUse フック」</h3>
+<p>本PJでは <strong>ファイルを書き換えうるサブエージェントを、隔離ワークツリーなしで起動しようとするとフックが弾く</strong>ようにした。隔離なし起動が止まるのは事故ではなく<strong>セーフティネット</strong>であり、これにより「並行ジョブが同じ作業ディレクトリでブランチを切り替え、未コミット変更を失う／勝手に stash 退避される」事故を<strong>構造的に</strong>防げる。読み取り専用の調査エージェントやレビュアーは隔離不要なので、フックは<strong>種別で判定</strong>して書き込み系のみに worktree を必須化する。</p>
+<div class="takeaway">
+<strong>横展開:</strong> 「役割分担サブエージェント定義」＋「worktree 強制 PreToolUse フック」＋「所有境界とブランチ運用を書いた CLAUDE.md 規約」を<strong>1回テンプレ化</strong>しておくと、次のプロジェクトに丸ごと持ち込めて初速が出る。ここは投資対効果が高い。
+</div>
+
+<h2>2. 触る前に調べる（plan mode × 並行 Explore）</h2>
+<p>実装に入る前に、<strong>read-only の Explore エージェントを並行起動</strong>して、該当箇所・既存パターン・命名規則を地図化してから着手すると手戻りが減る。「どこに似た実装があるか」「この種の関数はどう名付けられているか」を先に押さえると、設計プラン（plan mode）の精度が上がり、実装後の作り直しが目に見えて減った。</p>
+<div class="takeaway">
+<strong>横展開:</strong> Explore は<strong>安い</strong>（読み取りのみ・並行可）。迷ったら毎回やる、を既定にしてよい。「調べてから書く」を儀式化するだけで品質が底上げされる。
+</div>
+
+<h2>3. Git/PR 戦略はデプロイの現実に合わせる</h2>
+<p><strong>main マージ＝本番自動デプロイ</strong>という構成では、関連する複数 PR を<strong>並行（parallel）ではなく積み重ね（stack）</strong>、最後に1回だけマージしてデプロイを集約すると無駄なデプロイが減る。</p>
+<ul>
+  <li>tip（先端）の PR を <code>base=main</code> に付け替えて squash マージ → デプロイは1回に集約。下位 PR はクローズ。</li>
+  <li><strong>共有ハブ</strong>（複数機能が同じファイルを触る箇所）は並行にすると衝突するので、最初から stack する。</li>
+</ul>
+<div class="takeaway">
+<strong>原則:</strong> 「<strong>並行にできる ≠ 並行にしてよい</strong>」。独立した領域は並行、同じファイルに触れる作業や1回のデプロイにまとめたい作業は stack。判断軸は「ファイルの所有境界」と「デプロイ単位」。
+</div>
+
+<h2>4. 「ハーネスで強制」か「指示で運用」かを区別する <span class="badge b-decide">最重要</span></h2>
+<p>本PJで一番大きな気づきがこれ。<strong>lint / 型チェックが毎回走っていたのは、実はフックではなくエージェントへの指示文＋習慣だった</strong>＝構造的な保証はゼロだった。「いつも通っているから大丈夫」は、たまたま守られていただけで、忘れれば崩れる。</p>
+<table>
+<thead><tr><th></th><th>ハーネスで強制</th><th>指示で運用</th></tr></thead>
+<tbody>
+<tr><td>実体</td><td>フック / CI / ブランチ保護</td><td>CLAUDE.md・プロンプト・習慣</td></tr>
+<tr><td>保証</td><td>構造的（破れない）</td><td>善意ベース（忘れると破れる）</td></tr>
+<tr><td>例</td><td>書き込み系の worktree 強制フック、PR 必須＋CI 必須チェック</td><td>「コミット前に lint して」という指示</td></tr>
+</tbody>
+</table>
+<div class="takeaway">
+<strong>原則:</strong> <strong>保証が欲しい挙動は、記憶や善意ではなく仕組みに落とす。</strong>「AI が覚えてくれる」は保証ではない。守られないと困るものは、フック・CI・ブランチ保護のいずれかで構造化する。
+</div>
+
+<h2>5. メモリ運用そのものがスキル</h2>
+<p>エージェントのメモリ（永続記憶）は、書く内容を選ばないと急速に陳腐化・肥大化する。本PJで効いた運用ルール。</p>
+<ul>
+  <li><strong>repo / git から読めることは書かない。</strong>コード構造・ファイルパス・修正履歴は <code>git log</code> / コードが正典。</li>
+  <li><strong>残す価値があるのは</strong>「運用上の罠」「決定の理由（なぜそうしたか）」「外部システムへのポインタ」。コードを読んでも導けない文脈こそメモリ向き。</li>
+  <li><strong>「完了した＝消せる」ではない。</strong>削除の判断軸は「その情報が他のどこかに存在するか」。完了タスクでも、理由や罠が他に残っていなければ保持する。</li>
+  <li><strong>インデックスは痩せさせる。</strong><code>MEMORY.md</code> 的な索引は常時読み込まれるので、本文を索引に書かず一行フックに留める。</li>
+</ul>
+<div class="takeaway">
+<strong>横展開:</strong> メモリは「将来の会話で役立つか」「他に正典があるか」の2軸で取捨選択する。プロジェクト状態の要約（活動ログ・アーキ図）は<strong>その時点で凍結</strong>される点に注意し、「最近の状態」は <code>git log</code> / コードを優先する。
+</div>
+
+<h2>6. 本番手前は実物 × レビューでゲートする</h2>
+<p>マージ前に<strong>実物で確認し、差分をレビューし、最後は CI で構造化</strong>する三段で品質を担保した。</p>
+<ul>
+  <li><strong>実物:</strong> dev サーバを起動して実機・実画面で挙動を確認（テストだけで満足しない）。</li>
+  <li><strong>レビュー:</strong> read-only のレビュアーで差分を読む（書き込み権限を持たせないことで、レビューと実装の責務が混ざらない）。</li>
+  <li><strong>構造化:</strong> 善意の確認に頼らず、CI でチェックを<strong>必須化</strong>する（「やる」ではなく「通らないとマージできない」へ）。</li>
+</ul>
+<div class="takeaway">
+<strong>原則:</strong> 「テスト緑」と「実際に動く」は別物。手元の実機確認を省かない。そして人手のレビュー・確認は、最終的に CI へ吸い上げて<strong>強制</strong>に変える（4. と地続き）。
+</div>
+
+<h2>7. 詰まり所（次回先回りできる）</h2>
+<table>
+<thead><tr><th>症状</th><th>正体</th><th>対処</th></tr></thead>
+<tbody>
+<tr><td>作業ツリーが別ブランチの中身に戻る</td><td>並行作業中のブランチ切替（多くは worktree 未隔離が原因）</td><td>慌てない。<strong>成果はブランチ／PR が持つ</strong>と切り分ければ失っていない。再発防止は worktree 隔離の強制（1.）。</td></tr>
+<tr><td>2か所の値がいつの間にかズレる</td><td>手動同期ポイント（例: <code>package.json</code> の版番号と、UI 表示用の版番号定数）</td><td>同期点を<strong>減らす</strong>（単一の真実源にする）か、ズレたら<strong>気づける</strong>形にする（テスト/CI で突き合わせ）。手動同期は漏れる前提で設計する。</td></tr>
+<tr><td>使い捨て worktree が溜まる</td><td>隔離起動の副産物が掃除されず蓄積</td><td>定期的に掃除する運用を入れる。worktree はあくまで使い捨て＝成果の永続性はブランチ側にある、と割り切る。</td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>まとめ：次のPJに持ち込むチェックリスト</h2>
+<ul>
+  <li>役割分担サブエージェント定義＋<strong>worktree 強制フック</strong>＋CLAUDE.md 規約をテンプレ化して持ち込む。</li>
+  <li>実装前に<strong>並行 Explore</strong> で地図化する習慣を既定に。</li>
+  <li>デプロイ単位に合わせて PR を <strong>stack か parallel か</strong>を意識的に選ぶ。</li>
+  <li>守られないと困る挙動は、指示ではなく<strong>ハーネス（フック / CI / ブランチ保護）</strong>で強制する。</li>
+  <li>メモリは「他に正典があるか」「将来役立つか」で選別し、索引は痩せさせる。</li>
+  <li>マージ前は<strong>実物確認 → read-only レビュー → CI 必須化</strong>の三段でゲートする。</li>
+</ul>
+
+</div>
+</body>
+</html>
