@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code 開発ワークフロー導入プレイブック（新規PJ用キット）</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-bg: #dbeafe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --destructive: #dc2626;
+  --code-bg: #f3f4f6;
+  --done-bg: #dcfce7;
+  --done-fg: #166534;
+  --todo-bg: #f3f4f6;
+  --todo-fg: #4b5563;
+  --hold-bg: #fef3c7;
+  --hold-fg: #92400e;
+  --decide-bg: #fee2e2;
+  --decide-fg: #991b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d23;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2d333b;
+    --primary: #60a5fa;
+    --primary-bg: #1e3a8a;
+    --success: #22c55e;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --code-bg: #21262d;
+    --done-bg: #052e16;
+    --done-fg: #86efac;
+    --todo-bg: #21262d;
+    --todo-fg: #9ca3af;
+    --hold-bg: #451a03;
+    --hold-fg: #fcd34d;
+    --decide-bg: #450a0a;
+    --decide-fg: #fca5a5;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+               "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 80px; }
+.backlink {
+  display: inline-block; margin-bottom: 16px; color: var(--primary);
+  text-decoration: none; font-size: 13px;
+}
+.backlink:hover { text-decoration: underline; }
+h1 { font-size: 26px; margin: 4px 0 8px; }
+h2 {
+  font-size: 20px; margin: 36px 0 10px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 8px 0; }
+a { color: var(--primary); }
+code {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+pre {
+  background: var(--code-bg); padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 12px 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--primary);
+  background: var(--card); border-radius: 0 8px 8px 0; color: var(--muted);
+  font-size: 14px;
+}
+blockquote strong { color: var(--fg); }
+ul { margin: 8px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+ol { margin: 8px 0; padding-left: 22px; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px;
+  background: var(--card); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); font-weight: 600; white-space: nowrap; }
+td.c { text-align: center; white-space: nowrap; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.b-done { background: var(--done-bg); color: var(--done-fg); }
+.b-todo { background: var(--todo-bg); color: var(--todo-fg); }
+.b-hold { background: var(--hold-bg); color: var(--hold-fg); }
+.b-decide { background: var(--decide-bg); color: var(--decide-fg); }
+.rec { color: var(--success); font-weight: 600; }
+.muted { color: var(--muted); }
+del { color: var(--muted); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+.layer {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 14px; margin: 10px 0;
+}
+.layer .label {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  letter-spacing: .04em; padding: 1px 8px; border-radius: 4px; margin-right: 6px;
+}
+.l-prompt { background: var(--primary-bg); color: var(--primary); }
+.l-config { background: var(--hold-bg); color: var(--hold-fg); }
+.l-timing { background: var(--done-bg); color: var(--done-fg); }
+.takeaway {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--success); border-radius: 0 8px 8px 0;
+  padding: 10px 16px; margin: 14px 0; font-size: 14px;
+}
+.takeaway strong { color: var(--fg); }
+.phase {
+  margin: 28px 0 8px; padding: 6px 14px; border-radius: 8px;
+  background: var(--primary-bg); color: var(--primary); font-weight: 700;
+  border: none;
+}
+.warn {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--warning); border-radius: 0 8px 8px 0;
+  padding: 10px 16px; margin: 14px 0; font-size: 14px;
+}
+.warn strong { color: var(--fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="backlink" href="index.html">← ドキュメント一覧へ</a>
+<h1>Claude Code 開発ワークフロー 導入プレイブック（新規PJ用キット）</h1>
+
+<blockquote>
+作成: 2026-06-17。<strong>ステータス: プレイブック</strong>（特定機能の設計プランではなく、新規プロジェクトに足場を組むための手順書）。<br>
+新しいプロジェクトで、本プロジェクトと同じ Claude Code 開発ワークフローの足場を最短で組むための<strong>コピペ可能な実用キット</strong>。各項目は「<strong>プロンプト/指示の型</strong>」「<strong>設定テンプレ</strong>」「<strong>タイミング原則</strong>」の3層から成る。デプロイ先（PaaS / VPS / AWS など）に依存しない形でまとめてあり、プラットフォーム固有部分は「抽象原則＋複数例」で示す。<br>
+<strong>背景・なぜこうするのか</strong>は <a href="claude-code-retrospective.html">Claude Code 開発ワークフロー 振り返り</a> を参照（＝振り返り＝<em>なぜ</em> / 本書＝<em>どうやる</em> の役割分担）。本書を読んで手が止まったら、対応する振り返りの節に立ち返ること。
+</blockquote>
+
+<h2>このキットの読み方（3層）</h2>
+<p>新規プロジェクトでワークフローの足場を組むことが目的。やみくもにツールを入れるのではなく、各ステップを次の3層で捉えると、別PJでも再現できる。</p>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> Claude にどう頼むか・CLAUDE.md やエージェント定義にどう書くか（＝言葉で運用する層）。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> ファイルとして置く設定（CLAUDE.md / エージェント定義 / フック / CI / 保護設定）。コピペの元はこのキット末尾の「テンプレ集」。</div>
+<div class="layer"><span class="label l-timing">タイミング原則</span> いつ入れるか。とくにガードレールは「守る対象が生まれる<strong>前</strong>」に入れる。</div>
+<div class="takeaway">
+<strong>全体を貫く一文:</strong> 保証が欲しい挙動は記憶や善意ではなく<strong>仕組み</strong>（フック / CI / ブランチ保護 / パイプライン構造）に落とす。指示の型はその仕組みを動かすための補助であって、代替ではない。
+</div>
+
+<!-- ===================== フェーズ0 ===================== -->
+<h2 class="phase">フェーズ0: プロジェクト初期化（day 0）</h2>
+<p class="muted">まだコードがほぼ無い段階。ここで「進め方そのもの」を固めると初速が出る。コードがある前から入れられる足場はすべてここで入れる。</p>
+
+<h3>0-1. <code>CLAUDE.md</code> を規約の単一の置き場にする</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「このプロジェクトの開発規約を <code>CLAUDE.md</code> にまとめて。役割分担・ファイル所有境界・ブランチ/PR運用・docs規約・コミット分割方針を含めて」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> ルート直下 <code>CLAUDE.md</code>。最低限、次を1か所に集約する。</div>
+<ul>
+  <li><strong>一次情報の所在</strong>（仕様は <code>docs/spec.html</code> 等、CLAUDE.md は非自明点だけ、と宣言）。</li>
+  <li><strong>役割分担とファイル所有境界</strong>（誰がどのディレクトリ/ファイルを触るか）。</li>
+  <li><strong>ブランチ/PR運用</strong>（feat ブランチ → PR → main、main 直コミットは軽微のみ）。</li>
+  <li><strong>コミット分割方針</strong>（例: feat と docs を分ける）。</li>
+  <li><strong>docs規約</strong>（自己完結HTML・起点 index・backlink・plan/backlog の置き場）。</li>
+</ul>
+<div class="layer"><span class="label l-timing">タイミング原則</span> 最初に置く。規約が無いまま実装を始めると、後付けの規約は既存コードと衝突して守られにくい。</div>
+
+<h3>0-2. サブエージェント定義（所有境界つき）</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「レビュー(read-only)/テスト/docs/フロント実装のサブエージェントを <code>.claude/agents/</code> に定義して。各定義に『自分の領域・触ってよいファイル・push/PR まで完了させる』を明記」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> <code>.claude/agents/*.md</code>。役割ごとに1ファイル。各 frontmatter で使えるツールを絞り、本文に所有境界とブランチ運用を書く。</div>
+<table>
+<thead><tr><th>役割</th><th>所有境界（触ってよい範囲）</th><th>書き込み</th></tr></thead>
+<tbody>
+<tr><td>レビュー</td><td>なし（差分を読みコメントするだけ）</td><td class="c">read-only</td></tr>
+<tr><td>テスト</td><td><code>*.test.*</code> 等のテストファイル</td><td class="c">あり</td></tr>
+<tr><td>ドキュメント</td><td><code>docs/</code>（spec/plan/backlog/index）</td><td class="c">あり</td></tr>
+<tr><td>フロント実装</td><td>UI コンポーネント・client state・配線</td><td class="c">あり</td></tr>
+<tr><td>司令塔・バックエンド・規約</td><td>残り全部・統合・PR は直列</td><td class="c">あり</td></tr>
+</tbody>
+</table>
+<div class="layer"><span class="label l-timing">タイミング原則</span> 0-1 と同時。所有境界が決まって初めて「並行で安全に走らせられる作業」と「直列にすべき共有ハブ」を切り分けられる。</div>
+
+<h3>0-3. 書き込み系サブエージェントに worktree 隔離を強制するフック</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「<code>.claude/settings.json</code> の <code>PreToolUse</code> で、書き込み権限を持つサブエージェントが隔離ワークツリー無しで起動したら deny するフックを入れて。read-only の調査/レビューエージェントは除外」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> <code>.claude/settings.json</code> の <code>PreToolUse</code>（末尾「テンプレ集」の JSON 雛形）。判定は<strong>種別で</strong>: 書き込み（Write/Edit を持つ）エージェントのみ worktree を必須化し、read-only は通す。</div>
+<div class="layer"><span class="label l-timing">タイミング原則</span> 並行作業を始める前。隔離なし起動が止まるのは事故ではなく<strong>セーフティネット</strong>で、「複数ジョブが同じ作業ディレクトリでブランチを切り替え、未コミット変更を失う」事故を構造的に防ぐ。</div>
+<div class="warn">
+<strong>このフックはプロジェクト限定にする。</strong>他プロジェクトには適用しないよう、リポジトリ内の <code>.claude/settings.json</code> に置く（グローバル設定に入れない）。
+</div>
+
+<h3>0-4. メモリ運用方針を決める</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「メモリには repo/git から読めることは書かない。残すのは運用の罠・決定理由・外部システムへのポインタだけ。索引（MEMORY.md 相当）は本文を書かず一行フックに留める」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> CLAUDE.md か エージェント定義に上記方針を明記。索引ファイルは常時読み込まれる前提で痩せさせる。</div>
+<div class="layer"><span class="label l-timing">タイミング原則</span> 最初に方針だけ決めておく。後から肥大化したメモリを整理するのは高コスト。</div>
+
+<!-- ===================== フェーズ1 ===================== -->
+<h2 class="phase">フェーズ1: 開発の足場（テストが書けるようになったら）</h2>
+
+<h3>1-1. テスト基盤（runner ＋必要ならバージョンピン）</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「テストランナーを入れて最小の1本を通して。実行環境（例: Node のバージョン）と相性問題があれば、依存をピンしてその理由をメモリ/CLAUDE.md に残して」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> プロジェクトのスタックに合う runner（例: 一般的な JS なら Vitest/Jest）。バージョンを固定したらその<strong>理由</strong>を必ず残す（「上げると起動失敗」等は後で必ず忘れる）。</div>
+<div class="layer"><span class="label l-timing">タイミング原則</span> 最初のロジックが書けたらすぐ。テストが無いと、後段の CI・ブランチ保護が「守る対象」を持てない。</div>
+
+<h3>1-2. 実装前に plan mode × 並行 read-only Explore を癖に</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「実装に入る前に、read-only の調査エージェントを<strong>並行で</strong>起動して、該当箇所・既存パターン・命名規則を地図化して。その上で plan mode で設計プランを出して」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> 設定というより儀式。非自明な改修は「調べる → plan → 実装」を既定フローにする。Explore は読み取りのみ＝安いので隔離不要・並行可。</div>
+<div class="layer"><span class="label l-timing">タイミング原則</span> 毎回の実装の<strong>前</strong>。先に地図を持つほど plan の精度が上がり、実装後の作り直しが減る。</div>
+
+<!-- ===================== フェーズ2 ===================== -->
+<h2 class="phase">フェーズ2: 共有/本番の「前」に（＝守る対象ができる前に入れる）</h2>
+<p class="muted">ここがプレイブックの肝。ガードレールは「それが守る対象」より<strong>遅れて入れない</strong>。共有・本番が始まる前に CI とブランチ保護を効かせる。</p>
+
+<h3>2-1. CI ワークフロー（test ＋型チェック）を置く</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「CI を追加して。install → 型チェック → test の最小構成で。まず PR で一度走らせて緑になること、そして<strong>必須化に使うチェック名</strong>を確認したい」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> CI 定義（例: GitHub Actions の <code>.github/workflows/ci.yml</code>。末尾「テンプレ集」に雛形）。実行環境のバージョンは 1-1 のピンと揃える。</div>
+<div class="layer"><span class="label l-timing">タイミング原則</span> ブランチ保護の<strong>前</strong>。次項の鶏卵問題のため、まず CI を一度走らせてチェック名を実在させる。</div>
+
+<h3>2-2. ブランチ保護（必須チェック・PR必須）</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「main に PR 必須＋CI の test を必須チェックにするブランチ保護を設定して。管理者にも適用するか（<code>enforce_admins</code>）は方針を確認して決めて」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> ホスティングのブランチ保護 API/設定（末尾「テンプレ集」に <code>gh api</code> 例）。必須チェック名は 2-1 で<strong>実在させたもの</strong>を指定する。</div>
+<div class="layer"><span class="label l-timing">タイミング原則 <span class="badge b-decide">順序厳守</span></span> <strong>CI 設置 → 一度走らせる → 保護設定</strong> の順。チェック名が一度も存在しないと必須化できない（鶏卵）。逆順にすると「存在しないチェックを待ち続ける」状態になる。</div>
+
+<h3>2-3. デプロイ手段を用意するなら、そのゲートも同時に</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「デプロイを用意するなら、最初から<strong>ゲート済み</strong>に。test 緑を通った成果物だけが本番に出る形にして」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> デプロイ経路に応じて（フェーズ3 で詳述）。最初の本番デプロイが最初からゲートされていることが重要。</div>
+<div class="layer"><span class="label l-timing">タイミング原則</span> デプロイ導入と同時。「まず素のデプロイを通してから後でゲートを足す」は、その間に無防備な本番反映が起きうる。</div>
+
+<!-- ===================== フェーズ3 ===================== -->
+<h2 class="phase">フェーズ3: 本番運用（デプロイ＝プラットフォーム非依存で抽象化）</h2>
+<p class="muted">デプロイ手段は PaaS / VPS / AWS など様々。ここでは<strong>狙い（原則）</strong>を先に置き、各経路での実現<strong>例</strong>を併記する。Vercel 等の特定 PaaS はあくまで一例。</p>
+
+<h3>3-1. 「ドキュメント/CI設定だけの変更では本番デプロイを走らせない」</h3>
+<p><strong>原則:</strong> 非コード変更（docs・CI 設定など）では本番デプロイを起動しない。無駄なデプロイ・無駄なリスクを避ける。実現手段はプラットフォーム依存なので、原則を満たす<strong>複数の手</strong>を持っておく。</p>
+<table>
+<thead><tr><th>経路</th><th>実現例</th></tr></thead>
+<tbody>
+<tr><td>CI 内 deploy ジョブ</td><td>deploy ジョブに <code>paths-ignore</code>（docs・workflow ファイルを無視）を付ける。</td></tr>
+<tr><td>自前デプロイスクリプト（VPS/AWS）</td><td>スクリプト冒頭で <code>git diff</code> し、対象パス（例 <code>src/</code>）に変更が無ければデプロイを <code>exit 0</code> でスキップ。</td></tr>
+<tr><td>PaaS のビルド無視設定</td><td>プラットフォームの「このコミットをビルドするか」判定（例: Vercel の <code>ignoreCommand</code>）で非コード変更を無視。</td></tr>
+</tbody>
+</table>
+<div class="takeaway"><strong>共通の狙い:</strong> 「非コード変更はデプロイしない」。手段が違っても満たすべき条件は同じ。末尾「テンプレ集」に <code>paths-ignore</code> と <code>git diff</code> 判定の2例。</div>
+
+<h3>3-2. テスト緑を通過した成果物だけをデプロイする（パイプライン構造で保証）</h3>
+<p><strong>原則:</strong> 「テストを<em>やってから</em>デプロイする」を善意ではなく<strong>構造</strong>で保証する。一番素直なのは、CI の deploy ジョブを test ジョブに依存させる形。</p>
+<table>
+<thead><tr><th>経路</th><th>実現例</th></tr></thead>
+<tbody>
+<tr><td>CI（GitHub Actions 等）</td><td>deploy ジョブに <code>needs: test</code>。test が落ちたら deploy は走らない。<span class="rec">最も汎用</span>（VPS=ssh 配備 / AWS=CLI 配備 / PaaS いずれにも適用可）。</td></tr>
+<tr><td>VPS（ssh 配備）</td><td>CI の test ジョブ成功後に deploy ジョブが ssh して配備（<code>needs: test</code> で連結）。</td></tr>
+<tr><td>AWS（CLI 配備）</td><td>同様に test 成功後の deploy ジョブで CLI 配備（<code>needs: test</code>）。</td></tr>
+<tr><td>PaaS 固有のビルド前置</td><td>プラットフォームのビルドコマンドに test を前置する手もある（例: Vercel の build スクリプトに test を挟む）。<strong>一例</strong>として軽く触れる程度に留め、基本は CI の <code>needs:</code> 連結を推す。</td></tr>
+</tbody>
+</table>
+<div class="takeaway"><strong>共通の狙い:</strong> デプロイ経路がどれであれ「test 緑 → デプロイ」の順序を、人の記憶ではなくパイプラインの依存関係で固定する。</div>
+
+<h3>3-3. 本番投入の運用テンプレと踏んだ罠を残す</h3>
+<div class="layer"><span class="label l-prompt">プロンプト/指示の型</span> 「本番投入の手順（マイグレーション / シード / secrets 投入）を docs に手順化して。踏んだ罠は理由つきでメモリ/docs に残して」。</div>
+<div class="layer"><span class="label l-config">設定テンプレ</span> 本番手順は <code>docs/&lt;deploy&gt;-plan.html</code> 等に。プラットフォーム固有部分（接続文字列・secrets の入れ方・ビルドコマンド）はプロジェクト側で具体化する前提で、<strong>順序と注意点</strong>を抽象的に残す。</div>
+<ul>
+  <li>スキーマ移行は配備の前か後か（多くは「移行 → 配備」）。</li>
+  <li>初期データ（seed）の要否と冪等性。</li>
+  <li>secrets の投入先と「鍵を変えると既存セッション/cookie が無効化される」類の副作用。</li>
+</ul>
+<div class="layer"><span class="label l-timing">タイミング原則</span> 初回本番投入の直後に書く（記憶が新しいうちに）。罠は再発するので「なぜ詰まったか」を必ず添える。</div>
+
+<hr>
+
+<!-- ===================== テンプレ集 ===================== -->
+<h2>コピペ用テンプレ集（プラットフォーム非依存が基本）</h2>
+<p class="muted">そのまま貼って動かすのではなく、プロジェクトのスタック・ホスティングに合わせて調整する前提の<strong>雛形</strong>。固有名は一例。</p>
+
+<h3>A. PreToolUse「worktree 強制」フック（書き込み系のみ deny）</h3>
+<p>書き込み権限を持つサブエージェントが隔離ワークツリー無しで起動したら deny する判定の骨子。実際の判定スクリプトは「エージェント種別が書き込み系か」「現在地が隔離 worktree か」を見て、満たさなければ <code>permissionDecision: "deny"</code> を返す。read-only エージェントは素通し。</p>
+<pre><code>// .claude/settings.json（PreToolUse の骨子）
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        // 書き込み系ツールの起動を判定スクリプトに通す
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          { "type": "command",
+            "command": ".claude/hooks/require-worktree.sh" }
+        ]
+      }
+    ]
+  }
+}
+
+// .claude/hooks/require-worktree.sh（擬似ロジック）
+//  1. 呼び出し元が read-only 種別（レビュー/Explore 等）なら exit 0（許可）
+//  2. 現在の作業ディレクトリが隔離 worktree なら exit 0（許可）
+//  3. それ以外（書き込み系がメインの作業ツリーで動こうとした）は
+//     {"hookSpecificOutput":{"permissionDecision":"deny",
+//       "permissionDecisionReason":"書き込み系は隔離worktreeで起動して"}} を出力</code></pre>
+<p class="muted">ポイントは「<strong>種別で判定</strong>」すること（書き込み系のみ必須化、read-only は除外）と、これを<strong>リポジトリ内</strong>の設定に置いて他プロジェクトに波及させないこと。</p>
+
+<h3>B. CI ワークフロー雛形（install → 型チェック → test）</h3>
+<pre><code># .github/workflows/ci.yml（GitHub Actions の最小形・一例）
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+jobs:
+  test:                      # ← この job 名がブランチ保護の必須チェック名になる
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.11'   # 1-1 のピンと揃える
+      - run: npm ci
+      - run: npm run typecheck    # 型チェック（無ければ tsc --noEmit 等）
+      - run: npm test             # テスト</code></pre>
+<p class="muted">スタックが JS でなければ install/型チェック/test の各行を置き換える。狙いは「PR ごとに緑/赤が出る固定のチェック名を1つ用意する」こと。</p>
+
+<h3>C. ブランチ保護を有効化する <code>gh api</code> 例</h3>
+<pre><code># main に「PR必須＋CIのtest必須」を設定（GitHub の一例）
+gh api -X PUT repos/&lt;owner&gt;/&lt;repo&gt;/branches/main/protection \
+  -H "Accept: application/vnd.github+json" \
+  -f 'required_status_checks[strict]=true' \
+  -f 'required_status_checks[contexts][]=test' \  # ← B の job 名と一致させる
+  -f 'required_pull_request_reviews[required_approving_review_count]=0' \
+  -F 'enforce_admins=true' \      # 管理者にも適用（方針次第で false）
+  -F 'restrictions=null'</code></pre>
+<ul>
+  <li><code>contexts[]=test</code> は<strong>実在するチェック名</strong>（B を一度走らせて確認）でないと、永遠に保留になる。</li>
+  <li><code>enforce_admins</code>: 管理者も保護対象にするか。小規模で緊急 push の余地を残すなら <code>false</code> も可だが、原則は <code>true</code>。</li>
+  <li>PR レビュー必須人数はチーム規模で。1人運用なら <code>0</code>（PR は通すが直 push は禁止）でも「PR 経由＋CI 必須」は効く。</li>
+</ul>
+
+<h3>D. 「非コード変更はデプロイしない」パスフィルタ（2例）</h3>
+<pre><code># 例1: GitHub Actions deploy ジョブに paths-ignore
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/**'</code></pre>
+<pre><code># 例2: 自前デプロイスクリプト内で git diff 判定（VPS/AWS 向け）
+#  直前コミットで src/ 等の対象パスに変更が無ければデプロイをスキップ
+if git diff --quiet HEAD~1 HEAD -- src/ prisma/ package.json; then
+  echo "コード変更なし → デプロイをスキップ"
+  exit 0
+fi
+# ここから実際の配備（ssh / CLI など）</code></pre>
+<p class="muted">PaaS のビルド無視設定（例: Vercel の <code>ignoreCommand</code>）も同じ狙い。どの手でも条件は「非コード変更ならビルド/デプロイしない」。</p>
+
+<h3>E. 「test 緑のみデプロイ」例（deploy ジョブを test に依存）</h3>
+<pre><code># .github/workflows/ci.yml に deploy ジョブを足す（経路非依存）
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # ... B と同じ install / typecheck / test ...
+
+  deploy:
+    needs: test                       # ← test が緑のときだけ走る
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # VPS なら ssh 配備 / AWS なら CLI 配備 / PaaS なら deploy フック呼び出し
+      - run: ./scripts/deploy.sh</code></pre>
+<p class="muted">PaaS 固有のビルド前置（ビルドコマンドに test を挟む）でも「test を通らないと本番に出ない」は実現できるが、経路に依存しない <code>needs: test</code> をまず推す。</p>
+
+<hr>
+
+<!-- ===================== 横断原則 ===================== -->
+<h2>横断原則（最終チェックリスト）</h2>
+<ul>
+  <li><strong>ガードレールは「それが守る対象」より遅れて入れない。</strong>CI はテストが書けたら、ブランチ保護は共有が始まる前、デプロイゲートはデプロイ導入と同時。</li>
+  <li><strong>保証が欲しい挙動は記憶/善意でなく仕組みに落とす。</strong>フック / CI / ブランチ保護 / パイプライン構造のいずれかで構造化する。「AI が覚えてくれる」は保証ではない。</li>
+  <li><strong>所有境界で並行、共有ハブは stack。</strong>独立した領域は並行で、複数機能が触るファイル（共有コンポーネント・スキーマ・lock ファイル等）や1回のデプロイにまとめたい作業は積み重ねる。</li>
+  <li><strong>repo/git から読めることはメモリに書かない。</strong>コード構造・履歴は <code>git log</code>/コードが正典。メモリに残すのは運用の罠・決定理由・外部ポインタ。</li>
+  <li><strong>順序の鶏卵に注意。</strong>必須チェックは「CI 設置 → 一度走らせる → 保護設定」の順でしか組めない。</li>
+  <li><strong>デプロイは経路非依存の原則で設計する。</strong>「非コード変更はデプロイしない」「test 緑のみデプロイ」を満たせれば、PaaS/VPS/AWS のどれでもよい。</li>
+</ul>
+
+</div>
+</body>
+</html>
