@@ -4,7 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 import { ThinkingBubble } from "@/components/thinking-bubble";
 
-// ヘッダーに出す小さなキャラクター。タップで当月へジャンプしつつ「ぴょこっ」と揺れる。
+// ヘッダーに出す小さなキャラクター。タップで「ぴょこっ」と揺れつつ、当月以外なら
+// 当月へジャンプ、当月表示中ならその月を再取得（PWA向けの手動リフレッシュ導線）する。
 // 月に関わらず常時表示する。
 // thinking=true（明細PDF抽出中）はキャラが揺れ続け、頭から「考え中…」吹き出しを出す。
 export function HeaderCharacter({
@@ -20,7 +21,7 @@ export function HeaderCharacter({
     <span className="relative inline-flex">
       <button
         type="button"
-        aria-label="今月へ移動"
+        aria-label="今月へ移動・更新"
         onClick={() => {
           setPlaying(true);
           onPress?.();

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useState } from "react";
+import { Spade, Heart } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { CategoryManager } from "@/components/category-manager";
 import { useBottomSheet, BottomSheet } from "@/components/bottom-sheet";
@@ -148,8 +149,8 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
                 <div className="flex gap-3">
                   {(
                     [
-                      { value: 1, symbol: "♂", label: "夫", active: "border-blue-500 bg-blue-50 text-blue-600", idle: "text-blue-500/70" },
-                      { value: 2, symbol: "♀", label: "妻", active: "border-rose-500 bg-rose-50 text-rose-600", idle: "text-rose-500/70" },
+                      { value: 1, Icon: Spade, label: "夫", active: "border-blue-500 bg-blue-50 text-blue-600", idle: "text-blue-500/70" },
+                      { value: 2, Icon: Heart, label: "妻", active: "border-rose-500 bg-rose-50 text-rose-600", idle: "text-rose-500/70" },
                     ] as const
                   ).map((o) => {
                     const selected = enteredBy === o.value;
@@ -166,9 +167,7 @@ export function SettingsModalProvider({ children }: { children: React.ReactNode 
                             : `border-border bg-background ${o.idle} hover:bg-muted`
                         }`}
                       >
-                        <span className="text-2xl leading-none" aria-hidden="true">
-                          {o.symbol}
-                        </span>
+                        <o.Icon className="size-6" aria-hidden="true" />
                         <span>{o.label}</span>
                       </button>
                     );

@@ -104,6 +104,18 @@ export function useMonthlySummary(opts: {
   const isCurrentMonth =
     year === now.getFullYear() && month === now.getMonth() + 1;
 
+  // キャラクタータップ用。当月表示中なら同じ月をその場で再取得する
+  // （PWA だとページ更新が気軽に使えないため、手動リフレッシュの導線にする）。
+  // 当月以外なら当月へ移動する（その月送りで通常どおり取得が走るので別処理は不要）。
+  const goToCurrentMonthOrRefresh = useCallback(() => {
+    if (isCurrentMonth) {
+      pendingNavDir.current = 0;
+      fetchSummary();
+    } else {
+      goToCurrentMonth();
+    }
+  }, [isCurrentMonth, fetchSummary, goToCurrentMonth]);
+
   // 月送りスライド＋フェードの style。view 側のラッパに spread する。
   const transitionStyle: React.CSSProperties = {
     opacity: fade ? 0 : 1,
@@ -125,6 +137,7 @@ export function useMonthlySummary(opts: {
     goNext,
     goToMonth,
     goToCurrentMonth,
+    goToCurrentMonthOrRefresh,
     transitionStyle,
   };
 }
