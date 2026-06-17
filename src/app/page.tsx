@@ -38,7 +38,7 @@ export default function SummaryPage() {
     goPrev,
     goNext,
     goToMonth,
-    goToCurrentMonth,
+    goToCurrentMonthOrRefresh,
     transitionStyle,
   } = useMonthlySummary({ unlocked, mutationVersion, categoriesVersion });
 
@@ -165,7 +165,7 @@ export default function SummaryPage() {
         title={monthSwitcher}
         left={unlocked ? <StatementImportButton /> : null}
         right={
-          <HeaderCharacter onPress={goToCurrentMonth} thinking={importing} />
+          <HeaderCharacter onPress={goToCurrentMonthOrRefresh} thinking={importing} />
         }
       />
       <div>
