@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ChartPie, ChartColumnBig } from "lucide-react";
+import { ChartPie, ChartColumnBig, Spade, Heart, type LucideIcon } from "lucide-react";
 import { getTrendLevel, TREND_TEXT_COLOR } from "@/lib/trend";
 import { formatJstDate, formatJstDateLabel } from "@/lib/date";
 import { formatYen, formatDiff } from "@/lib/format";
@@ -37,11 +37,17 @@ function TagDots({ tags }: { tags: string[] }) {
   );
 }
 
-// 全体カードの夫婦タグフィルタの選択肢（全体=null / ♂=spouse:1 / ♀=spouse:2）。
-const SPOUSE_FILTERS: { value: string | null; label: string }[] = [
+// 全体カードの夫婦タグフィルタの選択肢（全体=null / 夫=spouse:1 / 妻=spouse:2）。
+// 夫=スペード（青）/ 妻=ハート（ローズ）のアイコン表示。label はスクリーンリーダー用。
+const SPOUSE_FILTERS: {
+  value: string | null;
+  label: string;
+  Icon?: LucideIcon;
+  iconClass?: string;
+}[] = [
   { value: null, label: "全体" },
-  { value: SPOUSE_TAGS[0], label: "♂" },
-  { value: SPOUSE_TAGS[1], label: "♀" },
+  { value: SPOUSE_TAGS[0], label: "夫", Icon: Spade, iconClass: "text-blue-500" },
+  { value: SPOUSE_TAGS[1], label: "妻", Icon: Heart, iconClass: "text-rose-500" },
 ];
 
 // 過去6ヶ月の異常値検出バー（フィル方式）。
@@ -274,7 +280,7 @@ export function MonthlySummaryView({
     <main className="px-4 py-6 space-y-6">
         {/* 合計カード: 左にドーナツ（中央に合計金額）、右に上位7カテゴリのレジェンド（＝カテゴリ選択UI） */}
         <div className="bg-card rounded-2xl p-4 shadow-sm border border-border/50">
-          {/* 上段: 左に表示切替トグル（単月⇔6ヶ月）、右に夫婦タグフィルタ（全体/♂/♀）。 */}
+          {/* 上段: 左に表示切替トグル（単月⇔6ヶ月）、右に夫婦タグフィルタ（全体/夫/妻）。 */}
           <div className="mb-3 flex items-center justify-between">
             {/* 表示切替: 単月（ドーナツ）⇔ 6ヶ月（積み上げ棒）。アクティブ側をハイライト。 */}
             <div
@@ -309,7 +315,7 @@ export function MonthlySummaryView({
                 <ChartColumnBig className="size-4" aria-hidden="true" />
               </button>
             </div>
-            {/* 夫婦タグフィルタ（全体/♂/♀）。選択でドーナツ・合計・前月比・明細すべてが絞られる。 */}
+            {/* 夫婦タグフィルタ（全体/夫♠/妻♥）。選択でドーナツ・合計・前月比・明細すべてが絞られる。 */}
             <div
               role="group"
               aria-label="入力者で絞り込み"
@@ -323,13 +329,18 @@ export function MonthlySummaryView({
                     type="button"
                     onClick={() => onTagChange(f.value)}
                     aria-pressed={active}
-                    className={`min-w-[2.5rem] rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    aria-label={f.Icon ? f.label : undefined}
+                    className={`inline-flex min-w-[2.5rem] items-center justify-center rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                       active
                         ? "bg-card text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {f.label}
+                    {f.Icon ? (
+                      <f.Icon className={`size-4 ${f.iconClass ?? ""}`} aria-hidden="true" />
+                    ) : (
+                      f.label
+                    )}
                   </button>
                 );
               })}
