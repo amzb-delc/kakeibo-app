@@ -1,0 +1,40 @@
+name: CI
+
+# PR（main 宛）で必ず実行し、main への push（マージ後）でも実行する。
+# 機能ブランチへの直 push は pull_request 経由でのみ走るため二重実行にならない。
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# 同一 PR/ブランチで新しい push が来たら古い実行をキャンセル（無駄な並行実行を抑制）。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # テスト基盤（Vitest v2 / jsdom v25）が Node 20.11 互換にピンされているため固定。
+          node-version: "20.11.0"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Prisma Client の型が無いと tsc / vitest が落ちるため生成（DB 接続は不要）。
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
